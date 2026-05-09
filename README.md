@@ -22,6 +22,9 @@ To ensure efficient collaboration during the build process, the following rules 
 2. **No Guessing During Debugging** — Do not provide speculative solutions when debugging. Troubleshooting must be based only on the actual code, logs, or errors provided.
 3. **Step-by-Step Workflow** — Only one step should be given at a time. After each step, wait for confirmation before proceeding.
 4. **Provide Complete Code Blocks** — Whenever code is required, always provide the full file or full code block to avoid missing pieces or implementation errors.
+5. **Code in Chat, Not Artifacts** — Always provide code here in the chat unless an artifact is explicitly requested.
+6. **Build Fast** — Always recommend the fastest build path, whether that is running commands from the root terminal or providing full file contents directly.
+7. **Always State the File Path** — Every code block must be preceded by the full file path so it is always clear which file to create or update.
 
 ---
 
