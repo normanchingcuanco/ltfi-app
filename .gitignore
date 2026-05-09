@@ -1,0 +1,5 @@
+node_modules
+.env
+.env.production
+frontend/.expo
+frontend/node_modules
