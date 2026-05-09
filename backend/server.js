@@ -27,6 +27,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/food', require('./routes/food'));
 app.use('/api/meals', require('./routes/meals'));
 app.use('/api/weight', require('./routes/weight'));
+app.use('/api/recipes', require('./routes/recipes'));
 
 // DB connection
 mongoose.connect(process.env.MONGODB_URI)
