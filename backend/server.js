@@ -24,6 +24,8 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/food', require('./routes/food'));
+app.use('/api/meals', require('./routes/meals'));
 
 // DB connection
 mongoose.connect(process.env.MONGODB_URI)
