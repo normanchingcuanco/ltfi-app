@@ -261,21 +261,21 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Expo App Setup | Expo + React Native Web with navigation | ⬜ Not Built |
-| Backend Server Setup | Express app with helmet, morgan, rate limiting | ⬜ Not Built |
-| MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ⬜ Not Built |
-| Environment Config | .env for DB URI, JWT secret, Anthropic API key, frontend URL | ⬜ Not Built |
+| Expo App Setup | Expo + React Native Web with navigation | ✅ Done |
+| Backend Server Setup | Express app with helmet, morgan, rate limiting | ✅ Done |
+| MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ✅ Done |
+| Environment Config | .env for DB URI, JWT secret, Anthropic API key, frontend URL | ✅ Done |
 
 #### 2. Authentication
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| User Model | Mongoose schema with profile fields, goals, and password | ⬜ Not Built |
-| Registration Screen | Name, email, password, age, height, current weight, goal weight, activity level, diet preference | ⬜ Not Built |
-| Auto Calorie Calculation | Calculate daily calorie and macro goals on registration using TDEE formula | ⬜ Not Built |
-| Login Screen | Email + password form | ⬜ Not Built |
-| JWT Middleware | Protect all API routes | ⬜ Not Built |
-| Session Persistence | JWT survives app restarts | ⬜ Not Built |
+| User Model | Mongoose schema with profile fields, goals, and password | ✅ Done |
+| Registration Screen | Name, email, password, age, height, current weight, goal weight, activity level, diet preference | ✅ Done |
+| Auto Calorie Calculation | Calculate daily calorie and macro goals on registration using TDEE formula | ✅ Done |
+| Login Screen | Email + password form | ✅ Done |
+| JWT Middleware | Protect all API routes | ✅ Done |
+| Session Persistence | JWT survives app restarts | ✅ Done |
 | Password Reset | Forgot password flow via email | ⬜ Not Built |
 | Profile Screen | Update name, weight, and goals | ⬜ Not Built |
 
@@ -283,24 +283,24 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Food Model | Mongoose schema with nutrition fields and source tracking | ⬜ Not Built |
-| Meal Log Model | Daily meal log per user with meal types | ⬜ Not Built |
-| Daily Food Diary | Log food under breakfast, lunch, dinner, snacks | ⬜ Not Built |
+| Food Model | Mongoose schema with nutrition fields and source tracking | ✅ Done |
+| Meal Log Model | Daily meal log per user with meal types | ✅ Done |
+| Daily Food Diary | Log food under breakfast, lunch, dinner, snacks | ✅ Done |
 | Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ⬜ Not Built |
 | AI Food Photo Scan | Camera photo → Anthropic API → food name + nutrition estimate | ⬜ Not Built |
-| Custom Food Entry | Manual entry form for foods not in any database | ⬜ Not Built |
-| Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ⬜ Not Built |
-| Multi-day Food Logging | Log same food across multiple days | ⬜ Not Built |
-| Food Search | Search food database — Open Food Facts + custom entries | ⬜ Not Built |
+| Custom Food Entry | Manual entry form for foods not in any database | ✅ Done |
+| Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ✅ Done |
+| Multi-day Food Logging | Log same food across multiple days | ✅ Done |
+| Food Search | Search food database — Open Food Facts + custom entries | ✅ Done |
 
 #### 4. Nutrition Dashboard
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Daily Calorie Counter | Shows calories consumed vs goal | ⬜ Not Built |
-| Macros Tracking | Protein, carbs, fat progress bars vs goals | ⬜ Not Built |
+| Daily Calorie Counter | Shows calories consumed vs goal | ✅ Done |
+| Macros Tracking | Protein, carbs, fat progress bars vs goals | ✅ Done |
 | Micronutrients | Sodium, sugar, fiber breakdown per day | ⬜ Not Built |
-| Nutrition Summary | Per meal and per day breakdown | ⬜ Not Built |
+| Nutrition Summary | Per meal and per day breakdown | ✅ Done |
 | Progress Dashboard | Visual overview of daily and weekly nutrition | ⬜ Not Built |
 | Weekly Weight Tracker | Log weight entries and view weekly trend chart | ⬜ Not Built |
 
