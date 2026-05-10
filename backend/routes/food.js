@@ -2,13 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { createFood, searchFood, getFoodByBarcode, getUserFoods, deleteFood } = require('../controllers/foodController');
 const { protect } = require('../middleware/auth');
-
+router.use(express.json());
 router.use(protect);
-
 router.get('/search', searchFood);
 router.get('/my', getUserFoods);
 router.get('/barcode/:barcode', getFoodByBarcode);
 router.post('/', createFood);
 router.delete('/:id', deleteFood);
-
 module.exports = router;

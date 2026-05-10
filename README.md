@@ -264,7 +264,7 @@ ltfi/
 | Expo App Setup | Expo + React Native Web with navigation | ✅ Done |
 | Backend Server Setup | Express app with helmet, morgan, rate limiting | ✅ Done |
 | MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ✅ Done |
-| Environment Config | .env for DB URI, JWT secret, Anthropic API key, frontend URL | ✅ Done |
+| Environment Config | .env for DB URI, JWT secret, Gemini API key, frontend URL | ✅ Done |
 
 #### 2. Authentication
 
@@ -286,8 +286,8 @@ ltfi/
 | Food Model | Mongoose schema with nutrition fields and source tracking | ✅ Done |
 | Meal Log Model | Daily meal log per user with meal types | ✅ Done |
 | Daily Food Diary | Log food under breakfast, lunch, dinner, snacks | ✅ Done |
-| Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ⬜ Not Built |
-| AI Food Photo Scan | Camera photo → Anthropic API → food name + nutrition estimate | ⬜ Not Built |
+| Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ✅ Done |
+| AI Food Photo Scan | Camera photo → Gemini API → food name + nutrition estimate | ✅ Done |
 | Custom Food Entry | Manual entry form for foods not in any database | ✅ Done |
 | Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |

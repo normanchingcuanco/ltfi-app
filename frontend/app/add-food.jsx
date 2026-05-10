@@ -1,15 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
 
 export default function AddFoodScreen() {
-  const { mealType, date } = useLocalSearchParams();
+  const { mealType, date, prefillFood } = useLocalSearchParams();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    if (prefillFood) {
+      setResults([JSON.parse(prefillFood)]);
+    }
+  }, [prefillFood]);
 
   const searchFood = async () => {
     if (!search.trim()) return;
@@ -76,9 +82,17 @@ export default function AddFoodScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.customBtn} onPress={() => router.push({ pathname: '/custom-food', params: { mealType, date } })}>
-        <Text style={styles.customBtnText}>+ Add Custom Food</Text>
-      </TouchableOpacity>
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/barcode-scanner', params: { mealType, date } })}>
+          <Text style={styles.actionBtnText}>📷 Scan Barcode</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/ai-food-scan', params: { mealType, date } })}>
+          <Text style={styles.actionBtnText}>🤖 AI Scan</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/custom-food', params: { mealType, date } })}>
+          <Text style={styles.actionBtnText}>+ Custom</Text>
+        </TouchableOpacity>
+      </View>
 
       {loading && <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />}
 
@@ -108,8 +122,9 @@ const styles = StyleSheet.create({
   input: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, fontSize: 15, color: '#1A1A1A' },
   searchBtn: { backgroundColor: '#F77E2D', borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
   searchBtnText: { color: '#fff', fontWeight: '700' },
-  customBtn: { borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
-  customBtnText: { color: '#F77E2D', fontWeight: '700' },
+  actionRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
+  actionBtn: { flex: 1, borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 12, alignItems: 'center' },
+  actionBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 12 },
   resultItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, marginBottom: 10 },
   resultInfo: { flex: 1 },
   resultName: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 2 },

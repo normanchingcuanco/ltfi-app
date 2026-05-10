@@ -2,12 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { getMeals, addFoodToMeal, removeFoodFromMeal, getDailySummary } = require('../controllers/mealController');
 const { protect } = require('../middleware/auth');
-
+router.use(express.json());
 router.use(protect);
-
 router.get('/', getMeals);
 router.get('/summary', getDailySummary);
 router.post('/', addFoodToMeal);
 router.delete('/:mealId/food/:foodId', removeFoodFromMeal);
-
 module.exports = router;

@@ -2,11 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { logWeight, getWeightHistory, deleteWeightEntry } = require('../controllers/weightController');
 const { protect } = require('../middleware/auth');
-
+router.use(express.json());
 router.use(protect);
-
 router.get('/', getWeightHistory);
 router.post('/', logWeight);
 router.delete('/:id', deleteWeightEntry);
-
 module.exports = router;
