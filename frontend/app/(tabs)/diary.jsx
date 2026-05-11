@@ -56,6 +56,23 @@ export default function DiaryScreen() {
             <Text style={styles.summaryLabel}>Fat</Text>
           </View>
         </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.microValue}>{summary?.totalFiber || 0}g</Text>
+            <Text style={styles.summaryLabel}>Fiber</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={styles.microValue}>{summary?.totalSugar || 0}g</Text>
+            <Text style={styles.summaryLabel}>Sugar</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={styles.microValue}>{summary?.totalSodium || 0}mg</Text>
+            <Text style={styles.summaryLabel}>Sodium</Text>
+          </View>
+        </View>
       </View>
 
       {MEAL_TYPES.map(mealType => {
@@ -96,8 +113,10 @@ const styles = StyleSheet.create({
   date: { fontSize: 13, color: '#999', marginBottom: 24 },
   summaryCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 24 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  divider: { height: 1, backgroundColor: '#C5BFB4', marginVertical: 16 },
   summaryItem: { alignItems: 'center' },
   summaryValue: { fontSize: 20, fontWeight: '800', color: '#F77E2D' },
+  microValue: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
   summaryLabel: { fontSize: 11, color: '#888', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
   mealSection: { marginBottom: 24 },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
