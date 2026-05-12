@@ -28,6 +28,27 @@ To ensure efficient collaboration during the build process, the following rules 
 
 ---
 
+## Free-First Requirement
+
+**Every tool, service, and API used in this project must have a free tier or be completely free.** No paid subscriptions, no trial-only services, no features locked behind a paywall — at any layer of the stack.
+
+This applies to:
+- All third-party APIs (AI, food data, health data)
+- All hosting and infrastructure
+- All development tools and SDKs
+- All database services
+
+If a free option exists, it must be used. If a service requires payment to function at any meaningful level, it must be replaced with a free alternative before building.
+
+Current free services in use:
+- MongoDB Atlas — free tier (512MB)
+- Open Food Facts API — completely free, no key required
+- Groq API — free tier with generous limits for LLaMA vision
+- Gmail SMTP — free via app password
+- Expo — free for development and Expo Go distribution
+
+---
+
 ## The Problem
 
 There is no free, all-in-one health app that combines nutrition tracking, workout timers, and wearable health data without locking features behind a paywall.
@@ -76,18 +97,19 @@ An Expo-based mobile and web app that:
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Mobile + Web | Expo + React Native Web |
-| Backend | Node.js + Express |
-| Database | MongoDB (Mongoose) |
-| Auth | JWT + Email/Password |
-| Barcode Scanning | Open Food Facts API (free) |
-| AI Food Scanning | Anthropic API — personal account free tier |
-| Health Data | Apple HealthKit |
-| Wearable | Colmi Ring via QRing → HealthKit pipeline |
-| Hosting (Frontend) | TBD |
-| Hosting (Backend) | TBD |
+| Layer | Technology | Cost |
+|-------|------------|------|
+| Mobile + Web | Expo + React Native Web | Free |
+| Backend | Node.js + Express | Free |
+| Database | MongoDB Atlas (free tier) | Free |
+| Auth | JWT + Email/Password | Free |
+| Barcode Scanning | Open Food Facts API | Free |
+| AI Food Scanning | Groq API — LLaMA Vision (free tier) | Free |
+| Email | Gmail SMTP via Nodemailer | Free |
+| Health Data | Apple HealthKit | Free |
+| Wearable | Colmi Ring via QRing → HealthKit pipeline | Free |
+| Hosting (Frontend) | TBD — target free tier | Free |
+| Hosting (Backend) | TBD — target free tier | Free |
 
 ---
 
@@ -129,33 +151,31 @@ ltfi/
 ├── frontend/
 │   ├── assets/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── common/
-│   │   │   └── layout/
 │   │   ├── contexts/
 │   │   │   └── AuthContext.jsx
-│   │   ├── screens/
-│   │   │   ├── auth/
-│   │   │   │   ├── LoginScreen.jsx
-│   │   │   │   └── RegisterScreen.jsx
-│   │   │   ├── nutrition/
-│   │   │   │   ├── DashboardScreen.jsx
-│   │   │   │   ├── FoodDiaryScreen.jsx
-│   │   │   │   ├── BarcodeScannerScreen.jsx
-│   │   │   │   ├── AIFoodScanScreen.jsx
-│   │   │   │   ├── CustomFoodScreen.jsx
-│   │   │   │   └── RecipeBuilderScreen.jsx
-│   │   │   ├── progress/
-│   │   │   │   └── WeightTrackerScreen.jsx
-│   │   │   └── workout/
-│   │   │       ├── IntervalTimerScreen.jsx
-│   │   │       └── WorkoutLogScreen.jsx
-│   │   ├── navigation/
-│   │   │   └── AppNavigator.jsx
-│   │   ├── utils/
-│   │   │   ├── api.js
-│   │   │   └── constants.js
-│   │   └── App.jsx
+│   │   └── utils/
+│   │       └── api.js
+│   ├── app/
+│   │   ├── (auth)/
+│   │   │   ├── login.jsx
+│   │   │   ├── register.jsx
+│   │   │   └── forgot-password.jsx
+│   │   ├── (tabs)/
+│   │   │   ├── _layout.jsx
+│   │   │   ├── dashboard.jsx
+│   │   │   ├── diary.jsx
+│   │   │   ├── recipes.jsx
+│   │   │   ├── workout.jsx
+│   │   │   ├── progress.jsx
+│   │   │   └── profile.jsx
+│   │   ├── _layout.jsx
+│   │   ├── add-food.jsx
+│   │   ├── ai-food-scan.jsx
+│   │   ├── barcode-scanner.jsx
+│   │   ├── create-workout.jsx
+│   │   ├── custom-food.jsx
+│   │   ├── reset-password.jsx
+│   │   └── timer.jsx
 │   ├── app.json
 │   ├── babel.config.js
 │   └── package.json
@@ -192,7 +212,7 @@ ltfi/
 |-------|------|-------|
 | _id | ObjectId | PK |
 | user | ObjectId | Ref: User |
-| date | Date | |
+| date | String | YYYY-MM-DD |
 | mealType | String | breakfast / lunch / dinner / snacks |
 | foods | Array | [{ foodId, name, quantity, unit, calories, protein, carbs, fat }] |
 | totalCalories | Number | Computed |
@@ -350,7 +370,8 @@ ltfi/
 - MongoDB Atlas account (free tier)
 - Expo CLI (`npm install -g expo-cli`)
 - Expo Go app installed on your iPhone
-- Anthropic account (personal, free tier) for AI food scanning
+- Groq account (free tier) for AI food scanning — https://console.groq.com
+- Gmail account with app password enabled for password reset emails
 - Open Food Facts API (no key required)
 
 ### 1. Clone the repo
@@ -360,22 +381,31 @@ cd ltfi
 
 ### 2. Install dependencies
 
-npm run install:all
+cd backend && npm install
+cd ../frontend && npm install
 
 ### 3. Configure environment variables
 
-Copy `backend/.env` and fill in your values:
+Create `backend/.env` and fill in your values:
 
 MONGODB_URI=your_mongodb_atlas_uri
 JWT_SECRET=your_random_secret
 FRONTEND_URL=http://localhost:8081
-ANTHROPIC_API_KEY=your_anthropic_personal_api_key
+PORT=5000
+GROQ_API_KEY=your_groq_api_key
+EMAIL_USER=your_gmail@gmail.com
+EMAIL_PASS=your_gmail_app_password
 
 ### 4. Run locally
 
-npm run dev
+Terminal 1 — Backend:
+cd backend && node server.js
 
-Frontend (Expo): scan QR code with Expo Go on your iPhone
+Terminal 2 — Frontend:
+cd frontend && npx expo start
+
+Frontend (Web): http://localhost:8081
+Frontend (Mobile): scan QR code with Expo Go on your iPhone
 Backend: http://localhost:5000
 
 ---
