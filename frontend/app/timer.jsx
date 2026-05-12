@@ -1,7 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as Speech from 'expo-speech';
 import api from '../src/utils/api';
+
+const speak = (text) => {
+  if (Platform.OS === 'web') {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.1;
+      window.speechSynthesis.speak(utterance);
+    }
+  } else {
+    Speech.stop();
+    Speech.speak(text, { rate: 1.1 });
+  }
+};
 
 export default function TimerScreen() {
   const { workoutId } = useLocalSearchParams();
@@ -14,6 +29,7 @@ export default function TimerScreen() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
+  const [caloriesBurned, setCaloriesBurned] = useState('');
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -41,6 +57,9 @@ export default function TimerScreen() {
             advance();
             return 0;
           }
+          if (prev === 4) speak('3');
+          if (prev === 3) speak('2');
+          if (prev === 2) speak('1');
           return prev - 1;
         });
       }, 1000);
@@ -53,12 +72,12 @@ export default function TimerScreen() {
   const advance = () => {
     if (!workout) return;
     const intervals = workout.intervals;
-
     if (phase === 'work') {
       const restTime = intervals[currentInterval].restSeconds;
       if (restTime > 0) {
         setPhase('rest');
         setTimeLeft(restTime);
+        speak('Rest');
       } else {
         nextInterval();
       }
@@ -70,27 +89,52 @@ export default function TimerScreen() {
   const nextInterval = () => {
     const intervals = workout.intervals;
     if (currentInterval + 1 < intervals.length) {
+      const next = intervals[currentInterval + 1];
       setCurrentInterval(prev => prev + 1);
       setPhase('work');
-      setTimeLeft(intervals[currentInterval + 1].workSeconds);
+      setTimeLeft(next.workSeconds);
+      speak(next.name);
     } else if (currentRound < workout.rounds) {
-      setCurrentRound(prev => prev + 1);
+      const nextRound = currentRound + 1;
+      setCurrentRound(nextRound);
       setCurrentInterval(0);
       setPhase('work');
       setTimeLeft(intervals[0].workSeconds);
+      speak(`Round ${nextRound}. ${intervals[0].name}`);
     } else {
       setRunning(false);
       setDone(true);
+      speak('Workout complete. Great job!');
     }
+  };
+
+  const handleStart = () => {
+    if (!running && workout) {
+      speak(workout.intervals[currentInterval].name);
+    }
+    setRunning(!running);
   };
 
   const handleFinish = async () => {
     try {
-      await api.post(`/workouts/${workoutId}/log`, { caloriesBurned: 0 });
+      await api.post(`/workouts/${workoutId}/log`, {
+        caloriesBurned: parseInt(caloriesBurned) || 0
+      });
     } catch (err) {
       console.error(err);
     }
     router.back();
+  };
+
+  const handleQuit = () => {
+    setRunning(false);
+    if (Platform.OS === 'web') {
+      if (window.confirm('Quit workout? Your progress will be lost.')) {
+        router.back();
+      } else {
+        setRunning(true);
+      }
+    }
   };
 
   const formatTime = (s) => {
@@ -109,6 +153,15 @@ export default function TimerScreen() {
     <View style={styles.center}>
       <Text style={styles.doneTitle}>Workout Complete! 🎉</Text>
       <Text style={styles.doneSub}>{workout.name}</Text>
+      <Text style={styles.calsLabel}>Calories Burned (optional)</Text>
+      <TextInput
+        style={styles.calsInput}
+        placeholder="e.g. 250"
+        placeholderTextColor="#999"
+        keyboardType="numeric"
+        value={caloriesBurned}
+        onChangeText={setCaloriesBurned}
+      />
       <TouchableOpacity style={styles.finishBtn} onPress={handleFinish}>
         <Text style={styles.finishBtnText}>Finish</Text>
       </TouchableOpacity>
@@ -120,13 +173,7 @@ export default function TimerScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isWork ? '#1A1A1A' : '#2C4A2E' }]}>
-      <TouchableOpacity style={styles.closeBtn} onPress={() => {
-        setRunning(false);
-        Alert.alert('Quit Workout?', 'Your progress will be lost.', [
-          { text: 'Keep Going', style: 'cancel', onPress: () => setRunning(true) },
-          { text: 'Quit', style: 'destructive', onPress: () => router.back() }
-        ]);
-      }}>
+      <TouchableOpacity style={styles.closeBtn} onPress={handleQuit}>
         <Text style={styles.closeBtnText}>✕</Text>
       </TouchableOpacity>
 
@@ -151,7 +198,7 @@ export default function TimerScreen() {
           <Text style={styles.controlBtnText}>↺</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.playBtn} onPress={() => setRunning(!running)}>
+        <TouchableOpacity style={styles.playBtn} onPress={handleStart}>
           <Text style={styles.playBtnText}>{running ? '⏸' : '▶'}</Text>
         </TouchableOpacity>
 
@@ -183,7 +230,7 @@ export default function TimerScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF', padding: 24 },
   loadingText: { color: '#888', fontSize: 16 },
   closeBtn: { position: 'absolute', top: 60, right: 24 },
   closeBtnText: { color: '#fff', fontSize: 20, opacity: 0.6 },
@@ -200,8 +247,10 @@ const styles = StyleSheet.create({
   upNext: { position: 'absolute', bottom: 60, alignItems: 'center' },
   upNextLabel: { fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 },
   upNextText: { fontSize: 16, color: 'rgba(255,255,255,0.7)', fontWeight: '600' },
-  doneTitle: { fontSize: 32, fontWeight: '900', color: '#1A1A1A', marginBottom: 8 },
+  doneTitle: { fontSize: 32, fontWeight: '900', color: '#1A1A1A', marginBottom: 8, textAlign: 'center' },
   doneSub: { fontSize: 16, color: '#888', marginBottom: 32 },
+  calsLabel: { fontSize: 13, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
+  calsInput: { backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, fontSize: 18, color: '#1A1A1A', textAlign: 'center', width: 200, marginBottom: 24 },
   finishBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, paddingHorizontal: 48 },
   finishBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 }
 });
