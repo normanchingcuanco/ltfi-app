@@ -21,6 +21,7 @@ app.use('/api/meals', require('./routes/meals'));
 app.use('/api/weight', require('./routes/weight'));
 app.use('/api/recipes', require('./routes/recipes'));
 app.use('/api/ai-scan', require('./routes/aiScan'));
+app.use('/api/workouts', require('./routes/workouts'));
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
