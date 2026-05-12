@@ -276,8 +276,8 @@ ltfi/
 | Login Screen | Email + password form | ✅ Done |
 | JWT Middleware | Protect all API routes | ✅ Done |
 | Session Persistence | JWT survives app restarts | ✅ Done |
-| Password Reset | Forgot password flow via email | ⬜ Not Built |
-| Profile Screen | Update name, weight, and goals | ⬜ Not Built |
+| Password Reset | Forgot password flow via email | ✅ Done |
+| Profile Screen | Update name, weight, and goals | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -287,7 +287,7 @@ ltfi/
 | Meal Log Model | Daily meal log per user with meal types | ✅ Done |
 | Daily Food Diary | Log food under breakfast, lunch, dinner, snacks | ✅ Done |
 | Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ✅ Done |
-| AI Food Photo Scan | Camera photo → Gemini API → food name + nutrition estimate | ✅ Done |
+| AI Food Photo Scan | Camera photo → Groq LLaMA Vision → food name + nutrition estimate | ✅ Done |
 | Custom Food Entry | Manual entry form for foods not in any database | ✅ Done |
 | Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
@@ -299,10 +299,10 @@ ltfi/
 |---------|-------------|--------|
 | Daily Calorie Counter | Shows calories consumed vs goal | ✅ Done |
 | Macros Tracking | Protein, carbs, fat progress bars vs goals | ✅ Done |
-| Micronutrients | Sodium, sugar, fiber breakdown per day | ⬜ Not Built |
+| Micronutrients | Sodium, sugar, fiber breakdown per day | ✅ Done |
 | Nutrition Summary | Per meal and per day breakdown | ✅ Done |
-| Progress Dashboard | Visual overview of daily and weekly nutrition | ⬜ Not Built |
-| Weekly Weight Tracker | Log weight entries and view weekly trend chart | ⬜ Not Built |
+| Progress Dashboard | Visual overview of daily and weekly nutrition | ✅ Done |
+| Weekly Weight Tracker | Log weight entries and view weekly trend chart | ✅ Done |
 
 ---
 
