@@ -264,7 +264,7 @@ ltfi/
 | Expo App Setup | Expo + React Native Web with navigation | ✅ Done |
 | Backend Server Setup | Express app with helmet, morgan, rate limiting | ✅ Done |
 | MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ✅ Done |
-| Environment Config | .env for DB URI, JWT secret, Gemini API key, frontend URL | ✅ Done |
+| Environment Config | .env for DB URI, JWT secret, Groq API key, Gemini API key, email, frontend URL | ✅ Done |
 
 #### 2. Authentication
 
@@ -273,11 +273,11 @@ ltfi/
 | User Model | Mongoose schema with profile fields, goals, and password | ✅ Done |
 | Registration Screen | Name, email, password, age, height, current weight, goal weight, activity level, diet preference | ✅ Done |
 | Auto Calorie Calculation | Calculate daily calorie and macro goals on registration using TDEE formula | ✅ Done |
-| Login Screen | Email + password form | ✅ Done |
+| Login Screen | Email + password form with show/hide password | ✅ Done |
 | JWT Middleware | Protect all API routes | ✅ Done |
 | Session Persistence | JWT survives app restarts | ✅ Done |
-| Password Reset | Forgot password flow via email | ✅ Done |
-| Profile Screen | Update name, weight, and goals | ✅ Done |
+| Password Reset | Forgot password flow via email using Gmail + Nodemailer | ✅ Done |
+| Profile Screen | Update name, weight, goals — recalculates TDEE on save | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -297,12 +297,14 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Daily Calorie Counter | Shows calories consumed vs goal | ✅ Done |
+| Daily Calorie Counter | Shows calories eaten vs remaining vs goal with progress bar | ✅ Done |
 | Macros Tracking | Protein, carbs, fat progress bars vs goals | ✅ Done |
-| Micronutrients | Sodium, sugar, fiber breakdown per day | ✅ Done |
+| Micronutrients | Sodium, sugar, fiber breakdown per day in diary | ✅ Done |
 | Nutrition Summary | Per meal and per day breakdown | ✅ Done |
 | Progress Dashboard | Visual overview of daily and weekly nutrition | ✅ Done |
 | Weekly Weight Tracker | Log weight entries and view weekly trend chart | ✅ Done |
+| Workout Calories Deducted | Calories burned from workouts added to remaining on dashboard | ✅ Done |
+| Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it | ✅ Done |
 
 ---
 
@@ -310,15 +312,17 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Workout Model | Mongoose schema for interval and workout sessions | ⬜ Not Built |
-| Interval Timer | HIIT, Tabata, and circuit timer with work and rest periods | ⬜ Not Built |
-| Custom Intervals | Set work duration, rest duration, rounds, and sets | ⬜ Not Built |
-| Named Exercises | Label each interval with an exercise name | ⬜ Not Built |
-| Saved Workout Presets | Save and reuse custom timer configurations | ⬜ Not Built |
-| Voice Announcements | Audio cues for interval changes | ⬜ Not Built |
-| Background Timer | Timer continues running when app is backgrounded | ⬜ Not Built |
-| Exercise Logging | Log workout type, duration, sets, reps | ⬜ Not Built |
-| Calories Burned | Estimate and log calories burned per workout | ⬜ Not Built |
+| Workout Model | Mongoose schema for interval and workout sessions | ✅ Done |
+| Interval Timer | HIIT, Tabata, and circuit timer with work and rest periods | ✅ Done |
+| Custom Intervals | Set work duration, rest duration, rounds, and sets | ✅ Done |
+| Named Exercises | Label each interval with an exercise name | ✅ Done |
+| Saved Workout Presets | Save and reuse custom timer configurations | ✅ Done |
+| Voice Announcements | Audio cues for interval changes with countdown | ✅ Done |
+| Voice Picker | Select from available system voices before starting workout | ✅ Done |
+| Background Timer | Timer continues running when app is backgrounded | ⬜ Mobile only — deferred |
+| Exercise Logging | Log workout type, duration, sets, reps | ✅ Done |
+| Calories Burned | MET-based auto-estimate on completion, editable before saving | ✅ Done |
+| Workout Settings Screen | Preview intervals and select voice before starting | ✅ Done |
 
 ---
 
