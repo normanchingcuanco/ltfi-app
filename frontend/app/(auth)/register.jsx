@@ -9,6 +9,7 @@ export default function RegisterScreen() {
     age: '', height: '', currentWeight: '',
     goalWeight: '', activityLevel: 'moderate', dietPreference: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
@@ -50,7 +51,21 @@ export default function RegisterScreen() {
 
         <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#999" value={form.name} onChangeText={v => update('name', v)} />
         <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#999" value={form.email} onChangeText={v => update('email', v)} autoCapitalize="none" keyboardType="email-address" />
-        <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#999" value={form.password} onChangeText={v => update('password', v)} secureTextEntry />
+
+        <View style={styles.passwordRow}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            placeholderTextColor="#999"
+            value={form.password}
+            onChangeText={v => update('password', v)}
+            secureTextEntry={!showPassword}
+          />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+            <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>
+          </TouchableOpacity>
+        </View>
+
         <TextInput style={styles.input} placeholder="Age" placeholderTextColor="#999" value={form.age} onChangeText={v => update('age', v)} keyboardType="numeric" />
         <TextInput style={styles.input} placeholder="Height (cm)" placeholderTextColor="#999" value={form.height} onChangeText={v => update('height', v)} keyboardType="numeric" />
         <TextInput style={styles.input} placeholder="Current Weight (kg)" placeholderTextColor="#999" value={form.currentWeight} onChangeText={v => update('currentWeight', v)} keyboardType="numeric" />
@@ -91,6 +106,10 @@ const styles = StyleSheet.create({
   tagline: { fontSize: 13, color: '#999', textAlign: 'center', marginBottom: 32, letterSpacing: 2 },
   error: { color: '#FF2D2D', marginBottom: 12, textAlign: 'center', fontSize: 13 },
   input: { backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, marginBottom: 12, fontSize: 15, color: '#1A1A1A' },
+  passwordRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, marginBottom: 12 },
+  passwordInput: { flex: 1, padding: 14, fontSize: 15, color: '#1A1A1A' },
+  eyeBtn: { paddingHorizontal: 14 },
+  eyeText: { fontSize: 18 },
   label: { fontSize: 13, color: '#888', marginBottom: 10, letterSpacing: 1 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
   pill: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 99, backgroundColor: '#D9D3C8' },
