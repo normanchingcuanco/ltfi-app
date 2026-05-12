@@ -1,163 +1,133 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../src/contexts/AuthContext';
 import api from '../../src/utils/api';
 
-const screenWidth = Dimensions.get('window').width - 48;
-
-export default function ProgressScreen() {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [weight, setWeight] = useState('');
-  const [notes, setNotes] = useState('');
-  const [logging, setLogging] = useState(false);
-  const [showForm, setShowForm] = useState(false);
+export default function ProfileScreen() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    currentWeight: '',
+    goalWeight: '',
+    height: '',
+    age: '',
+    activityLevel: 'sedentary',
+    dietPreference: ''
+  });
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    if (user) {
+      setForm({
+        name: user.name || '',
+        currentWeight: user.currentWeight?.toString() || '',
+        goalWeight: user.goalWeight?.toString() || '',
+        height: user.height?.toString() || '',
+        age: user.age?.toString() || '',
+        activityLevel: user.activityLevel || 'sedentary',
+        dietPreference: user.dietPreference || ''
+      });
+    }
+  }, [user]);
 
-  const fetchHistory = async () => {
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/login');
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
     try {
-      const res = await api.get('/weight');
-      setHistory(res.data);
+      await api.put('/auth/profile', {
+        name: form.name,
+        currentWeight: parseFloat(form.currentWeight),
+        goalWeight: parseFloat(form.goalWeight),
+        height: parseFloat(form.height),
+        age: parseInt(form.age),
+        activityLevel: form.activityLevel,
+        dietPreference: form.dietPreference
+      });
+      setEditing(false);
+      Alert.alert('Saved', 'Profile updated.');
     } catch (err) {
-      console.error(err);
+      Alert.alert('Error', 'Failed to update profile.');
     } finally {
       setLoading(false);
     }
   };
 
-  const logWeight = async () => {
-    if (!weight) return;
-    setLogging(true);
-    try {
-      await api.post('/weight', { weight: parseFloat(weight), notes });
-      setWeight('');
-      setNotes('');
-      setShowForm(false);
-      await fetchHistory();
-    } catch (err) {
-      Alert.alert('Error', 'Failed to log weight.');
-    } finally {
-      setLogging(false);
-    }
-  };
-
-  if (loading) return (
-    <View style={styles.center}>
-      <ActivityIndicator size="large" color="#F77E2D" />
-    </View>
-  );
-
-  const latest = history[history.length - 1];
-  const first = history[0];
-  const change = latest && first ? (latest.weight - first.weight).toFixed(1) : null;
-
-  const maxWeight = history.length ? Math.max(...history.map(e => e.weight)) : 0;
-  const minWeight = history.length ? Math.min(...history.map(e => e.weight)) : 0;
-  const range = maxWeight - minWeight || 1;
-  const chartHeight = 160;
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Progress</Text>
+      <View style={styles.header}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{user?.avatarInitials}</Text>
+        </View>
+        <Text style={styles.name}>{user?.name}</Text>
+        <Text style={styles.email}>{user?.email}</Text>
+      </View>
 
-      <TouchableOpacity style={styles.logBtn} onPress={() => setShowForm(!showForm)}>
-        <Text style={styles.logBtnText}>{showForm ? 'Cancel' : '+ Log Weight'}</Text>
-      </TouchableOpacity>
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>Daily Calorie Goal</Text>
+        <Text style={styles.cardValue}>{user?.dailyCalorieGoal} kcal</Text>
+      </View>
 
-      {showForm && (
+      <View style={styles.macrosRow}>
+        <View style={styles.macroCard}>
+          <Text style={styles.macroValue}>{user?.macroGoals?.protein}g</Text>
+          <Text style={styles.macroLabel}>Protein</Text>
+        </View>
+        <View style={styles.macroCard}>
+          <Text style={styles.macroValue}>{user?.macroGoals?.carbs}g</Text>
+          <Text style={styles.macroLabel}>Carbs</Text>
+        </View>
+        <View style={styles.macroCard}>
+          <Text style={styles.macroValue}>{user?.macroGoals?.fat}g</Text>
+          <Text style={styles.macroLabel}>Fat</Text>
+        </View>
+      </View>
+
+      {!editing && (
+        <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
+          <Text style={styles.editBtnText}>Edit Profile</Text>
+        </TouchableOpacity>
+      )}
+
+      {editing && (
         <View style={styles.formCard}>
-          <TextInput
-            style={styles.input}
-            placeholder="Weight (kg)"
-            placeholderTextColor="#999"
-            keyboardType="decimal-pad"
-            value={weight}
-            onChangeText={setWeight}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Notes (optional)"
-            placeholderTextColor="#999"
-            value={notes}
-            onChangeText={setNotes}
-          />
-          <TouchableOpacity style={styles.submitBtn} onPress={logWeight} disabled={logging}>
-            <Text style={styles.submitBtnText}>{logging ? 'Saving...' : 'Save'}</Text>
+          {[
+            { label: 'Name', key: 'name' },
+            { label: 'Current Weight (kg)', key: 'currentWeight', numeric: true },
+            { label: 'Goal Weight (kg)', key: 'goalWeight', numeric: true },
+            { label: 'Height (cm)', key: 'height', numeric: true },
+            { label: 'Age', key: 'age', numeric: true },
+            { label: 'Diet Preference', key: 'dietPreference' }
+          ].map(field => (
+            <View key={field.key} style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>{field.label}</Text>
+              <TextInput
+                style={styles.input}
+                value={form[field.key]}
+                onChangeText={val => setForm({ ...form, [field.key]: val })}
+                keyboardType={field.numeric ? 'decimal-pad' : 'default'}
+                placeholderTextColor="#999"
+              />
+            </View>
+          ))}
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
+            <Text style={styles.saveBtnText}>{loading ? 'Saving...' : 'Save Changes'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditing(false)}>
+            <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {history.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyText}>No weight entries yet. Log your first entry above.</Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{latest?.weight} kg</Text>
-              <Text style={styles.statLabel}>Current</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{first?.weight} kg</Text>
-              <Text style={styles.statLabel}>Starting</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: change > 0 ? '#E05A2B' : '#4CAF50' }]}>
-                {change > 0 ? '+' : ''}{change} kg
-              </Text>
-              <Text style={styles.statLabel}>Change</Text>
-            </View>
-          </View>
-
-          <View style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Weight Trend</Text>
-            <View style={styles.chart}>
-              {history.map((entry, idx) => {
-                const x = (idx / Math.max(history.length - 1, 1)) * screenWidth;
-                const y = chartHeight - ((entry.weight - minWeight) / range) * chartHeight;
-                return (
-                  <View key={idx} style={[styles.dot, { left: x - 5, top: y - 5 }]} />
-                );
-              })}
-              {history.length > 1 && history.map((entry, idx) => {
-                if (idx === 0) return null;
-                const prev = history[idx - 1];
-                const x1 = ((idx - 1) / Math.max(history.length - 1, 1)) * screenWidth;
-                const y1 = chartHeight - ((prev.weight - minWeight) / range) * chartHeight;
-                const x2 = (idx / Math.max(history.length - 1, 1)) * screenWidth;
-                const y2 = chartHeight - ((entry.weight - minWeight) / range) * chartHeight;
-                const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
-                return (
-                  <View key={`line-${idx}`} style={[styles.line, {
-                    left: x1,
-                    top: y1,
-                    width: length,
-                    transform: [{ rotate: `${angle}deg` }]
-                  }]} />
-                );
-              })}
-            </View>
-            <View style={styles.chartLabels}>
-              <Text style={styles.chartLabel}>{minWeight} kg</Text>
-              <Text style={styles.chartLabel}>{maxWeight} kg</Text>
-            </View>
-          </View>
-
-          <View style={styles.logList}>
-            <Text style={styles.logTitle}>Recent Entries</Text>
-            {[...history].reverse().slice(0, 10).map((entry, idx) => (
-              <View key={idx} style={styles.logItem}>
-                <Text style={styles.logDate}>{new Date(entry.loggedAt).toDateString()}</Text>
-                <Text style={styles.logWeight}>{entry.weight} kg</Text>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -165,30 +135,28 @@ export default function ProgressScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#EDE8DF' },
   content: { padding: 24, paddingTop: 60 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
-  title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 24 },
-  logBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
-  logBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  formCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 24, gap: 12 },
+  header: { alignItems: 'center', marginBottom: 32 },
+  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F77E2D', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  avatarText: { color: '#fff', fontWeight: '900', fontSize: 26 },
+  name: { fontSize: 22, fontWeight: '800', color: '#1A1A1A' },
+  email: { fontSize: 13, color: '#999', marginTop: 4 },
+  card: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16 },
+  cardLabel: { fontSize: 12, color: '#888', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
+  cardValue: { fontSize: 36, fontWeight: '900', color: '#F77E2D' },
+  macrosRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  macroCard: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, alignItems: 'center' },
+  macroValue: { fontSize: 22, fontWeight: '800', color: '#1A1A1A' },
+  macroLabel: { fontSize: 11, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  formCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16, gap: 12 },
+  fieldGroup: { gap: 4 },
+  fieldLabel: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 1 },
   input: { backgroundColor: '#EDE8DF', borderRadius: 10, padding: 14, fontSize: 15, color: '#1A1A1A' },
-  submitBtn: { backgroundColor: '#F77E2D', borderRadius: 10, padding: 14, alignItems: 'center' },
-  submitBtnText: { color: '#fff', fontWeight: '700' },
-  emptyBox: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 24, alignItems: 'center' },
-  emptyText: { color: '#888', textAlign: 'center', fontSize: 14 },
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  statCard: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, alignItems: 'center' },
-  statValue: { fontSize: 18, fontWeight: '800', color: '#F77E2D' },
-  statLabel: { fontSize: 11, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
-  chartCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 24 },
-  chartTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 16 },
-  chart: { height: 160, position: 'relative', marginBottom: 8 },
-  dot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#F77E2D' },
-  line: { position: 'absolute', height: 2, backgroundColor: '#F77E2D', opacity: 0.4, transformOrigin: 'left center' },
-  chartLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  chartLabel: { fontSize: 11, color: '#888' },
-  logList: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20 },
-  logTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
-  logItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#C5BFB4' },
-  logDate: { fontSize: 13, color: '#555' },
-  logWeight: { fontSize: 13, fontWeight: '700', color: '#F77E2D' }
+  saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center' },
+  saveBtnText: { color: '#fff', fontWeight: '700' },
+  cancelBtn: { borderWidth: 1.5, borderColor: '#C4BDB2', borderRadius: 12, padding: 14, alignItems: 'center' },
+  cancelBtnText: { color: '#888', fontWeight: '600' },
+  editBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
+  editBtnText: { color: '#fff', fontWeight: '700' },
+  logoutBtn: { padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#C4BDB2', alignItems: 'center', marginTop: 8 },
+  logoutText: { color: '#888', fontWeight: '600' }
 });
