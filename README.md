@@ -350,17 +350,21 @@ ltfi/
 
 ### Phase 3 — Health Data Integration
 
+> ⚠️ Deferred — Expo SDK 55 is not yet compatible with iOS 26. Will resume once Expo releases a compatible SDK update.
+
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Apple HealthKit Setup | Request HealthKit permissions on first launch | ⬜ Not Built |
-| Steps Tracking | Read daily step count from HealthKit | ⬜ Not Built |
-| Active Calories | Read active calories burned from HealthKit | ⬜ Not Built |
-| Heart Rate | Read heart rate data from HealthKit | ⬜ Not Built |
-| Blood Oxygen | Read SpO2 data from HealthKit | ⬜ Not Built |
-| Sleep Tracking | Read sleep duration from HealthKit | ⬜ Not Built |
-| Distance | Read daily distance from HealthKit | ⬜ Not Built |
-| Multi-sport Workout Sync | Sync completed workouts from HealthKit | ⬜ Not Built |
-| Colmi Ring Integration | Colmi ring data flows via QRing app into HealthKit — no direct integration needed | ⬜ Not Built |
+| Apple HealthKit Setup | Request HealthKit permissions on first launch | ⏸ Deferred — iOS 26 incompatibility |
+| Steps Tracking | Read daily step count from HealthKit | ⏸ Deferred |
+| Active Calories | Read active calories burned from HealthKit | ⏸ Deferred |
+| Heart Rate | Read heart rate data from HealthKit | ⏸ Deferred |
+| Blood Oxygen | Read SpO2 data from HealthKit | ⏸ Deferred |
+| Sleep Tracking | Read sleep duration from HealthKit | ⏸ Deferred |
+| Distance | Read daily distance from HealthKit | ⏸ Deferred |
+| Multi-sport Workout Sync | Sync completed workouts from HealthKit | ⏸ Deferred |
+| Colmi Ring Integration | Colmi ring data flows via QRing app into HealthKit — no direct integration needed | ⏸ Deferred |
+| Health Screen UI | Dashboard showing steps, heart rate, calories, sleep, distance | ✅ Built — pending native build |
+| HealthKit Utility Layer | Platform-aware data fetching from HealthKit | ✅ Built — pending native build |
 
 ---
 
