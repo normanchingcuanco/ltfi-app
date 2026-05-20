@@ -13,7 +13,15 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ltfi.app"
+      "bundleIdentifier": "com.ltfi.app",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "LTFI reads your health data including steps, heart rate, calories, and sleep to give you a complete picture of your health.",
+        "NSHealthUpdateUsageDescription": "LTFI writes workout data to Apple Health."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,10 +34,23 @@
       "output": "static"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "react-native-health",
+        {
+          "isClinicalDataEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "330777bd-74a9-4489-aaf1-07cf5583d72b"
+      }
+    },
+    "owner": "norman.chingcuanco"
   }
 }

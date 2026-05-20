@@ -306,6 +306,7 @@ ltfi/
 | Food Model | Mongoose schema with nutrition fields and source tracking | ✅ Done |
 | Meal Log Model | Daily meal log per user with meal types | ✅ Done |
 | Daily Food Diary | Log food under breakfast, lunch, dinner, snacks | ✅ Done |
+| Delete Food from Diary | Remove logged food items from any meal | ✅ Done |
 | Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ✅ Done |
 | AI Food Photo Scan | Camera photo → Groq LLaMA Vision → food name + nutrition estimate | ✅ Done |
 | Custom Food Entry | Manual entry form for foods not in any database | ✅ Done |
@@ -325,6 +326,7 @@ ltfi/
 | Weekly Weight Tracker | Log weight entries and view weekly trend chart | ✅ Done |
 | Workout Calories Deducted | Calories burned from workouts added to remaining on dashboard | ✅ Done |
 | Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it | ✅ Done |
+| Diary Focus Refresh | Diary re-fetches data every time user navigates to it | ✅ Done |
 
 ---
 
