@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
@@ -11,9 +11,11 @@ export default function DiaryScreen() {
   const router = useRouter();
   const today = new Date().toISOString().split('T')[0];
 
-  useEffect(() => {
-    fetchSummary();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchSummary();
+    }, [])
+  );
 
   const fetchSummary = async () => {
     try {
@@ -23,6 +25,15 @@ export default function DiaryScreen() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deleteFood = async (mealId, foodId) => {
+    try {
+      await api.delete(`/meals/${mealId}/food/${foodId}`);
+      fetchSummary();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -91,8 +102,16 @@ export default function DiaryScreen() {
             {meal?.foods?.length > 0 ? (
               meal.foods.map((food, idx) => (
                 <View key={idx} style={styles.foodItem}>
-                  <Text style={styles.foodName}>{food.name}</Text>
-                  <Text style={styles.foodCals}>{food.calories} kcal</Text>
+                  <View style={styles.foodInfo}>
+                    <Text style={styles.foodName}>{food.name}</Text>
+                    <Text style={styles.foodCals}>{food.calories} kcal</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => deleteFood(meal._id, food._id)}
+                  >
+                    <Text style={styles.deleteBtnText}>✕</Text>
+                  </TouchableOpacity>
                 </View>
               ))
             ) : (
@@ -123,8 +142,11 @@ const styles = StyleSheet.create({
   mealTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', textTransform: 'capitalize' },
   addBtn: { backgroundColor: '#F77E2D', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  foodItem: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#D9D3C8', borderRadius: 10, padding: 12, marginBottom: 6 },
+  foodItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 10, padding: 12, marginBottom: 6 },
+  foodInfo: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   foodName: { fontSize: 14, color: '#1A1A1A', fontWeight: '500' },
   foodCals: { fontSize: 14, color: '#F77E2D', fontWeight: '700' },
+  deleteBtn: { marginLeft: 12, width: 28, height: 28, borderRadius: 14, backgroundColor: '#C5BFB4', justifyContent: 'center', alignItems: 'center' },
+  deleteBtnText: { color: '#888', fontSize: 12, fontWeight: '700' },
   emptyText: { fontSize: 13, color: '#bbb', fontStyle: 'italic' }
 });
