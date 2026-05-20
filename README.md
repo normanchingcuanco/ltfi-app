@@ -350,6 +350,8 @@ ltfi/
 
 ### Phase 3 — Health Data Integration
 
+#### iOS — Apple HealthKit
+
 > ⚠️ Deferred — Expo SDK 55 is not yet compatible with iOS 26. Will resume once Expo releases a compatible SDK update.
 
 | Feature | Description | Status |
@@ -365,6 +367,18 @@ ltfi/
 | Colmi Ring Integration | Colmi ring data flows via QRing app into HealthKit — no direct integration needed | ⏸ Deferred |
 | Health Screen UI | Dashboard showing steps, heart rate, calories, sleep, distance | ✅ Built — pending native build |
 | HealthKit Utility Layer | Platform-aware data fetching from HealthKit | ✅ Built — pending native build |
+
+#### Android — Google Health Connect
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Health Connect Setup | Request Health Connect permissions on first launch | ⬜ Not Built |
+| Steps Tracking | Read daily step count from Health Connect | ⬜ Not Built |
+| Active Calories | Read active calories burned from Health Connect | ⬜ Not Built |
+| Heart Rate | Read heart rate data from Health Connect | ⬜ Not Built |
+| Sleep Tracking | Read sleep duration from Health Connect | ⬜ Not Built |
+| Distance | Read daily distance from Health Connect | ⬜ Not Built |
+| Android APK Distribution | Build and distribute APK directly to users — no Google Play needed | ⬜ Not Built |
 
 ---
 
