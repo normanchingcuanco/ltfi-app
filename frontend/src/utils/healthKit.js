@@ -3,7 +3,11 @@ import { Platform } from 'react-native';
 let AppleHealthKit = null;
 
 if (Platform.OS === 'ios') {
-  AppleHealthKit = require('react-native-health').default;
+  try {
+    AppleHealthKit = require('react-native-health').default;
+  } catch (e) {
+    AppleHealthKit = null;
+  }
 }
 
 const PERMISSIONS = AppleHealthKit ? {
