@@ -8,6 +8,7 @@ export default function BarcodeScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [facing, setFacing] = useState('back');
   const router = useRouter();
   const params = useLocalSearchParams();
 
@@ -44,9 +45,13 @@ export default function BarcodeScannerScreen() {
     <View style={styles.container}>
       <CameraView
         style={StyleSheet.absoluteFillObject}
+        facing={facing}
         onBarcodeScanned={handleBarCodeScanned}
         barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
       />
+      <TouchableOpacity style={styles.flipBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
+        <Text style={styles.flipText}>⇄ Flip</Text>
+      </TouchableOpacity>
       {loading && (
         <View style={styles.overlay}>
           <ActivityIndicator size="large" color="#F77E2D" />
@@ -69,6 +74,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF', padding: 24 },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   bottomBar: { position: 'absolute', bottom: 40, width: '100%', alignItems: 'center' },
+  flipBtn: { position: 'absolute', top: 60, right: 24, backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 99 },
+  flipText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   text: { fontSize: 16, color: '#1A1A1A', textAlign: 'center', marginBottom: 16 },
   loadingText: { color: '#fff', marginTop: 12, fontSize: 16 },
   button: { backgroundColor: '#F77E2D', paddingVertical: 12, paddingHorizontal: 32, borderRadius: 8 },
