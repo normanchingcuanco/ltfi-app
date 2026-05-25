@@ -17,25 +17,24 @@ function WebBarcodeScanner({ onScanned, loading }) {
       readerRef.current = codeReader;
 
       try {
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        const backCamera = devices.find(d =>
-          d.label.toLowerCase().includes('back') ||
-          d.label.toLowerCase().includes('rear') ||
-          d.label.toLowerCase().includes('environment')
-        ) || devices[devices.length - 1];
-
-        const deviceId = backCamera?.deviceId;
-
-        await codeReader.decodeFromVideoDevice(deviceId, videoRef.current, (result, err) => {
-          if (result) {
-            onScanned(result.getText());
+        await codeReader.decodeFromConstraints(
+          {
+            video: {
+              facingMode: { ideal: 'environment' }
+            }
+          },
+          videoRef.current,
+          (result, err) => {
+            if (result) {
+              onScanned(result.getText());
+            }
           }
-        });
+        );
       } catch (err) {
         console.error('Camera error:', err);
       }
     };
-
+    
     startScanner();
 
     return () => {
