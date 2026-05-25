@@ -382,6 +382,17 @@ ltfi/
 
 ---
 
+### Phase 4 — Deployment
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Backend Deployment | Deploy Express backend to Render free tier | ⬜ Not Built |
+| Frontend Deployment | Deploy Expo web to Vercel | ⬜ Not Built |
+| Environment Config (Production) | Set production env vars on Render and Vercel | ⬜ Not Built |
+| Mobile Build | EAS build for iOS and Android native binary | ⬜ Not Built |
+
+---
+
 ## Setup Instructions
 
 ### Prerequisites
