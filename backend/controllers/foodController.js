@@ -3,13 +3,11 @@ const Food = require('../models/Food');
 const createFood = async (req, res) => {
   try {
     const { name, calories, protein, carbs, fat, fiber, sodium, sugar, servingSize, servingUnit, barcode } = req.body;
-
     const food = await Food.create({
       name, calories, protein, carbs, fat,
       fiber, sodium, sugar, servingSize, servingUnit,
       barcode, source: 'custom', createdBy: req.user._id
     });
-
     res.status(201).json(food);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -21,12 +19,33 @@ const searchFood = async (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ message: 'Search query required' });
 
-    const foods = await Food.find({
+    const localFoods = await Food.find({
       name: { $regex: q, $options: 'i' },
       $or: [{ createdBy: null }, { createdBy: req.user._id }]
-    }).limit(20);
+    }).limit(10);
 
-    res.json(foods);
+    const offRes = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10`);
+    const offData = await offRes.json();
+
+    const offFoods = (offData.products || [])
+      .filter(p => p.product_name && p.nutriments)
+      .map(p => ({
+        _id: null,
+        name: p.product_name,
+        calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
+        protein: Math.round(p.nutriments['proteins_100g'] || 0),
+        carbs: Math.round(p.nutriments['carbohydrates_100g'] || 0),
+        fat: Math.round(p.nutriments['fat_100g'] || 0),
+        fiber: Math.round(p.nutriments['fiber_100g'] || 0),
+        sodium: Math.round(p.nutriments['sodium_100g'] || 0),
+        sugar: Math.round(p.nutriments['sugars_100g'] || 0),
+        servingSize: 100,
+        servingUnit: 'g',
+        source: 'open_food_facts'
+      }));
+
+    const combined = [...localFoods, ...offFoods].slice(0, 20);
+    res.json(combined);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -35,15 +54,11 @@ const searchFood = async (req, res) => {
 const getFoodByBarcode = async (req, res) => {
   try {
     const { barcode } = req.params;
-
-    // Check local DB first
     let food = await Food.findOne({ barcode });
     if (food) return res.json(food);
 
-    // Fall back to Open Food Facts API
     const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
     const data = await response.json();
-
     if (data.status !== 1) return res.status(404).json({ message: 'Product not found' });
 
     const p = data.product.nutriments;
@@ -60,7 +75,6 @@ const getFoodByBarcode = async (req, res) => {
       source: 'open_food_facts',
       createdBy: null
     });
-
     res.json(food);
   } catch (err) {
     res.status(500).json({ message: err.message });
