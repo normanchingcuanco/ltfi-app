@@ -41,7 +41,7 @@ export default function AddFoodScreen() {
   const fetchMyFoods = async () => {
     setMyFoodsLoading(true);
     try {
-      const res = await api.get('/food/user');
+      const res = await api.get('/food/my');
       setMyFoods(res.data);
     } catch (err) {
       console.error(err);
