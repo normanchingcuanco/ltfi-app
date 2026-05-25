@@ -314,6 +314,7 @@ ltfi/
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
 | Food Search | Search food database — Open Food Facts + custom entries | ✅ Done |
 | Open Food Facts Live Search | Food search queries Open Food Facts in real time — no pre-loaded data needed | ✅ Done |
+| My Foods | View and delete custom foods from the Add Food screen | ✅ Done |
 
 #### 4. Nutrition Dashboard
 
