@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Platform } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
@@ -49,9 +49,11 @@ export default function BarcodeScannerScreen() {
         onBarcodeScanned={handleBarCodeScanned}
         barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
       />
-      <TouchableOpacity style={styles.flipBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
-        <Text style={styles.flipText}>⇄ Flip</Text>
-      </TouchableOpacity>
+      {Platform.OS !== 'web' && (
+        <TouchableOpacity style={styles.flipBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
+          <Text style={styles.flipText}>⇄ Flip</Text>
+        </TouchableOpacity>
+      )}
       {loading && (
         <View style={styles.overlay}>
           <ActivityIndicator size="large" color="#F77E2D" />
