@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import api from '../src/utils/api';
+import api from '../../src/utils/api';
 
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {
