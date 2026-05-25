@@ -313,6 +313,7 @@ ltfi/
 | Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
 | Food Search | Search food database — Open Food Facts + custom entries | ✅ Done |
+| Open Food Facts Live Search | Food search queries Open Food Facts in real time — no pre-loaded data needed | ✅ Done |
 
 #### 4. Nutrition Dashboard
 
@@ -386,9 +387,9 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Backend Deployment | Deploy Express backend to Render free tier | ⬜ Not Built |
-| Frontend Deployment | Deploy Expo web to Vercel | ⬜ Not Built |
-| Environment Config (Production) | Set production env vars on Render and Vercel | ⬜ Not Built |
+| Backend Deployment | Deploy Express backend to Render free tier | ✅ Done |
+| Frontend Deployment | Deploy Expo web to Vercel | ✅ Done |
+| Environment Config (Production) | Set production env vars on Render and Vercel | ✅ Done |
 | Mobile Build | EAS build for iOS and Android native binary | ⬜ Not Built |
 
 ---

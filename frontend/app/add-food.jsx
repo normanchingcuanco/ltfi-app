@@ -1,21 +1,54 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
+
+const showAlert = (title, message, buttons) => {
+  if (Platform.OS === 'web') {
+    if (buttons) {
+      if (window.confirm(`${title}: ${message}`)) {
+        buttons.find(b => b.style === 'destructive')?.onPress();
+      }
+    } else {
+      window.alert(`${title}: ${message}`);
+    }
+  } else {
+    Alert.alert(title, message, buttons);
+  }
+};
 
 export default function AddFoodScreen() {
   const { mealType, date, prefillFood } = useLocalSearchParams();
   const router = useRouter();
+  const [tab, setTab] = useState('search');
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [myFoods, setMyFoods] = useState([]);
+  const [myFoodsLoading, setMyFoodsLoading] = useState(false);
 
   useEffect(() => {
     if (prefillFood) {
       setResults([JSON.parse(prefillFood)]);
     }
   }, [prefillFood]);
+
+  useEffect(() => {
+    if (tab === 'myfoods') fetchMyFoods();
+  }, [tab]);
+
+  const fetchMyFoods = async () => {
+    setMyFoodsLoading(true);
+    try {
+      const res = await api.get('/food/user');
+      setMyFoods(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setMyFoodsLoading(false);
+    }
+  };
 
   const searchFood = async () => {
     if (!search.trim()) return;
@@ -45,9 +78,9 @@ export default function AddFoodScreen() {
           protein: food.protein,
           carbs: food.carbs,
           fat: food.fat,
-          fiber: food.fiber,
-          sodium: food.sodium,
-          sugar: food.sugar
+          fiber: food.fiber || 0,
+          sodium: food.sodium || 0,
+          sugar: food.sugar || 0
         }
       });
       router.back();
@@ -56,6 +89,22 @@ export default function AddFoodScreen() {
     } finally {
       setAdding(false);
     }
+  };
+
+  const deleteFood = (food) => {
+    showAlert('Delete Food', `Delete "${food.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await api.delete(`/food/${food._id}`);
+            setMyFoods(prev => prev.filter(f => f._id !== food._id));
+          } catch (err) {
+            showAlert('Error', 'Could not delete food.');
+          }
+        }
+      }
+    ]);
   };
 
   return (
@@ -68,45 +117,87 @@ export default function AddFoodScreen() {
         <Text style={styles.mealLabel}>{mealType}</Text>
       </View>
 
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Search food..."
-          placeholderTextColor="#999"
-          value={search}
-          onChangeText={setSearch}
-          onSubmitEditing={searchFood}
-        />
-        <TouchableOpacity style={styles.searchBtn} onPress={searchFood}>
-          <Text style={styles.searchBtnText}>Search</Text>
+      <View style={styles.tabs}>
+        <TouchableOpacity style={[styles.tabBtn, tab === 'search' && styles.tabBtnActive]} onPress={() => setTab('search')}>
+          <Text style={[styles.tabText, tab === 'search' && styles.tabTextActive]}>Search</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tabBtn, tab === 'myfoods' && styles.tabBtnActive]} onPress={() => setTab('myfoods')}>
+          <Text style={[styles.tabText, tab === 'myfoods' && styles.tabTextActive]}>My Foods</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/barcode-scanner', params: { mealType, date } })}>
-          <Text style={styles.actionBtnText}>📷 Scan Barcode</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/ai-food-scan', params: { mealType, date } })}>
-          <Text style={styles.actionBtnText}>🤖 AI Scan</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/custom-food', params: { mealType, date } })}>
-          <Text style={styles.actionBtnText}>+ Custom</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading && <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />}
-
-      {results.map((food, idx) => (
-        <View key={idx} style={styles.resultItem}>
-          <View style={styles.resultInfo}>
-            <Text style={styles.resultName}>{food.name}</Text>
-            <Text style={styles.resultMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F</Text>
+      {tab === 'search' && (
+        <>
+          <View style={styles.searchRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Search food..."
+              placeholderTextColor="#999"
+              value={search}
+              onChangeText={setSearch}
+              onSubmitEditing={searchFood}
+            />
+            <TouchableOpacity style={styles.searchBtn} onPress={searchFood}>
+              <Text style={styles.searchBtnText}>Search</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => addFood(food)} disabled={adding}>
-            <Text style={styles.addBtnText}>Add</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/barcode-scanner', params: { mealType, date } })}>
+              <Text style={styles.actionBtnText}>📷 Scan Barcode</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/ai-food-scan', params: { mealType, date } })}>
+              <Text style={styles.actionBtnText}>🤖 AI Scan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/custom-food', params: { mealType, date } })}>
+              <Text style={styles.actionBtnText}>+ Custom</Text>
+            </TouchableOpacity>
+          </View>
+
+          {loading && <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />}
+
+          {results.map((food, idx) => (
+            <View key={idx} style={styles.resultItem}>
+              <View style={styles.resultInfo}>
+                <Text style={styles.resultName}>{food.name}</Text>
+                <Text style={styles.resultMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F</Text>
+              </View>
+              <TouchableOpacity style={styles.addBtn} onPress={() => addFood(food)} disabled={adding}>
+                <Text style={styles.addBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </>
+      )}
+
+      {tab === 'myfoods' && (
+        <>
+          {myFoodsLoading ? (
+            <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />
+          ) : myFoods.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>No custom foods yet.</Text>
+            </View>
+          ) : (
+            myFoods.map((food, idx) => (
+              <View key={idx} style={styles.resultItem}>
+                <View style={styles.resultInfo}>
+                  <Text style={styles.resultName}>{food.name}</Text>
+                  <Text style={styles.resultMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F</Text>
+                </View>
+                <View style={styles.myFoodActions}>
+                  <TouchableOpacity style={styles.addBtn} onPress={() => addFood(food)} disabled={adding}>
+                    <Text style={styles.addBtnText}>Add</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteFood(food)}>
+                    <Text style={styles.deleteBtnText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -118,6 +209,11 @@ const styles = StyleSheet.create({
   back: { color: '#F77E2D', fontSize: 14, marginBottom: 8 },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A' },
   mealLabel: { fontSize: 13, color: '#999', textTransform: 'capitalize', marginTop: 2 },
+  tabs: { flexDirection: 'row', backgroundColor: '#D9D3C8', borderRadius: 12, padding: 4, marginBottom: 20 },
+  tabBtn: { flex: 1, padding: 10, borderRadius: 10, alignItems: 'center' },
+  tabBtnActive: { backgroundColor: '#F77E2D' },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#888' },
+  tabTextActive: { color: '#fff' },
   searchRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   input: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, fontSize: 15, color: '#1A1A1A' },
   searchBtn: { backgroundColor: '#F77E2D', borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
@@ -130,5 +226,10 @@ const styles = StyleSheet.create({
   resultName: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 2 },
   resultMacros: { fontSize: 12, color: '#888' },
   addBtn: { backgroundColor: '#F77E2D', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, marginLeft: 10 },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 }
+  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  myFoodActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  deleteBtn: { backgroundColor: '#E8E2D8', width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  deleteBtnText: { color: '#888', fontSize: 12, fontWeight: '700' },
+  emptyBox: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 24, alignItems: 'center' },
+  emptyText: { color: '#888', fontSize: 14 }
 });
