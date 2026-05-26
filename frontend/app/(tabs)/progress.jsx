@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
 import api from '../../src/utils/api';
 
 const screenWidth = Dimensions.get('window').width - 48;
+
+const confirmDelete = (onConfirm) => {
+  if (Platform.OS === 'web') {
+    if (window.confirm('Delete this entry?')) onConfirm();
+  } else {
+    Alert.alert('Delete', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onConfirm }
+    ]);
+  }
+};
 
 export default function ProgressScreen() {
   const [history, setHistory] = useState([]);
@@ -37,10 +48,21 @@ export default function ProgressScreen() {
       setShowForm(false);
       await fetchHistory();
     } catch (err) {
-      Alert.alert('Error', 'Failed to log weight.');
+      console.error(err);
     } finally {
       setLogging(false);
     }
+  };
+
+  const deleteEntry = (id) => {
+    confirmDelete(async () => {
+      try {
+        await api.delete(`/weight/${id}`);
+        setHistory(prev => prev.filter(e => e._id !== id));
+      } catch (err) {
+        console.error(err);
+      }
+    });
   };
 
   if (loading) return (
@@ -143,6 +165,9 @@ export default function ProgressScreen() {
               <View key={idx} style={styles.logItem}>
                 <Text style={styles.logDate}>{new Date(entry.loggedAt).toDateString()}</Text>
                 <Text style={styles.logWeight}>{entry.weight} kg</Text>
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteEntry(entry._id)}>
+                  <Text style={styles.deleteBtnText}>✕</Text>
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -178,7 +203,9 @@ const styles = StyleSheet.create({
   chartLabel: { fontSize: 11, color: '#888' },
   logList: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20 },
   logTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
-  logItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#C5BFB4' },
-  logDate: { fontSize: 13, color: '#555' },
-  logWeight: { fontSize: 13, fontWeight: '700', color: '#F77E2D' }
+  logItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#C5BFB4' },
+  logDate: { fontSize: 13, color: '#555', flex: 1 },
+  logWeight: { fontSize: 13, fontWeight: '700', color: '#F77E2D', marginRight: 12 },
+  deleteBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#C5BFB4', justifyContent: 'center', alignItems: 'center' },
+  deleteBtnText: { color: '#888', fontSize: 11, fontWeight: '700' }
 });
