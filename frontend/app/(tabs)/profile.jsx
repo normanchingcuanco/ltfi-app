@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import api from '../../src/utils/api';
 
+const ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'active', 'very active'];
+
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -90,9 +92,42 @@ export default function ProfileScreen() {
       </View>
 
       {!editing && (
-        <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
-          <Text style={styles.editBtnText}>Edit Profile</Text>
-        </TouchableOpacity>
+        <>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{user?.currentWeight} kg</Text>
+              <Text style={styles.statLabel}>Current Weight</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{user?.goalWeight} kg</Text>
+              <Text style={styles.statLabel}>Goal Weight</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{user?.height} cm</Text>
+              <Text style={styles.statLabel}>Height</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{user?.age}</Text>
+              <Text style={styles.statLabel}>Age</Text>
+            </View>
+          </View>
+
+          <View style={styles.activityCard}>
+            <Text style={styles.cardLabel}>Activity Level</Text>
+            <Text style={styles.activityValue}>{user?.activityLevel}</Text>
+          </View>
+
+          {user?.dietPreference ? (
+            <View style={styles.activityCard}>
+              <Text style={styles.cardLabel}>Diet Preference</Text>
+              <Text style={styles.activityValue}>{user?.dietPreference}</Text>
+            </View>
+          ) : null}
+
+          <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
+            <Text style={styles.editBtnText}>Edit Profile</Text>
+          </TouchableOpacity>
+        </>
       )}
 
       {editing && (
@@ -116,6 +151,20 @@ export default function ProfileScreen() {
               />
             </View>
           ))}
+
+          <Text style={styles.fieldLabel}>Activity Level</Text>
+          <View style={styles.pills}>
+            {ACTIVITY_LEVELS.map(level => (
+              <TouchableOpacity
+                key={level}
+                style={[styles.pill, form.activityLevel === level && styles.pillActive]}
+                onPress={() => setForm({ ...form, activityLevel: level })}
+              >
+                <Text style={[styles.pillText, form.activityLevel === level && styles.pillTextActive]}>{level}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
             <Text style={styles.saveBtnText}>{loading ? 'Saving...' : 'Save Changes'}</Text>
           </TouchableOpacity>
@@ -143,14 +192,25 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16 },
   cardLabel: { fontSize: 12, color: '#888', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
   cardValue: { fontSize: 36, fontWeight: '900', color: '#F77E2D' },
-  macrosRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  macrosRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   macroCard: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, alignItems: 'center' },
   macroValue: { fontSize: 22, fontWeight: '800', color: '#1A1A1A' },
   macroLabel: { fontSize: 11, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
+  statItem: { width: '47%', backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, alignItems: 'center' },
+  statValue: { fontSize: 20, fontWeight: '800', color: '#1A1A1A' },
+  statLabel: { fontSize: 11, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  activityCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
+  activityValue: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', textTransform: 'capitalize', marginTop: 4 },
   formCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16, gap: 12 },
   fieldGroup: { gap: 4 },
-  fieldLabel: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 1 },
+  fieldLabel: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
   input: { backgroundColor: '#EDE8DF', borderRadius: 10, padding: 14, fontSize: 15, color: '#1A1A1A' },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  pill: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 99, backgroundColor: '#EDE8DF' },
+  pillActive: { backgroundColor: '#F77E2D' },
+  pillText: { fontSize: 12, color: '#666', textTransform: 'capitalize' },
+  pillTextActive: { color: '#fff', fontWeight: '700' },
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontWeight: '700' },
   cancelBtn: { borderWidth: 1.5, borderColor: '#C4BDB2', borderRadius: 12, padding: 14, alignItems: 'center' },
