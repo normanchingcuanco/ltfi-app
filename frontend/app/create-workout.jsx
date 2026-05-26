@@ -103,14 +103,13 @@ export default function CreateWorkoutScreen() {
         }]
       };
     } else {
-      if (intervals.some(i => !i.name.trim())) return showAlert('Error', 'All intervals need a name');
       payload = {
         name,
         type,
         mode: 'complex',
         rounds: parseInt(rounds) || 1,
         intervals: intervals.map(i => ({
-          name: i.name,
+          name: i.name.trim() || 'Interval',
           workSeconds: parseInt(i.workSeconds) || 30,
           restSeconds: parseInt(i.restSeconds) || 10,
           met: i.met || 5.0
@@ -348,8 +347,8 @@ const styles = StyleSheet.create({
   modeTabSub: { fontSize: 11, color: '#aaa', marginTop: 4 },
   simpleCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 16 },
   durationRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
-  durationField: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#EDE8DF', borderRadius: 12, paddingHorizontal: 14 },
-  durationInput: { flex: 1, fontSize: 28, fontWeight: '900', color: '#1A1A1A', padding: 14, textAlign: 'center' },
+  durationField: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#EDE8DF', borderRadius: 12, paddingHorizontal: 14, overflow: 'hidden' },
+  durationInput: { flex: 1, fontSize: 24, fontWeight: '900', color: '#1A1A1A', padding: 12, textAlign: 'center', minWidth: 0 },
   durationUnit: { fontSize: 13, color: '#888', fontWeight: '600' },
   dropdown: { backgroundColor: '#EDE8DF', borderRadius: 10, marginBottom: 8 },
   dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#D9D3C8' },
