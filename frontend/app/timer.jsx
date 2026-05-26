@@ -4,8 +4,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Speech from 'expo-speech';
 import api from '../src/utils/api';
 
-const MET_VALUES = { HIIT: 8, Tabata: 8, circuit: 6, custom: 5 };
-
 const speakWithVoice = (text, voiceURI) => {
   if (Platform.OS === 'web') {
     if ('speechSynthesis' in window) {
@@ -26,14 +24,20 @@ const speakWithVoice = (text, voiceURI) => {
 };
 
 const calculateCalories = (workout, weightKg) => {
-  const met = MET_VALUES[workout.type] || 5;
-  let totalSeconds = 0;
-  workout.intervals.forEach(i => {
-    totalSeconds += i.workSeconds + i.restSeconds;
+  let totalKcal = 0;
+  workout.intervals.forEach(interval => {
+    const met = interval.met || 5.0;
+    const workHours = interval.workSeconds / 3600;
+    totalKcal += met * weightKg * workHours;
   });
-  totalSeconds *= workout.rounds;
-  const hours = totalSeconds / 3600;
-  return Math.round(met * weightKg * hours);
+  totalKcal *= workout.rounds;
+  return Math.round(totalKcal);
+};
+
+const formatTime = (s) => {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, '0')}`;
 };
 
 export default function TimerScreen() {
@@ -43,16 +47,22 @@ export default function TimerScreen() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [screen, setScreen] = useState('settings');
-  const [currentRound, setCurrentRound] = useState(1);
-  const [currentInterval, setCurrentInterval] = useState(0);
-  const [phase, setPhase] = useState('work');
-  const [timeLeft, setTimeLeft] = useState(0);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
   const [caloriesBurned, setCaloriesBurned] = useState('');
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const intervalRef = useRef(null);
+
+  // Simple mode state
+  const [simpleTimeLeft, setSimpleTimeLeft] = useState(0);
+  const [simpleTotalTime, setSimpleTotalTime] = useState(0);
+
+  // Complex mode state
+  const [currentRound, setCurrentRound] = useState(1);
+  const [currentInterval, setCurrentInterval] = useState(0);
+  const [phase, setPhase] = useState('work');
+  const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -73,9 +83,17 @@ export default function TimerScreen() {
         api.get(`/workouts/${workoutId}`),
         api.get('/auth/me')
       ]);
-      setWorkout(workoutRes.data);
+      const w = workoutRes.data;
+      setWorkout(w);
       setUser(userRes.data);
-      setTimeLeft(workoutRes.data.intervals[0].workSeconds);
+
+      if (w.mode === 'simple') {
+        const totalSecs = w.intervals[0].workSeconds;
+        setSimpleTimeLeft(totalSecs);
+        setSimpleTotalTime(totalSecs);
+      } else {
+        setTimeLeft(w.intervals[0].workSeconds);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -85,7 +103,37 @@ export default function TimerScreen() {
 
   const speak = (text) => speakWithVoice(text, selectedVoice);
 
+  // Simple timer tick
   useEffect(() => {
+    if (!workout || workout.mode !== 'simple') return;
+    if (running) {
+      intervalRef.current = setInterval(() => {
+        setSimpleTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(intervalRef.current);
+            setRunning(false);
+            setDone(true);
+            speak('Workout complete. Great job!');
+            if (user?.currentWeight) {
+              setCaloriesBurned(calculateCalories(workout, user.currentWeight).toString());
+            }
+            return 0;
+          }
+          if (prev === 4) speak('3');
+          if (prev === 3) speak('2');
+          if (prev === 2) speak('1');
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      clearInterval(intervalRef.current);
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [running, workout]);
+
+  // Complex timer tick
+  useEffect(() => {
+    if (!workout || workout.mode !== 'complex') return;
     if (running) {
       intervalRef.current = setInterval(() => {
         setTimeLeft(prev => {
@@ -100,7 +148,7 @@ export default function TimerScreen() {
       clearInterval(intervalRef.current);
     }
     return () => clearInterval(intervalRef.current);
-  }, [running, currentInterval, currentRound, phase, selectedVoice]);
+  }, [running, currentInterval, currentRound, phase, selectedVoice, workout]);
 
   const advance = () => {
     if (!workout) return;
@@ -139,14 +187,19 @@ export default function TimerScreen() {
       setDone(true);
       speak('Workout complete. Great job!');
       if (user?.currentWeight) {
-        const estimated = calculateCalories(workout, user.currentWeight);
-        setCaloriesBurned(estimated.toString());
+        setCaloriesBurned(calculateCalories(workout, user.currentWeight).toString());
       }
     }
   };
 
   const handleStart = () => {
-    if (!running && workout) speak(workout.intervals[currentInterval].name);
+    if (!running && workout) {
+      if (workout.mode === 'simple') {
+        speak(workout.name);
+      } else {
+        speak(workout.intervals[currentInterval].name);
+      }
+    }
     setRunning(!running);
   };
 
@@ -172,10 +225,19 @@ export default function TimerScreen() {
     }
   };
 
-  const formatTime = (s) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, '0')}`;
+  const resetSimple = () => {
+    setRunning(false);
+    setSimpleTimeLeft(simpleTotalTime);
+    setDone(false);
+  };
+
+  const resetComplex = () => {
+    setRunning(false);
+    setCurrentRound(1);
+    setCurrentInterval(0);
+    setPhase('work');
+    setTimeLeft(workout.intervals[0].workSeconds);
+    setDone(false);
   };
 
   if (loading || !workout) return (
@@ -184,13 +246,19 @@ export default function TimerScreen() {
     </View>
   );
 
+  // Settings screen
   if (screen === 'settings') return (
     <ScrollView style={styles.settingsContainer} contentContainerStyle={styles.settingsContent}>
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
       </TouchableOpacity>
       <Text style={styles.settingsTitle}>{workout.name}</Text>
-      <Text style={styles.settingsMeta}>{workout.type} · {workout.rounds} round{workout.rounds > 1 ? 's' : ''} · {workout.intervals.length} interval{workout.intervals.length !== 1 ? 's' : ''}</Text>
+      <Text style={styles.settingsMeta}>
+        {workout.type} · {workout.mode === 'simple'
+          ? formatTime(workout.intervals[0].workSeconds)
+          : `${workout.rounds} round${workout.rounds > 1 ? 's' : ''} · ${workout.intervals.length} interval${workout.intervals.length !== 1 ? 's' : ''}`
+        }
+      </Text>
 
       {voices.length > 0 && (
         <>
@@ -214,13 +282,27 @@ export default function TimerScreen() {
         </>
       )}
 
-      <Text style={styles.sectionLabel}>Intervals</Text>
-      {workout.intervals.map((interval, idx) => (
-        <View key={idx} style={styles.intervalPreview}>
-          <Text style={styles.intervalPreviewName}>{interval.name}</Text>
-          <Text style={styles.intervalPreviewTime}>{interval.workSeconds}s work / {interval.restSeconds}s rest</Text>
-        </View>
-      ))}
+      {workout.mode === 'complex' && (
+        <>
+          <Text style={styles.sectionLabel}>Intervals</Text>
+          {workout.intervals.map((interval, idx) => (
+            <View key={idx} style={styles.intervalPreview}>
+              <Text style={styles.intervalPreviewName}>{interval.name}</Text>
+              <Text style={styles.intervalPreviewTime}>{interval.workSeconds}s work / {interval.restSeconds}s rest</Text>
+            </View>
+          ))}
+        </>
+      )}
+
+      {workout.mode === 'simple' && (
+        <>
+          <Text style={styles.sectionLabel}>Duration</Text>
+          <View style={styles.intervalPreview}>
+            <Text style={styles.intervalPreviewName}>{workout.intervals[0].name}</Text>
+            <Text style={styles.intervalPreviewTime}>{formatTime(workout.intervals[0].workSeconds)}</Text>
+          </View>
+        </>
+      )}
 
       <TouchableOpacity style={styles.startWorkoutBtn} onPress={() => setScreen('timer')}>
         <Text style={styles.startWorkoutBtnText}>Start Workout</Text>
@@ -228,6 +310,7 @@ export default function TimerScreen() {
     </ScrollView>
   );
 
+  // Done screen
   if (done) return (
     <View style={styles.center}>
       <Text style={styles.doneTitle}>Workout Complete! 🎉</Text>
@@ -241,13 +324,51 @@ export default function TimerScreen() {
         value={caloriesBurned}
         onChangeText={setCaloriesBurned}
       />
-      <Text style={styles.calsHint}>Auto-estimated based on your weight and workout type. Edit if needed.</Text>
+      <Text style={styles.calsHint}>Auto-estimated based on your weight. Edit if needed.</Text>
       <TouchableOpacity style={styles.finishBtn} onPress={handleFinish}>
         <Text style={styles.finishBtnText}>Finish</Text>
       </TouchableOpacity>
     </View>
   );
 
+  // Simple timer screen
+  if (workout.mode === 'simple') {
+    const progress = simpleTotalTime > 0 ? simpleTimeLeft / simpleTotalTime : 0;
+    return (
+      <View style={[styles.container, { backgroundColor: '#1A1A1A' }]}>
+        <TouchableOpacity style={styles.closeBtn} onPress={handleQuit}>
+          <Text style={styles.closeBtnText}>✕</Text>
+        </TouchableOpacity>
+        <Text style={styles.simpleWorkoutName}>{workout.name}</Text>
+        <Text style={styles.timer}>{formatTime(simpleTimeLeft)}</Text>
+        <View style={styles.simpleProgressBar}>
+          <View style={[styles.simpleProgressFill, { width: `${progress * 100}%` }]} />
+        </View>
+        <Text style={styles.simpleRemaining}>
+          {Math.round(progress * 100)}% remaining
+        </Text>
+        <View style={styles.controls}>
+          <TouchableOpacity style={styles.controlBtn} onPress={resetSimple}>
+            <Text style={styles.controlBtnText}>↺</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.playBtn} onPress={handleStart}>
+            <Text style={styles.playBtnText}>{running ? '⏸' : '▶'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.controlBtn} onPress={() => {
+            setRunning(false);
+            setDone(true);
+            if (user?.currentWeight) {
+              setCaloriesBurned(calculateCalories(workout, user.currentWeight).toString());
+            }
+          }}>
+            <Text style={styles.controlBtnText}>⏹</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Complex timer screen
   const interval = workout.intervals[currentInterval];
   const isWork = phase === 'work';
 
@@ -264,14 +385,7 @@ export default function TimerScreen() {
       <Text style={styles.exerciseName}>{interval.name}</Text>
       <Text style={styles.timer}>{formatTime(timeLeft)}</Text>
       <View style={styles.controls}>
-        <TouchableOpacity style={styles.controlBtn} onPress={() => {
-          setRunning(false);
-          setCurrentRound(1);
-          setCurrentInterval(0);
-          setPhase('work');
-          setTimeLeft(workout.intervals[0].workSeconds);
-          setDone(false);
-        }}>
+        <TouchableOpacity style={styles.controlBtn} onPress={resetComplex}>
           <Text style={styles.controlBtnText}>↺</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.playBtn} onPress={handleStart}>
@@ -325,7 +439,11 @@ const styles = StyleSheet.create({
   metaText: { color: '#fff', fontSize: 12, opacity: 0.6 },
   phase: { fontSize: 14, fontWeight: '800', color: '#F77E2D', letterSpacing: 4, marginBottom: 8 },
   exerciseName: { fontSize: 32, fontWeight: '900', color: '#fff', textAlign: 'center', marginBottom: 24 },
-  timer: { fontSize: 88, fontWeight: '900', color: '#fff', marginBottom: 48 },
+  simpleWorkoutName: { fontSize: 24, fontWeight: '900', color: '#fff', textAlign: 'center', marginBottom: 24 },
+  timer: { fontSize: 88, fontWeight: '900', color: '#fff', marginBottom: 24 },
+  simpleProgressBar: { width: '80%', height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, overflow: 'hidden', marginBottom: 12 },
+  simpleProgressFill: { height: 6, backgroundColor: '#F77E2D', borderRadius: 3 },
+  simpleRemaining: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 48 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 24, marginBottom: 48 },
   controlBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
   controlBtnText: { color: '#fff', fontSize: 22 },
