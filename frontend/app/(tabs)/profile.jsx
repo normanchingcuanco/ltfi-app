@@ -77,6 +77,33 @@ export default function ProfileScreen() {
         <Text style={styles.cardValue}>{user?.dailyCalorieGoal} kcal</Text>
       </View>
 
+      {user?.currentWeight && user?.goalWeight && user?.currentWeight > user?.goalWeight && (
+        <View style={styles.deficitCard}>
+          <Text style={styles.cardLabel}>Weight Loss Plan</Text>
+          <View style={styles.deficitRow}>
+            <View style={styles.deficitItem}>
+              <Text style={styles.deficitValue}>
+                {Math.max(user.dailyCalorieGoal - 500, 1200)} kcal
+              </Text>
+              <Text style={styles.deficitLabel}>Daily Target</Text>
+            </View>
+            <View style={styles.deficitItem}>
+              <Text style={styles.deficitValue}>500 kcal</Text>
+              <Text style={styles.deficitLabel}>Daily Deficit</Text>
+            </View>
+            <View style={styles.deficitItem}>
+              <Text style={styles.deficitValue}>
+                {Math.ceil((user.currentWeight - user.goalWeight) / 0.5)} wks
+              </Text>
+              <Text style={styles.deficitLabel}>Est. to Goal</Text>
+            </View>
+          </View>
+          <Text style={styles.deficitNote}>
+            Based on 500 kcal/day deficit · 0.5 kg/week loss
+          </Text>
+        </View>
+      )}
+
       <View style={styles.macrosRow}>
         <View style={styles.macroCard}>
           <Text style={styles.macroValue}>{user?.macroGoals?.protein}g</Text>
@@ -193,6 +220,12 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16 },
   cardLabel: { fontSize: 12, color: '#888', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
   cardValue: { fontSize: 36, fontWeight: '900', color: '#F77E2D' },
+  deficitCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16 },
+  deficitRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 },
+  deficitItem: { alignItems: 'center', flex: 1 },
+  deficitValue: { fontSize: 18, fontWeight: '800', color: '#F77E2D' },
+  deficitLabel: { fontSize: 10, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' },
+  deficitNote: { fontSize: 11, color: '#aaa', textAlign: 'center' },
   macrosRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   macroCard: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, alignItems: 'center' },
   macroValue: { fontSize: 22, fontWeight: '800', color: '#1A1A1A' },
