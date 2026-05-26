@@ -28,6 +28,11 @@ export default function AddFoodScreen() {
   const [myFoods, setMyFoods] = useState([]);
   const [myFoodsLoading, setMyFoodsLoading] = useState(false);
 
+  // Quantity picker
+  const [selectedFood, setSelectedFood] = useState(null);
+  const [quantity, setQuantity] = useState('100');
+  const [showQuantityPicker, setShowQuantityPicker] = useState(false);
+
   useEffect(() => {
     if (prefillFood) {
       setResults([JSON.parse(prefillFood)]);
@@ -63,24 +68,36 @@ export default function AddFoodScreen() {
     }
   };
 
-  const addFood = async (food) => {
+  const handleAddPress = (food) => {
+    setSelectedFood(food);
+    setQuantity('100');
+    setShowQuantityPicker(true);
+  };
+
+  const confirmAdd = async () => {
+    if (!selectedFood) return;
     setAdding(true);
+    setShowQuantityPicker(false);
+
+    const qty = parseFloat(quantity) || 100;
+    const ratio = qty / (selectedFood.servingSize || 100);
+
     try {
       await api.post('/meals', {
         date,
         mealType,
         food: {
-          foodId: food._id,
-          name: food.name,
-          quantity: 100,
-          unit: food.servingUnit || 'g',
-          calories: food.calories,
-          protein: food.protein,
-          carbs: food.carbs,
-          fat: food.fat,
-          fiber: food.fiber || 0,
-          sodium: food.sodium || 0,
-          sugar: food.sugar || 0
+          foodId: selectedFood._id,
+          name: selectedFood.name,
+          quantity: qty,
+          unit: selectedFood.servingUnit || 'g',
+          calories: Math.round(selectedFood.calories * ratio),
+          protein: Math.round(selectedFood.protein * ratio),
+          carbs: Math.round(selectedFood.carbs * ratio),
+          fat: Math.round(selectedFood.fat * ratio),
+          fiber: Math.round((selectedFood.fiber || 0) * ratio),
+          sodium: Math.round((selectedFood.sodium || 0) * ratio),
+          sugar: Math.round((selectedFood.sugar || 0) * ratio)
         }
       });
       router.back();
@@ -106,6 +123,10 @@ export default function AddFoodScreen() {
       }
     ]);
   };
+
+  const calculatedCalories = selectedFood
+    ? Math.round(selectedFood.calories * (parseFloat(quantity) || 100) / (selectedFood.servingSize || 100))
+    : 0;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -136,9 +157,10 @@ export default function AddFoodScreen() {
               value={search}
               onChangeText={setSearch}
               onSubmitEditing={searchFood}
+              returnKeyType="search"
             />
             <TouchableOpacity style={styles.searchBtn} onPress={searchFood}>
-              <Text style={styles.searchBtnText}>Search</Text>
+              {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.searchBtnText}>Search</Text>}
             </TouchableOpacity>
           </View>
 
@@ -154,15 +176,13 @@ export default function AddFoodScreen() {
             </TouchableOpacity>
           </View>
 
-          {loading && <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />}
-
           {results.map((food, idx) => (
             <View key={idx} style={styles.resultItem}>
               <View style={styles.resultInfo}>
                 <Text style={styles.resultName}>{food.name}</Text>
-                <Text style={styles.resultMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F</Text>
+                <Text style={styles.resultMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F per 100g</Text>
               </View>
-              <TouchableOpacity style={styles.addBtn} onPress={() => addFood(food)} disabled={adding}>
+              <TouchableOpacity style={styles.addBtn} onPress={() => handleAddPress(food)} disabled={adding}>
                 <Text style={styles.addBtnText}>Add</Text>
               </TouchableOpacity>
             </View>
@@ -186,7 +206,7 @@ export default function AddFoodScreen() {
                   <Text style={styles.resultMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F</Text>
                 </View>
                 <View style={styles.myFoodActions}>
-                  <TouchableOpacity style={styles.addBtn} onPress={() => addFood(food)} disabled={adding}>
+                  <TouchableOpacity style={styles.addBtn} onPress={() => handleAddPress(food)} disabled={adding}>
                     <Text style={styles.addBtnText}>Add</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteFood(food)}>
@@ -197,6 +217,43 @@ export default function AddFoodScreen() {
             ))
           )}
         </>
+      )}
+
+      {showQuantityPicker && selectedFood && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{selectedFood.name}</Text>
+            <Text style={styles.modalSub}>How much are you logging?</Text>
+
+            <View style={styles.quantityRow}>
+              <TextInput
+                style={styles.quantityInput}
+                keyboardType="numeric"
+                value={quantity}
+                onChangeText={setQuantity}
+                autoFocus
+              />
+              <Text style={styles.quantityUnit}>{selectedFood.servingUnit || 'g'}</Text>
+            </View>
+
+            <Text style={styles.caloriePreview}>{calculatedCalories} kcal</Text>
+
+            <View style={styles.quickBtns}>
+              {['50', '100', '150', '200'].map(q => (
+                <TouchableOpacity key={q} style={[styles.quickBtn, quantity === q && styles.quickBtnActive]} onPress={() => setQuantity(q)}>
+                  <Text style={[styles.quickBtnText, quantity === q && styles.quickBtnTextActive]}>{q}g</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd} disabled={adding}>
+              {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Add to {mealType}</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowQuantityPicker(false)}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </ScrollView>
   );
@@ -216,7 +273,7 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#fff' },
   searchRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   input: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, fontSize: 15, color: '#1A1A1A' },
-  searchBtn: { backgroundColor: '#F77E2D', borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
+  searchBtn: { backgroundColor: '#F77E2D', borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center', minWidth: 72, alignItems: 'center' },
   searchBtnText: { color: '#fff', fontWeight: '700' },
   actionRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   actionBtn: { flex: 1, borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 12, alignItems: 'center' },
@@ -231,5 +288,22 @@ const styles = StyleSheet.create({
   deleteBtn: { backgroundColor: '#E8E2D8', width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   deleteBtnText: { color: '#888', fontSize: 12, fontWeight: '700' },
   emptyBox: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 24, alignItems: 'center' },
-  emptyText: { color: '#888', fontSize: 14 }
+  emptyText: { color: '#888', fontSize: 14 },
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalCard: { backgroundColor: '#EDE8DF', borderRadius: 20, padding: 24, width: '100%' },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 4, textAlign: 'center' },
+  modalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 20 },
+  quantityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingHorizontal: 16, marginBottom: 8 },
+  quantityInput: { flex: 1, fontSize: 32, fontWeight: '900', color: '#1A1A1A', padding: 14, textAlign: 'center' },
+  quantityUnit: { fontSize: 16, color: '#888', fontWeight: '600' },
+  caloriePreview: { fontSize: 14, color: '#F77E2D', fontWeight: '700', textAlign: 'center', marginBottom: 16 },
+  quickBtns: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  quickBtn: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 10, padding: 10, alignItems: 'center' },
+  quickBtnActive: { backgroundColor: '#F77E2D' },
+  quickBtnText: { fontSize: 13, color: '#888', fontWeight: '600' },
+  quickBtnTextActive: { color: '#fff' },
+  confirmBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 8 },
+  confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  cancelBtn: { padding: 12, alignItems: 'center' },
+  cancelBtnText: { color: '#888', fontSize: 14 }
 });
