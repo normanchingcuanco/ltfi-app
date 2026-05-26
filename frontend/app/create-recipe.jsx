@@ -22,6 +22,7 @@ export default function CreateRecipeScreen() {
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchingIdx, setSearchingIdx] = useState(null);
+  const [searching, setSearching] = useState(false);
 
   const addIngredient = () => {
     setIngredients(prev => [...prev, { name: '', quantity: '100', unit: 'g', calories: '', protein: '', carbs: '', fat: '' }]);
@@ -38,11 +39,14 @@ export default function CreateRecipeScreen() {
   const searchFood = async (idx) => {
     if (!search.trim()) return;
     setSearchingIdx(idx);
+    setSearching(true);
     try {
       const res = await api.get(`/food/search?q=${search}`);
       setSearchResults(res.data);
     } catch (err) {
       console.error(err);
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -129,9 +133,14 @@ export default function CreateRecipeScreen() {
                 setSearch(val);
                 updateIngredient(idx, 'name', val);
               }}
+              onSubmitEditing={() => searchFood(idx)}
+              returnKeyType="search"
             />
             <TouchableOpacity style={styles.searchBtn} onPress={() => searchFood(idx)}>
-              <Text style={styles.searchBtnText}>Search</Text>
+              {searching && searchingIdx === idx
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.searchBtnText}>Search</Text>
+              }
             </TouchableOpacity>
           </View>
 
@@ -193,7 +202,7 @@ const styles = StyleSheet.create({
   removeText: { fontSize: 12, color: '#F77E2D', fontWeight: '700' },
   searchRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   searchInput: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 10, padding: 12, fontSize: 14, color: '#1A1A1A' },
-  searchBtn: { backgroundColor: '#F77E2D', borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center' },
+  searchBtn: { backgroundColor: '#F77E2D', borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center', minWidth: 64, alignItems: 'center' },
   searchBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   dropdown: { backgroundColor: '#EDE8DF', borderRadius: 10, marginBottom: 8 },
   dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#D9D3C8' },
