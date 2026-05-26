@@ -81,7 +81,7 @@ export default function CreateRecipeScreen() {
           fat: parseFloat(i.fat) || 0
         }))
       });
-      router.back();
+      router.replace('/(tabs)/recipes');
     } catch (err) {
       showAlert('Error', 'Failed to save recipe.');
     } finally {
