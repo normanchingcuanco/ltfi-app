@@ -7,7 +7,7 @@ import api from '../../src/utils/api';
 const ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'active', 'very active'];
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -43,7 +43,7 @@ export default function ProfileScreen() {
   const handleSave = async () => {
     setLoading(true);
     try {
-      await api.put('/auth/profile', {
+      const res = await api.put('/auth/profile', {
         name: form.name,
         currentWeight: parseFloat(form.currentWeight),
         goalWeight: parseFloat(form.goalWeight),
@@ -52,6 +52,7 @@ export default function ProfileScreen() {
         activityLevel: form.activityLevel,
         dietPreference: form.dietPreference
       });
+      updateUser(res.data);
       setEditing(false);
       Alert.alert('Saved', 'Profile updated.');
     } catch (err) {
