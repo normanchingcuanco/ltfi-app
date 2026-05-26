@@ -18,7 +18,8 @@ export default function ProfileScreen() {
     height: '',
     age: '',
     activityLevel: 'sedentary',
-    dietPreference: ''
+    dietPreference: '',
+    gender: 'male'
   });
 
   useEffect(() => {
@@ -30,7 +31,8 @@ export default function ProfileScreen() {
         height: user.height?.toString() || '',
         age: user.age?.toString() || '',
         activityLevel: user.activityLevel || 'sedentary',
-        dietPreference: user.dietPreference || ''
+        dietPreference: user.dietPreference || '',
+        gender: user.gender || 'male'
       });
     }
   }, [user]);
@@ -50,7 +52,8 @@ export default function ProfileScreen() {
         height: parseFloat(form.height),
         age: parseInt(form.age),
         activityLevel: form.activityLevel,
-        dietPreference: form.dietPreference
+        dietPreference: form.dietPreference,
+        gender: form.gender
       });
       updateUser(res.data);
       setEditing(false);
@@ -141,6 +144,11 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.activityCard}>
+            <Text style={styles.cardLabel}>Gender</Text>
+            <Text style={styles.activityValue}>{user?.gender || 'Not set'}</Text>
+          </View>
+
+          <View style={styles.activityCard}>
             <Text style={styles.cardLabel}>Activity Level</Text>
             <Text style={styles.activityValue}>{user?.activityLevel}</Text>
           </View>
@@ -179,6 +187,21 @@ export default function ProfileScreen() {
               />
             </View>
           ))}
+
+          <Text style={styles.fieldLabel}>Gender</Text>
+          <View style={styles.pills}>
+            {['male', 'female'].map(g => (
+              <TouchableOpacity
+                key={g}
+                style={[styles.pill, form.gender === g && styles.pillActive]}
+                onPress={() => setForm({ ...form, gender: g })}
+              >
+                <Text style={[styles.pillText, form.gender === g && styles.pillTextActive]}>
+                  {g.charAt(0).toUpperCase() + g.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <Text style={styles.fieldLabel}>Activity Level</Text>
           <View style={styles.pills}>
