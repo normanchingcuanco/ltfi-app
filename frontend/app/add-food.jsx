@@ -80,7 +80,7 @@ export default function AddFoodScreen() {
     setShowQuantityPicker(false);
 
     const qty = parseFloat(quantity) || 100;
-    const ratio = qty / (selectedFood.servingSize || 100);
+    const ratio = qty / 100;
 
     try {
       await api.post('/meals', {
