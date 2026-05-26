@@ -1,7 +1,18 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../../src/utils/api';
+
+const confirmDelete = (onConfirm) => {
+  if (Platform.OS === 'web') {
+    if (window.confirm('Delete this workout?')) onConfirm();
+  } else {
+    Alert.alert('Delete', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onConfirm }
+    ]);
+  }
+};
 
 export default function WorkoutScreen() {
   const [workouts, setWorkouts] = useState([]);
@@ -23,20 +34,15 @@ export default function WorkoutScreen() {
     }
   };
 
-  const deleteWorkout = async (id) => {
-    Alert.alert('Delete', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          try {
-            await api.delete(`/workouts/${id}`);
-            setWorkouts(prev => prev.filter(w => w._id !== id));
-          } catch (err) {
-            console.error(err);
-          }
-        }
+  const deleteWorkout = (id) => {
+    confirmDelete(async () => {
+      try {
+        await api.delete(`/workouts/${id}`);
+        setWorkouts(prev => prev.filter(w => w._id !== id));
+      } catch (err) {
+        console.error(err);
       }
-    ]);
+    });
   };
 
   if (loading) return (
