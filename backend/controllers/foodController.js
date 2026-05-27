@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const { AbortController } = require('abort-controller');
 const Food = require('../models/Food');
 
 const createFood = async (req, res) => {
@@ -15,17 +16,31 @@ const createFood = async (req, res) => {
   }
 };
 
+const fetchWithTimeout = async (url, options = {}, ms = 8000) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const searchUSDA = async (q) => {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=10&dataType=Foundation,SR%20Legacy,Branded&api_key=${process.env.USDA_API_KEY}`,
-      { headers: { 'User-Agent': 'LTFI/1.0' }, timeout: 8000 }
+      { headers: { 'User-Agent': 'LTFI/1.0' } },
+      8000
     );
     const data = await res.json();
+    if (data.foods && data.foods[0]) {
+      console.log('USDA sample nutrients:', JSON.stringify(data.foods[0].foodNutrients.slice(0, 3)));
+    }
     return (data.foods || []).map(f => {
       const nutrients = f.foodNutrients || [];
       const getByNumber = (num) => {
-        const n = nutrients.find(n => n.nutrientNumber === num || n.nutrientNumber === String(num));
+        const n = nutrients.find(n => String(n.nutrientNumber) === String(num));
         return n ? Math.round(n.value || 0) : 0;
       };
       const getByName = (name) => {
@@ -46,7 +61,7 @@ const searchUSDA = async (q) => {
         servingUnit: 'g',
         source: 'usda'
       };
-    }).filter(f => f.name && f.calories >= 0);
+    }).filter(f => f.name);
   } catch (err) {
     console.error('USDA error:', err.message);
     return [];
@@ -55,9 +70,10 @@ const searchUSDA = async (q) => {
 
 const searchOFF = async (q) => {
   try {
-    const offRes = await fetch(
+    const offRes = await fetchWithTimeout(
       `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,nutriments`,
-      { headers: { 'User-Agent': 'LTFI/1.0' }, timeout: 5000 }
+      { headers: { 'User-Agent': 'LTFI/1.0' } },
+      5000
     );
     const contentType = offRes.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
@@ -114,9 +130,11 @@ const getFoodByBarcode = async (req, res) => {
     let food = await Food.findOne({ barcode });
     if (food) return res.json(food);
 
-    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`, {
-      headers: { 'User-Agent': 'LTFI/1.0' }
-    });
+    const response = await fetchWithTimeout(
+      `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
+      { headers: { 'User-Agent': 'LTFI/1.0' } },
+      8000
+    );
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       return res.status(404).json({ message: 'Product not found' });
