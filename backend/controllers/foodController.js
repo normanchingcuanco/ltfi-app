@@ -18,31 +18,35 @@ const createFood = async (req, res) => {
 const searchUSDA = async (q) => {
   try {
     const res = await fetch(
-      `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=10&api_key=${process.env.USDA_API_KEY}`,
+      `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=10&dataType=Foundation,SR%20Legacy,Branded&api_key=${process.env.USDA_API_KEY}`,
       { headers: { 'User-Agent': 'LTFI/1.0' }, timeout: 8000 }
     );
     const data = await res.json();
     return (data.foods || []).map(f => {
       const nutrients = f.foodNutrients || [];
-      const get = (name) => {
+      const getByNumber = (num) => {
+        const n = nutrients.find(n => n.nutrientNumber === num || n.nutrientNumber === String(num));
+        return n ? Math.round(n.value || 0) : 0;
+      };
+      const getByName = (name) => {
         const n = nutrients.find(n => n.nutrientName && n.nutrientName.toLowerCase().includes(name.toLowerCase()));
         return n ? Math.round(n.value || 0) : 0;
       };
       return {
         _id: null,
         name: f.description,
-        calories: get('Energy') || get('energy'),
-        protein: get('Protein'),
-        carbs: get('Carbohydrate'),
-        fat: get('Total lipid'),
-        fiber: get('Fiber'),
-        sodium: get('Sodium'),
-        sugar: get('Sugars'),
+        calories: getByNumber(208) || getByName('energy'),
+        protein: getByNumber(203) || getByName('protein'),
+        carbs: getByNumber(205) || getByName('carbohydrate'),
+        fat: getByNumber(204) || getByName('lipid'),
+        fiber: getByNumber(291) || getByName('fiber'),
+        sodium: getByNumber(307) || getByName('sodium'),
+        sugar: getByNumber(269) || getByName('sugar'),
         servingSize: 100,
         servingUnit: 'g',
         source: 'usda'
       };
-    }).filter(f => f.calories > 0);
+    }).filter(f => f.name && f.calories >= 0);
   } catch (err) {
     console.error('USDA error:', err.message);
     return [];
