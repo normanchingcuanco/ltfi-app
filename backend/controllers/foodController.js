@@ -37,9 +37,7 @@ const searchUSDA = async (q) => {
       },
       8000
     );
-    const text = await res.text();
-    console.log('USDA status:', res.status, 'response:', text.slice(0, 300));
-    const data = JSON.parse(text);
+    const data = await res.json();
     return (data.foods || []).map(f => {
       const nutrients = f.foodNutrients || [];
       const getByNumber = (num) => {
