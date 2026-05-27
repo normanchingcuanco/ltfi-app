@@ -29,14 +29,17 @@ const fetchWithTimeout = async (url, options = {}, ms = 8000) => {
 const searchUSDA = async (q) => {
   try {
     const res = await fetchWithTimeout(
-      `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=10&dataType=Foundation,SR%20Legacy,Branded&api_key=${process.env.USDA_API_KEY}`,
-      { headers: { 'User-Agent': 'LTFI/1.0' } },
+      `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${process.env.USDA_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'User-Agent': 'LTFI/1.0', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q, pageSize: 10 })
+      },
       8000
     );
-    const data = await res.json();
-    if (data.foods && data.foods[0]) {
-      console.log('USDA sample nutrients:', JSON.stringify(data.foods[0].foodNutrients.slice(0, 3)));
-    }
+    const text = await res.text();
+    console.log('USDA status:', res.status, 'response:', text.slice(0, 300));
+    const data = JSON.parse(text);
     return (data.foods || []).map(f => {
       const nutrients = f.foodNutrients || [];
       const getByNumber = (num) => {
