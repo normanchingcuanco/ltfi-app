@@ -83,8 +83,7 @@ export default function AIFoodScanScreen() {
           sugar: result.sugar
         }
       });
-      router.back();
-      router.back();
+      router.replace('/(tabs)/diary');
     } catch (err) {
       alert('Failed to add food.');
     } finally {

@@ -291,7 +291,7 @@ ltfi/
 | Feature | Description | Status |
 |---------|-------------|--------|
 | User Model | Mongoose schema with profile fields, goals, and password | ✅ Done |
-| Registration Screen | Name, email, password, age, height, current weight, goal weight, activity level, diet preference | ✅ Done |
+| Registration Screen | Name, email, password, age, height, current weight, goal weight, activity level, diet preference, gender | ✅ Done |
 | Auto Calorie Calculation | Calculate daily calorie and macro goals on registration using TDEE formula | ✅ Done |
 | Login Screen | Email + password form with show/hide password | ✅ Done |
 | JWT Middleware | Protect all API routes | ✅ Done |
@@ -308,13 +308,16 @@ ltfi/
 | Daily Food Diary | Log food under breakfast, lunch, dinner, snacks | ✅ Done |
 | Delete Food from Diary | Remove logged food items from any meal | ✅ Done |
 | Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ✅ Done |
+| Web Barcode Scanner | Browser-based barcode scanning via ZXing library | ✅ Done |
+| Manual Barcode Entry | Type barcode number manually if scan fails | ✅ Done |
 | AI Food Photo Scan | Camera photo → Groq LLaMA Vision → food name + nutrition estimate | ✅ Done |
 | Custom Food Entry | Manual entry form for foods not in any database | ✅ Done |
-| Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ✅ Done |
-| Multi-day Food Logging | Log same food across multiple days | ✅ Done |
-| Food Search | Search food database — Open Food Facts + custom entries | ✅ Done |
-| Open Food Facts Live Search | Food search queries Open Food Facts in real time — no pre-loaded data needed | ✅ Done |
 | My Foods | View and delete custom foods from the Add Food screen | ✅ Done |
+| Quantity Picker | Select serving size before adding food to diary with calorie preview | ✅ Done |
+| Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ✅ Done |
+| Recipes Screen | View, delete, and add recipes to diary | ✅ Done |
+| Multi-day Food Logging | Log same food across multiple days | ✅ Done |
+| Food Search | Search food database — Open Food Facts live search + custom entries | ✅ Done |
 
 #### 4. Nutrition Dashboard
 
@@ -326,9 +329,22 @@ ltfi/
 | Nutrition Summary | Per meal and per day breakdown | ✅ Done |
 | Progress Dashboard | Visual overview of daily and weekly nutrition | ✅ Done |
 | Weekly Weight Tracker | Log weight entries and view weekly trend chart | ✅ Done |
+| Delete Weight Entries | Remove incorrect weight log entries | ✅ Done |
 | Workout Calories Deducted | Calories burned from workouts added to remaining on dashboard | ✅ Done |
 | Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it | ✅ Done |
 | Diary Focus Refresh | Diary re-fetches data every time user navigates to it | ✅ Done |
+
+#### 5. Profile
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Profile Stats View | Shows current weight, goal weight, height, age, gender, activity level | ✅ Done |
+| Weight Loss Plan | Shows daily deficit target, 500 kcal deficit, and estimated weeks to goal | ✅ Done |
+| Macro Formula | Updated to 25% protein / 45% carbs / 30% fat industry standard split | ✅ Done |
+| TDEE Formula | Mifflin-St Jeor with activity multiplier and gender | ✅ Done |
+| Gender Field | Male/female selector on registration and profile for accurate TDEE | ✅ Done |
+| Context Sync | User context updates immediately after profile save | ✅ Done |
+| Logout | Moved to Profile tab only | ✅ Done |
 
 ---
 
@@ -337,9 +353,12 @@ ltfi/
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Workout Model | Mongoose schema for interval and workout sessions | ✅ Done |
-| Interval Timer | HIIT, Tabata, and circuit timer with work and rest periods | ✅ Done |
+| Simple Mode | Single countdown timer for straightforward workouts | ✅ Done |
+| Complex Mode | HIIT, Tabata, and circuit timer with work and rest periods | ✅ Done |
 | Custom Intervals | Set work duration, rest duration, rounds, and sets | ✅ Done |
 | Named Exercises | Label each interval with an exercise name | ✅ Done |
+| MET Lookup Table | 50+ exercises with accurate MET values for calorie calculation | ✅ Done |
+| MET-based Calorie Calc | Per-exercise MET values used for accurate calorie burn estimate | ✅ Done |
 | Saved Workout Presets | Save and reuse custom timer configurations | ✅ Done |
 | Voice Announcements | Audio cues for interval changes with countdown | ✅ Done |
 | Voice Picker | Select from available system voices before starting workout | ✅ Done |
@@ -347,6 +366,7 @@ ltfi/
 | Exercise Logging | Log workout type, duration, sets, reps | ✅ Done |
 | Calories Burned | MET-based auto-estimate on completion, editable before saving | ✅ Done |
 | Workout Settings Screen | Preview intervals and select voice before starting | ✅ Done |
+| Delete Workouts | Remove saved workouts | ✅ Done |
 
 ---
 
@@ -391,6 +411,8 @@ ltfi/
 | Backend Deployment | Deploy Express backend to Render free tier | ✅ Done |
 | Frontend Deployment | Deploy Expo web to Vercel | ✅ Done |
 | Environment Config (Production) | Set production env vars on Render and Vercel | ✅ Done |
+| SPA Routing Fix | Vercel rewrite rules for client-side routing | ✅ Done |
+| Cache Control | Static assets cached, HTML no-cache for instant updates | ✅ Done |
 | Mobile Build | EAS build for iOS and Android native binary | ⬜ Not Built |
 
 ---

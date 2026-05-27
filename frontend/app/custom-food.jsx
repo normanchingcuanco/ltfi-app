@@ -50,8 +50,7 @@ export default function CustomFoodScreen() {
         }
       });
 
-      router.back();
-      router.back();
+      router.replace('/(tabs)/diary');
     } catch (err) {
       console.error(err);
     } finally {

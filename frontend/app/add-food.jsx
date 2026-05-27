@@ -100,7 +100,7 @@ export default function AddFoodScreen() {
           sugar: Math.round((selectedFood.sugar || 0) * ratio)
         }
       });
-      router.back();
+      router.replace('/(tabs)/diary');
     } catch (err) {
       console.error(err);
     } finally {

@@ -120,7 +120,7 @@ export default function CreateWorkoutScreen() {
     setSaving(true);
     try {
       await api.post('/workouts', payload);
-      router.back();
+      router.replace('/(tabs)/workout');
     } catch (err) {
       showAlert('Error', 'Failed to save workout.');
     } finally {
