@@ -29,7 +29,7 @@ const searchFood = async (req, res) => {
     const offData = await offRes.json();
 
     const offFoods = (offData.products || [])
-      .filter(p => p.product_name && p.nutriments)
+      .filter(p => p.product_name && p.nutriments && p.product_name.toLowerCase().includes(q.toLowerCase()))
       .map(p => ({
         _id: null,
         name: p.product_name,
