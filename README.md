@@ -307,6 +307,9 @@ ltfi/
 | Meal Log Model | Daily meal log per user with meal types | ✅ Done |
 | Daily Food Diary | Log food under breakfast, lunch, dinner, snacks | ✅ Done |
 | Delete Food from Diary | Remove logged food items from any meal | ✅ Done |
+| Edit Food in Diary | Edit quantity of logged food items with calorie preview | ✅ Done |
+| Date Navigation | Navigate to any past or future date in the diary | ✅ Done |
+| Copy Previous Day | Copy all meals from previous day to current date | ✅ Done |
 | Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ✅ Done |
 | Web Barcode Scanner | Browser-based barcode scanning via ZXing library | ✅ Done |
 | Manual Barcode Entry | Type barcode number manually if scan fails | ✅ Done |
@@ -317,7 +320,7 @@ ltfi/
 | Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ✅ Done |
 | Recipes Screen | View, delete, and add recipes to diary | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
-| Food Search | Search food database — Open Food Facts live search + custom entries | ✅ Done |
+| Food Search | Search food database — USDA FoodData Central + Open Food Facts + custom entries | ✅ Done |
 
 #### 4. Nutrition Dashboard
 
