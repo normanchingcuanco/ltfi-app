@@ -27,7 +27,17 @@ const searchFood = async (req, res) => {
 
     let offFoods = [];
     try {
-      const offRes = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10`);
+      const offRes = await fetch(
+        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,nutriments`,
+        {
+          headers: { 'User-Agent': 'LTFI/1.0' },
+          timeout: 5000
+        }
+      );
+      const contentType = offRes.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response from Open Food Facts');
+      }
       const offData = await offRes.json();
       offFoods = (offData.products || [])
         .filter(p => p.product_name && p.nutriments && p.product_name.toLowerCase().includes(q.toLowerCase()))
@@ -62,7 +72,13 @@ const getFoodByBarcode = async (req, res) => {
     let food = await Food.findOne({ barcode });
     if (food) return res.json(food);
 
-    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`, {
+      headers: { 'User-Agent': 'LTFI/1.0' }
+    });
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
     const data = await response.json();
     if (data.status !== 1) return res.status(404).json({ message: 'Product not found' });
 
