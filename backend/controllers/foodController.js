@@ -15,6 +15,73 @@ const createFood = async (req, res) => {
   }
 };
 
+const searchUSDA = async (q) => {
+  try {
+    const res = await fetch(
+      `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&pageSize=10&api_key=${process.env.USDA_API_KEY}`,
+      { headers: { 'User-Agent': 'LTFI/1.0' }, timeout: 8000 }
+    );
+    const data = await res.json();
+    return (data.foods || []).map(f => {
+      const nutrients = f.foodNutrients || [];
+      const get = (name) => {
+        const n = nutrients.find(n => n.nutrientName && n.nutrientName.toLowerCase().includes(name.toLowerCase()));
+        return n ? Math.round(n.value || 0) : 0;
+      };
+      return {
+        _id: null,
+        name: f.description,
+        calories: get('Energy') || get('energy'),
+        protein: get('Protein'),
+        carbs: get('Carbohydrate'),
+        fat: get('Total lipid'),
+        fiber: get('Fiber'),
+        sodium: get('Sodium'),
+        sugar: get('Sugars'),
+        servingSize: 100,
+        servingUnit: 'g',
+        source: 'usda'
+      };
+    }).filter(f => f.calories > 0);
+  } catch (err) {
+    console.error('USDA error:', err.message);
+    return [];
+  }
+};
+
+const searchOFF = async (q) => {
+  try {
+    const offRes = await fetch(
+      `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,nutriments`,
+      { headers: { 'User-Agent': 'LTFI/1.0' }, timeout: 5000 }
+    );
+    const contentType = offRes.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Invalid response from Open Food Facts');
+    }
+    const offData = await offRes.json();
+    return (offData.products || [])
+      .filter(p => p.product_name && p.nutriments && p.product_name.toLowerCase().includes(q.toLowerCase()))
+      .map(p => ({
+        _id: null,
+        name: p.product_name,
+        calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
+        protein: Math.round(p.nutriments['proteins_100g'] || 0),
+        carbs: Math.round(p.nutriments['carbohydrates_100g'] || 0),
+        fat: Math.round(p.nutriments['fat_100g'] || 0),
+        fiber: Math.round(p.nutriments['fiber_100g'] || 0),
+        sodium: Math.round(p.nutriments['sodium_100g'] || 0),
+        sugar: Math.round(p.nutriments['sugars_100g'] || 0),
+        servingSize: 100,
+        servingUnit: 'g',
+        source: 'open_food_facts'
+      }));
+  } catch (err) {
+    console.error('Open Food Facts error:', err.message);
+    return [];
+  }
+};
+
 const searchFood = async (req, res) => {
   try {
     const { q } = req.query;
@@ -25,41 +92,12 @@ const searchFood = async (req, res) => {
       $or: [{ createdBy: null }, { createdBy: req.user._id }]
     }).limit(10);
 
-    let offFoods = [];
-    try {
-      const offRes = await fetch(
-        `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,nutriments`,
-        {
-          headers: { 'User-Agent': 'LTFI/1.0' },
-          timeout: 5000
-        }
-      );
-      const contentType = offRes.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Invalid response from Open Food Facts');
-      }
-      const offData = await offRes.json();
-      offFoods = (offData.products || [])
-        .filter(p => p.product_name && p.nutriments && p.product_name.toLowerCase().includes(q.toLowerCase()))
-        .map(p => ({
-          _id: null,
-          name: p.product_name,
-          calories: Math.round(p.nutriments['energy-kcal_100g'] || 0),
-          protein: Math.round(p.nutriments['proteins_100g'] || 0),
-          carbs: Math.round(p.nutriments['carbohydrates_100g'] || 0),
-          fat: Math.round(p.nutriments['fat_100g'] || 0),
-          fiber: Math.round(p.nutriments['fiber_100g'] || 0),
-          sodium: Math.round(p.nutriments['sodium_100g'] || 0),
-          sugar: Math.round(p.nutriments['sugars_100g'] || 0),
-          servingSize: 100,
-          servingUnit: 'g',
-          source: 'open_food_facts'
-        }));
-    } catch (offErr) {
-      console.error('Open Food Facts error:', offErr.message);
-    }
+    const [usdaFoods, offFoods] = await Promise.all([
+      searchUSDA(q),
+      searchOFF(q)
+    ]);
 
-    const combined = [...localFoods, ...offFoods].slice(0, 20);
+    const combined = [...localFoods, ...usdaFoods, ...offFoods].slice(0, 20);
     res.json(combined);
   } catch (err) {
     res.status(500).json({ message: err.message });
