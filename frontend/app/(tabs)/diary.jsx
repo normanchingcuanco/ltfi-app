@@ -5,7 +5,12 @@ import api from '../../src/utils/api';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
 
+const formatDate = (date) => date.toISOString().split('T')[0];
+const displayDate = (date) => date.toDateString();
+const isToday = (date) => formatDate(date) === formatDate(new Date());
+
 export default function DiaryScreen() {
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editingFood, setEditingFood] = useState(null);
@@ -13,18 +18,17 @@ export default function DiaryScreen() {
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
   const router = useRouter();
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
   useFocusEffect(
     useCallback(() => {
-      fetchSummary();
-    }, [])
+      fetchSummary(selectedDate);
+    }, [selectedDate])
   );
 
-  const fetchSummary = async () => {
+  const fetchSummary = async (date) => {
+    setLoading(true);
     try {
-      const res = await api.get(`/meals/summary?date=${today}`);
+      const res = await api.get(`/meals/summary?date=${formatDate(date)}`);
       setSummary(res.data);
     } catch (err) {
       console.error(err);
@@ -33,10 +37,29 @@ export default function DiaryScreen() {
     }
   };
 
+  const goToPrevDay = () => {
+    const prev = new Date(selectedDate);
+    prev.setDate(prev.getDate() - 1);
+    setSelectedDate(prev);
+    setSummary(null);
+  };
+
+  const goToNextDay = () => {
+    const next = new Date(selectedDate);
+    next.setDate(next.getDate() + 1);
+    setSelectedDate(next);
+    setSummary(null);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+    setSummary(null);
+  };
+
   const deleteFood = async (mealId, foodId) => {
     try {
       await api.delete(`/meals/${mealId}/food/${foodId}`);
-      fetchSummary();
+      fetchSummary(selectedDate);
     } catch (err) {
       console.error(err);
     }
@@ -65,7 +88,7 @@ export default function DiaryScreen() {
         sugar: Math.round((editingFood.food.sugar || 0) * ratio)
       });
       setEditingFood(null);
-      fetchSummary();
+      fetchSummary(selectedDate);
     } catch (err) {
       console.error(err);
     } finally {
@@ -76,18 +99,18 @@ export default function DiaryScreen() {
   const copyYesterday = async () => {
     setCopying(true);
     try {
-      const res = await api.get(`/meals/summary?date=${yesterday}`);
-      const yesterdayMeals = res.data?.meals || [];
-      if (yesterdayMeals.length === 0 || yesterdayMeals.every(m => m.foods.length === 0)) {
-        if (Platform.OS === 'web') {
-          window.alert('No meals logged yesterday.');
-        }
+      const prev = new Date(selectedDate);
+      prev.setDate(prev.getDate() - 1);
+      const res = await api.get(`/meals/summary?date=${formatDate(prev)}`);
+      const prevMeals = res.data?.meals || [];
+      if (prevMeals.length === 0 || prevMeals.every(m => m.foods.length === 0)) {
+        if (Platform.OS === 'web') window.alert('No meals logged on that day.');
         return;
       }
-      for (const meal of yesterdayMeals) {
+      for (const meal of prevMeals) {
         for (const food of meal.foods) {
           await api.post('/meals', {
-            date: today,
+            date: formatDate(selectedDate),
             mealType: meal.mealType,
             food: {
               name: food.name,
@@ -104,7 +127,7 @@ export default function DiaryScreen() {
           });
         }
       }
-      fetchSummary();
+      fetchSummary(selectedDate);
     } catch (err) {
       console.error(err);
     } finally {
@@ -123,7 +146,21 @@ export default function DiaryScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Food Diary</Text>
-      <Text style={styles.date}>{new Date().toDateString()}</Text>
+
+      <View style={styles.dateNav}>
+        <TouchableOpacity style={styles.navBtn} onPress={goToPrevDay}>
+          <Text style={styles.navBtnText}>‹</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={goToToday}>
+          <Text style={styles.dateText}>
+            {isToday(selectedDate) ? 'Today' : displayDate(selectedDate)}
+          </Text>
+          {!isToday(selectedDate) && <Text style={styles.goToToday}>Tap to go to today</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navBtn} onPress={goToNextDay}>
+          <Text style={styles.navBtnText}>›</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryRow}>
@@ -167,7 +204,7 @@ export default function DiaryScreen() {
         <TouchableOpacity style={styles.copyBtn} onPress={copyYesterday} disabled={copying}>
           {copying
             ? <ActivityIndicator color="#F77E2D" />
-            : <Text style={styles.copyBtnText}>📋 Copy Yesterday's Meals</Text>
+            : <Text style={styles.copyBtnText}>📋 Copy Previous Day's Meals</Text>
           }
         </TouchableOpacity>
       )}
@@ -180,7 +217,7 @@ export default function DiaryScreen() {
               <Text style={styles.mealTitle}>{mealType.charAt(0).toUpperCase() + mealType.slice(1)}</Text>
               <TouchableOpacity
                 style={styles.addBtn}
-                onPress={() => router.push({ pathname: '/add-food', params: { mealType, date: today } })}
+                onPress={() => router.push({ pathname: '/add-food', params: { mealType, date: formatDate(selectedDate) } })}
               >
                 <Text style={styles.addBtnText}>+ Add</Text>
               </TouchableOpacity>
@@ -195,10 +232,7 @@ export default function DiaryScreen() {
                     </View>
                     <Text style={styles.foodCals}>{food.calories} kcal</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
-                    onPress={() => deleteFood(meal._id, food._id)}
-                  >
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteFood(meal._id, food._id)}>
                     <Text style={styles.deleteBtnText}>✕</Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
@@ -256,8 +290,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#EDE8DF' },
   content: { padding: 24, paddingTop: 60 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
-  title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 4 },
-  date: { fontSize: 13, color: '#999', marginBottom: 24 },
+  title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 16 },
+  dateNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  navBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 20 },
+  navBtnText: { fontSize: 24, color: '#1A1A1A', fontWeight: '700' },
+  dateText: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', textAlign: 'center' },
+  goToToday: { fontSize: 11, color: '#F77E2D', textAlign: 'center', marginTop: 2 },
   summaryCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   divider: { height: 1, backgroundColor: '#C5BFB4', marginVertical: 16 },
