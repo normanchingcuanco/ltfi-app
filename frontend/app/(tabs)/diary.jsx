@@ -11,8 +11,10 @@ export default function DiaryScreen() {
   const [editingFood, setEditingFood] = useState(null);
   const [editQuantity, setEditQuantity] = useState('');
   const [saving, setSaving] = useState(false);
+  const [copying, setCopying] = useState(false);
   const router = useRouter();
   const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
   useFocusEffect(
     useCallback(() => {
@@ -71,6 +73,47 @@ export default function DiaryScreen() {
     }
   };
 
+  const copyYesterday = async () => {
+    setCopying(true);
+    try {
+      const res = await api.get(`/meals/summary?date=${yesterday}`);
+      const yesterdayMeals = res.data?.meals || [];
+      if (yesterdayMeals.length === 0 || yesterdayMeals.every(m => m.foods.length === 0)) {
+        if (Platform.OS === 'web') {
+          window.alert('No meals logged yesterday.');
+        }
+        return;
+      }
+      for (const meal of yesterdayMeals) {
+        for (const food of meal.foods) {
+          await api.post('/meals', {
+            date: today,
+            mealType: meal.mealType,
+            food: {
+              name: food.name,
+              quantity: food.quantity,
+              unit: food.unit,
+              calories: food.calories,
+              protein: food.protein,
+              carbs: food.carbs,
+              fat: food.fat,
+              fiber: food.fiber || 0,
+              sodium: food.sodium || 0,
+              sugar: food.sugar || 0
+            }
+          });
+        }
+      }
+      fetchSummary();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCopying(false);
+    }
+  };
+
+  const isEmpty = !summary?.meals || summary.meals.every(m => m.foods.length === 0);
+
   if (loading) return (
     <View style={styles.center}>
       <ActivityIndicator size="large" color="#F77E2D" />
@@ -119,6 +162,15 @@ export default function DiaryScreen() {
           </View>
         </View>
       </View>
+
+      {isEmpty && (
+        <TouchableOpacity style={styles.copyBtn} onPress={copyYesterday} disabled={copying}>
+          {copying
+            ? <ActivityIndicator color="#F77E2D" />
+            : <Text style={styles.copyBtnText}>📋 Copy Yesterday's Meals</Text>
+          }
+        </TouchableOpacity>
+      )}
 
       {MEAL_TYPES.map(mealType => {
         const meal = summary?.meals?.find(m => m.mealType === mealType);
@@ -206,13 +258,15 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 4 },
   date: { fontSize: 13, color: '#999', marginBottom: 24 },
-  summaryCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 24 },
+  summaryCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   divider: { height: 1, backgroundColor: '#C5BFB4', marginVertical: 16 },
   summaryItem: { alignItems: 'center' },
   summaryValue: { fontSize: 20, fontWeight: '800', color: '#F77E2D' },
   microValue: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
   summaryLabel: { fontSize: 11, color: '#888', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
+  copyBtn: { borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
+  copyBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 14 },
   mealSection: { marginBottom: 24 },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   mealTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', textTransform: 'capitalize' },
