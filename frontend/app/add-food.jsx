@@ -3,6 +3,16 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Activi
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
 
+const UNITS = ['g', 'kg', 'ml', 'L', 'cup', 'tbsp', 'tsp', 'oz', 'pc', 'serving'];
+
+const UNIT_TO_GRAMS = {
+  g: 1, kg: 1000, ml: 1, L: 1000,
+  cup: 240, tbsp: 15, tsp: 5,
+  oz: 28.35
+};
+
+const CUSTOM_UNITS = ['pc', 'serving', 'cup', 'tbsp', 'tsp'];
+
 const showAlert = (title, message, buttons) => {
   if (Platform.OS === 'web') {
     if (buttons) {
@@ -28,9 +38,10 @@ export default function AddFoodScreen() {
   const [myFoods, setMyFoods] = useState([]);
   const [myFoodsLoading, setMyFoodsLoading] = useState(false);
 
-  // Quantity picker
   const [selectedFood, setSelectedFood] = useState(null);
-  const [quantity, setQuantity] = useState('100');
+  const [quantity, setQuantity] = useState('1');
+  const [unit, setUnit] = useState('pc');
+  const [unitGrams, setUnitGrams] = useState('100');
   const [showQuantityPicker, setShowQuantityPicker] = useState(false);
 
   useEffect(() => {
@@ -70,8 +81,18 @@ export default function AddFoodScreen() {
 
   const handleAddPress = (food) => {
     setSelectedFood(food);
-    setQuantity('100');
+    setQuantity('1');
+    setUnit('pc');
+    setUnitGrams('100');
     setShowQuantityPicker(true);
+  };
+
+  const getTotalGrams = () => {
+    const qty = parseFloat(quantity) || 0;
+    if (UNIT_TO_GRAMS[unit] !== undefined) {
+      return qty * UNIT_TO_GRAMS[unit];
+    }
+    return qty * (parseFloat(unitGrams) || 100);
   };
 
   const confirmAdd = async () => {
@@ -79,8 +100,9 @@ export default function AddFoodScreen() {
     setAdding(true);
     setShowQuantityPicker(false);
 
-    const qty = parseFloat(quantity) || 100;
-    const ratio = qty / 100;
+    const totalGrams = getTotalGrams();
+    const ratio = totalGrams / 100;
+    const qty = parseFloat(quantity) || 1;
 
     try {
       await api.post('/meals', {
@@ -90,7 +112,7 @@ export default function AddFoodScreen() {
           foodId: selectedFood._id,
           name: selectedFood.name,
           quantity: qty,
-          unit: selectedFood.servingUnit || 'g',
+          unit,
           calories: Math.round(selectedFood.calories * ratio),
           protein: Math.round(selectedFood.protein * ratio),
           carbs: Math.round(selectedFood.carbs * ratio),
@@ -124,9 +146,9 @@ export default function AddFoodScreen() {
     ]);
   };
 
-  const calculatedCalories = selectedFood
-    ? Math.round(selectedFood.calories * (parseFloat(quantity) || 100) / (selectedFood.servingSize || 100))
-    : 0;
+  const totalGrams = getTotalGrams();
+  const calculatedCalories = selectedFood ? Math.round(selectedFood.calories * totalGrams / 100) : 0;
+  const needsGramEquivalent = CUSTOM_UNITS.includes(unit) && !UNIT_TO_GRAMS[unit];
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -233,18 +255,40 @@ export default function AddFoodScreen() {
                 onChangeText={setQuantity}
                 autoFocus
               />
-              <Text style={styles.quantityUnit}>{selectedFood.servingUnit || 'g'}</Text>
+              <Text style={styles.quantityUnit}>{unit}</Text>
             </View>
 
-            <Text style={styles.caloriePreview}>{calculatedCalories} kcal</Text>
-
-            <View style={styles.quickBtns}>
-              {['50', '100', '150', '200'].map(q => (
-                <TouchableOpacity key={q} style={[styles.quickBtn, quantity === q && styles.quickBtnActive]} onPress={() => setQuantity(q)}>
-                  <Text style={[styles.quickBtnText, quantity === q && styles.quickBtnTextActive]}>{q}g</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll} contentContainerStyle={styles.unitScrollContent}>
+              {UNITS.map(u => (
+                <TouchableOpacity
+                  key={u}
+                  style={[styles.unitBtn, unit === u && styles.unitBtnActive]}
+                  onPress={() => setUnit(u)}
+                >
+                  <Text style={[styles.unitBtnText, unit === u && styles.unitBtnTextActive]}>{u}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
+
+            {needsGramEquivalent && (
+              <View style={styles.gramEquivRow}>
+                <Text style={styles.gramEquivLabel}>1 {unit} =</Text>
+                <TextInput
+                  style={styles.gramEquivInput}
+                  keyboardType="numeric"
+                  value={unitGrams}
+                  onChangeText={setUnitGrams}
+                  placeholder="100"
+                  placeholderTextColor="#999"
+                />
+                <Text style={styles.gramEquivLabel}>g</Text>
+              </View>
+            )}
+
+            <Text style={styles.caloriePreview}>
+              {calculatedCalories} kcal
+              {totalGrams > 0 && <Text style={styles.gramsHint}> ({Math.round(totalGrams)}g)</Text>}
+            </Text>
 
             <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd} disabled={adding}>
               {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Add to {mealType}</Text>}
@@ -293,15 +337,20 @@ const styles = StyleSheet.create({
   modalCard: { backgroundColor: '#EDE8DF', borderRadius: 20, padding: 24, width: '100%' },
   modalTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 4, textAlign: 'center' },
   modalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 20 },
-  quantityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingHorizontal: 16, marginBottom: 8 },
+  quantityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingHorizontal: 16, marginBottom: 12 },
   quantityInput: { flex: 1, fontSize: 32, fontWeight: '900', color: '#1A1A1A', padding: 14, textAlign: 'center' },
   quantityUnit: { fontSize: 16, color: '#888', fontWeight: '600' },
+  unitScroll: { marginBottom: 12 },
+  unitScrollContent: { gap: 8, paddingHorizontal: 4 },
+  unitBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 99, backgroundColor: '#D9D3C8' },
+  unitBtnActive: { backgroundColor: '#F77E2D' },
+  unitBtnText: { fontSize: 13, color: '#888', fontWeight: '600' },
+  unitBtnTextActive: { color: '#fff' },
+  gramEquivRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, backgroundColor: '#D9D3C8', borderRadius: 12, padding: 12 },
+  gramEquivLabel: { fontSize: 14, color: '#888', fontWeight: '600' },
+  gramEquivInput: { flex: 1, fontSize: 18, fontWeight: '700', color: '#1A1A1A', textAlign: 'center', backgroundColor: '#EDE8DF', borderRadius: 8, padding: 8 },
   caloriePreview: { fontSize: 14, color: '#F77E2D', fontWeight: '700', textAlign: 'center', marginBottom: 16 },
-  quickBtns: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  quickBtn: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 10, padding: 10, alignItems: 'center' },
-  quickBtnActive: { backgroundColor: '#F77E2D' },
-  quickBtnText: { fontSize: 13, color: '#888', fontWeight: '600' },
-  quickBtnTextActive: { color: '#fff' },
+  gramsHint: { fontSize: 12, color: '#aaa' },
   confirmBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 8 },
   confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   cancelBtn: { padding: 12, alignItems: 'center' },
