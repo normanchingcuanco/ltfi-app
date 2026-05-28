@@ -86,12 +86,11 @@ An Expo-based mobile and web app that:
 ---
 
 ## Live URLs
-
 | Environment | URL |
 |-------------|-----|
-| Frontend (Web) | TBD |
-| Backend | TBD |
-| Mobile (Expo Go) | TBD |
+| Frontend (Web) | https://ltfi-app.vercel.app |
+| Backend | https://ltfi-backend.onrender.com |
+| Mobile (Expo Go) | Deferred — pending EAS native build |
 
 ---
 
