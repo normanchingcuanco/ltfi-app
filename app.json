@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "330777bd-74a9-4489-aaf1-07cf5583d72b"
+      }
+    },
+    "android": {
+      "package": "com.norman.chingcuanco.ltfi"
+    }
+  }
+}
