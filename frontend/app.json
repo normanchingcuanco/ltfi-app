@@ -8,6 +8,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "updates": {
+      "url": "https://u.expo.dev/330777bd-74a9-4489-aaf1-07cf5583d72b"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#EDE8DF"
@@ -35,7 +41,8 @@
       "output": "static"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": true
