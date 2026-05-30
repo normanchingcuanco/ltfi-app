@@ -43,9 +43,13 @@ If a free option exists, it must be used. If a service requires payment to funct
 Current free services in use:
 - MongoDB Atlas — free tier (512MB)
 - Open Food Facts API — completely free, no key required
+- USDA FoodData Central — completely free, no key required
 - Groq API — free tier with generous limits for LLaMA vision
 - Gmail SMTP — free via app password
-- Expo — free for development and Expo Go distribution
+- Expo — free for development and EAS free tier builds
+- EAS Build — free tier (30 builds/month)
+- Vercel — free tier for frontend hosting
+- Render — free tier for backend hosting
 
 ---
 
@@ -86,11 +90,13 @@ An Expo-based mobile and web app that:
 ---
 
 ## Live URLs
+
 | Environment | URL |
 |-------------|-----|
 | Frontend (Web) | https://ltfi-app.vercel.app |
 | Backend | https://ltfi-backend.onrender.com |
-| Mobile (Expo Go) | Deferred — pending EAS native build |
+| Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/e9ba3d36-6729-4ed1-b40b-d9b499fc1550 |
+| iOS Native Build | Deferred — requires Apple Developer account ($99/yr) |
 
 ---
 
@@ -98,22 +104,24 @@ An Expo-based mobile and web app that:
 
 | Layer | Technology | Cost |
 |-------|------------|------|
-| Mobile + Web | Expo + React Native Web | Free |
+| Mobile + Web | Expo SDK 54 + React Native Web | Free |
 | Backend | Node.js + Express | Free |
 | Database | MongoDB Atlas (free tier) | Free |
 | Auth | JWT + Email/Password | Free |
-| Barcode Scanning | Open Food Facts API | Free |
+| Food Data | USDA FoodData Central + Open Food Facts API | Free |
 | AI Food Scanning | Groq API — LLaMA Vision (free tier) | Free |
 | Email | Gmail SMTP via Nodemailer | Free |
-| Health Data | Apple HealthKit | Free |
-| Wearable | Colmi Ring via QRing → HealthKit pipeline | Free |
-| Hosting (Frontend) | TBD — target free tier | Free |
-| Hosting (Backend) | TBD — target free tier | Free |
+| Health Data | Apple HealthKit (deferred) | Free |
+| Wearable | Colmi Ring via QRing → HealthKit pipeline (deferred) | Free |
+| Hosting (Frontend) | Vercel free tier | Free |
+| Hosting (Backend) | Render free tier | Free |
+| Mobile Builds | EAS Build free tier | Free |
 
 ---
 
 ## Folder Structure
 
+```
 ltfi/
 ├── backend/
 │   ├── config/
@@ -165,21 +173,26 @@ ltfi/
 │   │   │   ├── diary.jsx
 │   │   │   ├── recipes.jsx
 │   │   │   ├── workout.jsx
+│   │   │   ├── health.jsx
 │   │   │   ├── progress.jsx
 │   │   │   └── profile.jsx
 │   │   ├── _layout.jsx
 │   │   ├── add-food.jsx
 │   │   ├── ai-food-scan.jsx
 │   │   ├── barcode-scanner.jsx
+│   │   ├── create-recipe.jsx
 │   │   ├── create-workout.jsx
 │   │   ├── custom-food.jsx
 │   │   ├── reset-password.jsx
 │   │   └── timer.jsx
 │   ├── app.json
 │   ├── babel.config.js
+│   ├── eas.json
+│   ├── metro.config.js
 │   └── package.json
 ├── README.md
 └── .gitignore
+```
 
 ---
 
@@ -230,7 +243,7 @@ ltfi/
 | fiber | Number | |
 | sodium | Number | |
 | sugar | Number | |
-| source | String | open_food_facts / ai_scan / custom |
+| source | String | usda / open_food_facts / ai_scan / custom / local |
 | createdBy | ObjectId | Ref: User — null if from public DB |
 
 ### Recipe
@@ -280,10 +293,10 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Expo App Setup | Expo + React Native Web with navigation | ✅ Done |
+| Expo App Setup | Expo SDK 54 + React Native Web with navigation | ✅ Done |
 | Backend Server Setup | Express app with helmet, morgan, rate limiting | ✅ Done |
 | MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ✅ Done |
-| Environment Config | .env for DB URI, JWT secret, Groq API key, Gemini API key, email, frontend URL | ✅ Done |
+| Environment Config | .env for DB URI, JWT secret, Groq API key, email, frontend URL | ✅ Done |
 
 #### 2. Authentication
 
@@ -320,6 +333,7 @@ ltfi/
 | Recipes Screen | View, delete, and add recipes to diary | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
 | Food Search | Search food database — USDA FoodData Central + Open Food Facts + custom entries | ✅ Done |
+| Philippine Food Database | Seeded local DB with Jollibee, McDonald's PH, and common Filipino dishes | ✅ Done |
 
 #### 4. Nutrition Dashboard
 
@@ -364,11 +378,11 @@ ltfi/
 | Saved Workout Presets | Save and reuse custom timer configurations | ✅ Done |
 | Voice Announcements | Audio cues for interval changes with countdown | ✅ Done |
 | Voice Picker | Select from available system voices before starting workout | ✅ Done |
-| Background Timer | Timer continues running when app is backgrounded | ⬜ Mobile only — deferred |
 | Exercise Logging | Log workout type, duration, sets, reps | ✅ Done |
 | Calories Burned | MET-based auto-estimate on completion, editable before saving | ✅ Done |
 | Workout Settings Screen | Preview intervals and select voice before starting | ✅ Done |
 | Delete Workouts | Remove saved workouts | ✅ Done |
+| Background Timer | Timer continues running when app is backgrounded | ⬜ Deferred — requires native build |
 
 ---
 
@@ -376,11 +390,11 @@ ltfi/
 
 #### iOS — Apple HealthKit
 
-> ⚠️ Deferred — Expo SDK 55 is not yet compatible with iOS 26. Will resume once Expo releases a compatible SDK update.
+> ⚠️ Deferred — requires EAS native iOS build. Will resume once Apple Developer account is set up.
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Apple HealthKit Setup | Request HealthKit permissions on first launch | ⏸ Deferred — iOS 26 incompatibility |
+| Apple HealthKit Setup | Request HealthKit permissions on first launch | ⏸ Deferred — requires native build |
 | Steps Tracking | Read daily step count from HealthKit | ⏸ Deferred |
 | Active Calories | Read active calories burned from HealthKit | ⏸ Deferred |
 | Heart Rate | Read heart rate data from HealthKit | ⏸ Deferred |
@@ -402,7 +416,6 @@ ltfi/
 | Heart Rate | Read heart rate data from Health Connect | ⬜ Not Built |
 | Sleep Tracking | Read sleep duration from Health Connect | ⬜ Not Built |
 | Distance | Read daily distance from Health Connect | ⬜ Not Built |
-| Android APK Distribution | Build and distribute APK directly to users — no Google Play needed | ⬜ Not Built |
 
 ---
 
@@ -415,7 +428,10 @@ ltfi/
 | Environment Config (Production) | Set production env vars on Render and Vercel | ✅ Done |
 | SPA Routing Fix | Vercel rewrite rules for client-side routing | ✅ Done |
 | Cache Control | Static assets cached, HTML no-cache for instant updates | ✅ Done |
-| Mobile Build | EAS build for iOS and Android native binary | ⬜ Not Built |
+| Tab Bar Icons | Ionicons on all tabs with safe area padding for Android | ✅ Done |
+| Android APK Build | EAS build for Android — sideload distribution, no Play Store needed | ✅ Done |
+| OTA Updates | expo-updates for seamless over-the-air app updates | ⬜ Not Built |
+| iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ Deferred |
 
 ---
 
@@ -423,28 +439,35 @@ ltfi/
 
 ### Prerequisites
 
-- Node.js v18+
+- Node.js v20+
 - MongoDB Atlas account (free tier)
 - Expo CLI (`npm install -g expo-cli`)
-- Expo Go app installed on your iPhone
+- EAS CLI (`npm install -g eas-cli`)
+- Expo Go app on Android for local testing
 - Groq account (free tier) for AI food scanning — https://console.groq.com
 - Gmail account with app password enabled for password reset emails
 - Open Food Facts API (no key required)
+- USDA FoodData Central (no key required)
 
 ### 1. Clone the repo
 
-git clone https://github.com/your-username/ltfi.git
+```
+git clone https://github.com/normanchingcuanco/ltfi-app.git
 cd ltfi
+```
 
 ### 2. Install dependencies
 
+```
 cd backend && npm install
-cd ../frontend && npm install
+cd ../frontend && npm install --legacy-peer-deps
+```
 
 ### 3. Configure environment variables
 
 Create `backend/.env` and fill in your values:
 
+```
 MONGODB_URI=your_mongodb_atlas_uri
 JWT_SECRET=your_random_secret
 FRONTEND_URL=http://localhost:8081
@@ -452,30 +475,44 @@ PORT=5000
 GROQ_API_KEY=your_groq_api_key
 EMAIL_USER=your_gmail@gmail.com
 EMAIL_PASS=your_gmail_app_password
+```
 
 ### 4. Run locally
 
 Terminal 1 — Backend:
+```
 cd backend && node server.js
+```
 
 Terminal 2 — Frontend:
+```
 cd frontend && npx expo start
+```
 
-Frontend (Web): http://localhost:8081
-Frontend (Mobile): scan QR code with Expo Go on your iPhone
-Backend: http://localhost:5000
+- Frontend (Web): http://localhost:8081
+- Frontend (Mobile): scan QR code with Expo Go on Android
+- Backend: http://localhost:5000
+
+### 5. Build Android APK
+
+```
+cd frontend
+eas build -p android --profile preview
+```
+
+Download and sideload the APK directly. No Google Play account needed.
 
 ---
 
 ## Sharing Without App Store
 
-Use Expo Go to share the app with family and friends during development:
+**Android (free):**
+1. Build the APK via `eas build -p android --profile preview`
+2. Share the EAS download link or the APK file directly via WhatsApp, Telegram, or Google Drive
+3. Recipients enable "Install from unknown sources" on their Android and install
 
-1. Run `npx expo start`
-2. Share the generated QR code or Expo link
-3. Recipients install Expo Go on their iPhone and scan the link
-
-No Apple Developer account required for testing.
+**iOS:**
+Requires Apple Developer account ($99/yr) for any distribution outside of Expo Go.
 
 ---
 
