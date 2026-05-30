@@ -516,4 +516,34 @@ Requires Apple Developer account ($99/yr) for any distribution outside of Expo G
 
 ---
 
+## Pushing OTA Updates
+
+For any JS/UI changes that don't require new native modules, push an OTA update instead of rebuilding the APK.
+
+### When to use OTA vs rebuild
+
+| Change | Use |
+|--------|-----|
+| UI changes, bug fixes, new screens | OTA update |
+| New native library added | Rebuild APK |
+| app.json native config changed | Rebuild APK |
+
+### How to push an OTA update
+
+```
+cd frontend
+eas update --branch preview --message "your update description"
+```
+
+Users get the update silently on next app launch. No new APK download needed.
+
+### Branches
+
+| Branch | Used for |
+|--------|----------|
+| preview | Internal testing and distribution |
+| production | App Store / Play Store (future) |
+
+---
+
 *Last updated: May 2026*
