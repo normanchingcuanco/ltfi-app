@@ -31,9 +31,10 @@ export default function AIFoodScanScreen() {
   const [adding, setAdding] = useState(false);
 
   const pickImage = async (useCamera) => {
+    const options = { base64: true, quality: 0.3, allowsEditing: true, aspect: [4, 3] };
     const source = useCamera
-      ? await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 })
-      : await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.5 });
+      ? await ImagePicker.launchCameraAsync(options)
+      : await ImagePicker.launchImageLibraryAsync(options);
 
     if (!source.canceled) {
       const asset = source.assets[0];
