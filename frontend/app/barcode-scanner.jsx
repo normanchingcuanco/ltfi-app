@@ -62,6 +62,9 @@ function WebBarcodeScanner({ onScanned, loading }) {
             value={manualBarcode}
             onChangeText={setManualBarcode}
             keyboardType="numeric"
+            returnKeyType="search"
+            onSubmitEditing={() => { if (manualBarcode.trim()) onScanned(manualBarcode.trim()); }}
+            blurOnSubmit={false}
           />
           <TouchableOpacity
             style={styles.manualBtn}
@@ -118,6 +121,9 @@ export default function BarcodeScannerScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <Text style={styles.backText}>← Back</Text>
+      </TouchableOpacity>
       <CameraView
         style={StyleSheet.absoluteFillObject}
         facing={facing}
@@ -137,6 +143,9 @@ export default function BarcodeScannerScreen() {
             value={manualBarcode}
             onChangeText={setManualBarcode}
             keyboardType="numeric"
+            returnKeyType="search"
+            onSubmitEditing={() => { if (manualBarcode.trim()) handleScanned(manualBarcode.trim()); }}
+            blurOnSubmit={false}
           />
           <TouchableOpacity
             style={styles.manualBtn}
@@ -168,6 +177,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF', padding: 24 },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   bottomBar: { position: 'absolute', bottom: 140, width: '100%', alignItems: 'center' },
+  backBtn: { position: 'absolute', top: 60, left: 24, backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 99, zIndex: 10 },
+  backText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   flipBtn: { position: 'absolute', top: 60, right: 24, backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 99 },
   flipText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   text: { fontSize: 16, color: '#1A1A1A', textAlign: 'center', marginBottom: 16 },
