@@ -20,7 +20,9 @@ export const AuthProvider = ({ children }) => {
         setUser(res.data);
       }
     } catch (err) {
-      await AsyncStorage.removeItem('token');
+      if (err.response?.status === 401) {
+        await AsyncStorage.removeItem('token');
+      }
     } finally {
       setLoading(false);
     }
