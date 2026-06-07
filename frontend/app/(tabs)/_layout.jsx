@@ -4,11 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-
   return (
     <Tabs
       screenOptions={({route}) => ({
         headerShown: false,
+        lazy: true,
         tabBarStyle: {
           backgroundColor: '#EDE8DF',
           borderTopColor: '#D9D3C8',
