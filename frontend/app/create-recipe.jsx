@@ -3,6 +3,17 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Activi
 import { useRouter } from 'expo-router';
 import api from '../src/utils/api';
 
+const UNITS = ['g', 'oz', 'ml', 'cup', 'tbsp', 'tsp'];
+
+const TO_GRAMS = {
+  g: 1,
+  oz: 28.3495,
+  ml: 1,
+  cup: 240,
+  tbsp: 15,
+  tsp: 5,
+};
+
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {
     window.alert(`${title}: ${message}`);
@@ -12,12 +23,26 @@ const showAlert = (title, message) => {
   }
 };
 
+const scaleMacros = (base, quantityStr, unit) => {
+  const qty = parseFloat(quantityStr) || 0;
+  const grams = qty * TO_GRAMS[unit];
+  const factor = grams / 100;
+  return {
+    calories: base.calories !== '' ? (parseFloat(base.calories) * factor).toFixed(1) : '',
+    protein: base.protein !== '' ? (parseFloat(base.protein) * factor).toFixed(1) : '',
+    carbs: base.carbs !== '' ? (parseFloat(base.carbs) * factor).toFixed(1) : '',
+    fat: base.fat !== '' ? (parseFloat(base.fat) * factor).toFixed(1) : '',
+  };
+};
+
 export default function CreateRecipeScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [servings, setServings] = useState('1');
   const [notes, setNotes] = useState('');
-  const [ingredients, setIngredients] = useState([{ name: '', quantity: '100', unit: 'g', calories: '', protein: '', carbs: '', fat: '' }]);
+  const [ingredients, setIngredients] = useState([
+    { name: '', quantity: '100', unit: 'g', calories: '', protein: '', carbs: '', fat: '', base: null }
+  ]);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -25,7 +50,7 @@ export default function CreateRecipeScreen() {
   const [searching, setSearching] = useState(false);
 
   const addIngredient = () => {
-    setIngredients(prev => [...prev, { name: '', quantity: '100', unit: 'g', calories: '', protein: '', carbs: '', fat: '' }]);
+    setIngredients(prev => [...prev, { name: '', quantity: '100', unit: 'g', calories: '', protein: '', carbs: '', fat: '', base: null }]);
   };
 
   const removeIngredient = (idx) => {
@@ -33,7 +58,29 @@ export default function CreateRecipeScreen() {
   };
 
   const updateIngredient = (idx, key, val) => {
-    setIngredients(prev => prev.map((item, i) => i === idx ? { ...item, [key]: val } : item));
+    setIngredients(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      const updated = { ...item, [key]: val };
+
+      if ((key === 'quantity' || key === 'unit') && item.base) {
+        const newQty = key === 'quantity' ? val : item.quantity;
+        const newUnit = key === 'unit' ? val : item.unit;
+
+        // convert existing qty if unit changed
+        if (key === 'unit') {
+          const gramsNow = parseFloat(item.quantity) * TO_GRAMS[item.unit];
+          const newQtyConverted = (gramsNow / TO_GRAMS[val]).toFixed(2);
+          updated.quantity = newQtyConverted;
+          const scaled = scaleMacros(item.base, newQtyConverted, val);
+          return { ...updated, unit: val, quantity: newQtyConverted, ...scaled };
+        }
+
+        const scaled = scaleMacros(item.base, newQty, newUnit);
+        return { ...updated, ...scaled };
+      }
+
+      return updated;
+    }));
   };
 
   const searchFood = async (idx) => {
@@ -51,14 +98,19 @@ export default function CreateRecipeScreen() {
   };
 
   const selectFood = (idx, food) => {
-    setIngredients(prev => prev.map((item, i) => i === idx ? {
-      ...item,
-      name: food.name,
+    const base = {
       calories: food.calories.toString(),
       protein: food.protein.toString(),
       carbs: food.carbs.toString(),
       fat: food.fat.toString(),
-      unit: food.servingUnit || 'g'
+    };
+    const ingredient = ingredients[idx];
+    const scaled = scaleMacros(base, ingredient.quantity, ingredient.unit);
+    setIngredients(prev => prev.map((item, i) => i === idx ? {
+      ...item,
+      name: food.name,
+      base,
+      ...scaled,
     } : item));
     setSearchResults([]);
     setSearch('');
@@ -82,7 +134,7 @@ export default function CreateRecipeScreen() {
           calories: parseFloat(i.calories) || 0,
           protein: parseFloat(i.protein) || 0,
           carbs: parseFloat(i.carbs) || 0,
-          fat: parseFloat(i.fat) || 0
+          fat: parseFloat(i.fat) || 0,
         }))
       });
       router.replace('/(tabs)/recipes');
@@ -125,7 +177,7 @@ export default function CreateRecipeScreen() {
           <View style={styles.searchRow}>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search food..."
+              placeholder="Search food or enter manually..."
               placeholderTextColor="#999"
               value={searchingIdx === idx ? search : ingredient.name}
               onChangeText={val => {
@@ -155,13 +207,39 @@ export default function CreateRecipeScreen() {
             </View>
           )}
 
+          <View style={styles.qtyUnitRow}>
+            <View style={styles.qtyField}>
+              <Text style={styles.macroLabel}>QTY</Text>
+              <TextInput
+                style={styles.macroInput}
+                keyboardType="numeric"
+                value={ingredient.quantity}
+                onChangeText={val => updateIngredient(idx, 'quantity', val)}
+                placeholderTextColor="#999"
+              />
+            </View>
+            <View style={styles.unitField}>
+              <Text style={styles.macroLabel}>UNIT</Text>
+              <View style={styles.unitPicker}>
+                {UNITS.map(u => (
+                  <TouchableOpacity
+                    key={u}
+                    style={[styles.unitBtn, ingredient.unit === u && styles.unitBtnActive]}
+                    onPress={() => updateIngredient(idx, 'unit', u)}
+                  >
+                    <Text style={[styles.unitBtnText, ingredient.unit === u && styles.unitBtnTextActive]}>{u}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+
           <View style={styles.macroRow}>
             {[
-              { label: 'Qty', key: 'quantity' },
-              { label: 'kcal', key: 'calories' },
-              { label: 'Protein', key: 'protein' },
-              { label: 'Carbs', key: 'carbs' },
-              { label: 'Fat', key: 'fat' }
+              { label: 'KCAL', key: 'calories' },
+              { label: 'PROTEIN', key: 'protein' },
+              { label: 'CARBS', key: 'carbs' },
+              { label: 'FAT', key: 'fat' },
             ].map(field => (
               <View key={field.key} style={styles.macroField}>
                 <Text style={styles.macroLabel}>{field.label}</Text>
@@ -208,6 +286,14 @@ const styles = StyleSheet.create({
   dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#D9D3C8' },
   dropdownName: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
   dropdownMacros: { fontSize: 11, color: '#888', marginTop: 2 },
+  qtyUnitRow: { flexDirection: 'row', gap: 8, marginBottom: 8, alignItems: 'flex-start' },
+  qtyField: { width: 80 },
+  unitField: { flex: 1 },
+  unitPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  unitBtn: { backgroundColor: '#EDE8DF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 6 },
+  unitBtnActive: { backgroundColor: '#F77E2D' },
+  unitBtnText: { fontSize: 11, color: '#888', fontWeight: '600' },
+  unitBtnTextActive: { color: '#fff' },
   macroRow: { flexDirection: 'row', gap: 8 },
   macroField: { flex: 1 },
   macroLabel: { fontSize: 10, color: '#888', textTransform: 'uppercase', marginBottom: 4 },
@@ -215,5 +301,5 @@ const styles = StyleSheet.create({
   addIngredientBtn: { borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
   addIngredientText: { color: '#F77E2D', fontWeight: '700' },
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 40 },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 }
+  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });
