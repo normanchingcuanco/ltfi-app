@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform, ActivityIndicator, KeyboardAvoidingView, InputAccessoryView, Keyboard } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
 import { searchMET } from '../src/utils/metValues';
 
 const WORKOUT_TYPES = ['HIIT', 'Tabata', 'circuit', 'custom'];
+const INPUT_ACCESSORY_ID = 'doneButton';
 
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {
@@ -202,122 +203,67 @@ export default function EditWorkoutScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Edit Workout</Text>
-
-      <Text style={styles.label}>Name</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="e.g. Morning Run"
-        placeholderTextColor="#999"
-        value={name}
-        onChangeText={setName}
-      />
-
-      <Text style={styles.label}>Type</Text>
-      <View style={styles.pills}>
-        {WORKOUT_TYPES.map(t => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.pill, type === t && styles.pillActive]}
-            onPress={() => setType(t)}
-          >
-            <Text style={[styles.pillText, type === t && styles.pillTextActive]}>{t}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.label}>Mode</Text>
-      <View style={styles.modeTabs}>
-        <TouchableOpacity
-          style={[styles.modeTab, mode === 'simple' && styles.modeTabActive]}
-          onPress={() => setMode('simple')}
-        >
-          <Text style={[styles.modeTabText, mode === 'simple' && styles.modeTabTextActive]}>Simple</Text>
-          <Text style={[styles.modeTabSub, mode === 'simple' && styles.modeTabTextActive]}>Single countdown</Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modeTab, mode === 'complex' && styles.modeTabActive]}
-          onPress={() => setMode('complex')}
-        >
-          <Text style={[styles.modeTabText, mode === 'complex' && styles.modeTabTextActive]}>Complex</Text>
-          <Text style={[styles.modeTabSub, mode === 'complex' && styles.modeTabTextActive]}>Work / Rest intervals</Text>
-        </TouchableOpacity>
-      </View>
+        <Text style={styles.title}>Edit Workout</Text>
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.label}>Warm Up</Text>
-        <View style={styles.durationRow}>
-          <View style={styles.durationField}>
-            <TextInput
-              style={styles.durationInput}
-              placeholder="0"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-              value={warmUpMins}
-              onChangeText={setWarmUpMins}
-            />
-            <Text style={styles.durationUnit}>min</Text>
-          </View>
-          <View style={styles.durationField}>
-            <TextInput
-              style={styles.durationInput}
-              placeholder="00"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-              value={warmUpSecs}
-              onChangeText={setWarmUpSecs}
-            />
-            <Text style={styles.durationUnit}>sec</Text>
-          </View>
+        <Text style={styles.label}>Name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Morning Run"
+          placeholderTextColor="#999"
+          value={name}
+          onChangeText={setName}
+          returnKeyType="done"
+          blurOnSubmit={true}
+        />
+
+        <Text style={styles.label}>Type</Text>
+        <View style={styles.pills}>
+          {WORKOUT_TYPES.map(t => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.pill, type === t && styles.pillActive]}
+              onPress={() => setType(t)}
+            >
+              <Text style={[styles.pillText, type === t && styles.pillTextActive]}>{t}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      </View>
 
-      {mode === 'simple' && (
-        <View style={styles.simpleCard}>
-          <Text style={styles.label}>Exercise (optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Search exercise..."
-            placeholderTextColor="#999"
-            value={simpleExercise}
-            onChangeText={handleSimpleSearch}
-            onFocus={() => {
-              setSimpleSearching(true);
-              setSimpleSearchResults(searchMET('').slice(0, 6));
-            }}
-          />
-          {simpleSearching && simpleSearchResults.length > 0 && (
-            <View style={styles.dropdown}>
-              {simpleSearchResults.map((exercise, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.dropdownItem}
-                  onPress={() => selectSimpleExercise(exercise)}
-                >
-                  <Text style={styles.dropdownName}>{exercise.name}</Text>
-                  <Text style={styles.dropdownMeta}>{exercise.category} · MET {exercise.met}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-          {simpleExercise && simpleMet ? (
-            <Text style={styles.metBadge}>MET: {simpleMet}</Text>
-          ) : null}
+        <Text style={styles.label}>Mode</Text>
+        <View style={styles.modeTabs}>
+          <TouchableOpacity
+            style={[styles.modeTab, mode === 'simple' && styles.modeTabActive]}
+            onPress={() => setMode('simple')}
+          >
+            <Text style={[styles.modeTabText, mode === 'simple' && styles.modeTabTextActive]}>Simple</Text>
+            <Text style={[styles.modeTabSub, mode === 'simple' && styles.modeTabTextActive]}>Single countdown</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeTab, mode === 'complex' && styles.modeTabActive]}
+            onPress={() => setMode('complex')}
+          >
+            <Text style={[styles.modeTabText, mode === 'complex' && styles.modeTabTextActive]}>Complex</Text>
+            <Text style={[styles.modeTabSub, mode === 'complex' && styles.modeTabTextActive]}>Work / Rest intervals</Text>
+          </TouchableOpacity>
+        </View>
 
-          <Text style={styles.label}>Duration</Text>
+        <View style={styles.sectionCard}>
+          <Text style={styles.label}>Warm Up</Text>
           <View style={styles.durationRow}>
             <View style={styles.durationField}>
               <TextInput
                 style={styles.durationInput}
                 placeholder="0"
                 placeholderTextColor="#999"
-                keyboardType="numeric"
-                value={simpleDurationMins}
-                onChangeText={setSimpleDurationMins}
+                keyboardType="number-pad"
+                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                value={warmUpMins}
+                onChangeText={setWarmUpMins}
               />
               <Text style={styles.durationUnit}>min</Text>
             </View>
@@ -326,167 +272,247 @@ export default function EditWorkoutScreen() {
                 style={styles.durationInput}
                 placeholder="00"
                 placeholderTextColor="#999"
-                keyboardType="numeric"
-                value={simpleDurationSecs}
-                onChangeText={setSimpleDurationSecs}
+                keyboardType="number-pad"
+                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                value={warmUpSecs}
+                onChangeText={setWarmUpSecs}
               />
               <Text style={styles.durationUnit}>sec</Text>
             </View>
           </View>
         </View>
-      )}
 
-      {mode === 'complex' && (
-        <>
-          <Text style={styles.label}>Rounds</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="1"
-            placeholderTextColor="#999"
-            keyboardType="numeric"
-            value={rounds}
-            onChangeText={setRounds}
-          />
-
-          <Text style={styles.label}>Intervals</Text>
-          {intervals.map((interval, idx) => (
-            <View key={idx} style={styles.intervalCard}>
-              <View style={styles.intervalHeader}>
-                <Text style={styles.intervalNum}>Interval {idx + 1}</Text>
-                <View style={styles.intervalActions}>
-                  {idx > 0 && (
-                    <TouchableOpacity onPress={() => moveInterval(idx, -1)} style={styles.moveBtn}>
-                      <Text style={styles.moveBtnText}>↑</Text>
-                    </TouchableOpacity>
-                  )}
-                  {idx < intervals.length - 1 && (
-                    <TouchableOpacity onPress={() => moveInterval(idx, 1)} style={styles.moveBtn}>
-                      <Text style={styles.moveBtnText}>↓</Text>
-                    </TouchableOpacity>
-                  )}
-                  {intervals.length > 1 && (
-                    <TouchableOpacity onPress={() => removeInterval(idx)}>
-                      <Text style={styles.removeText}>Remove</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              <Text style={styles.fieldLabel}>Exercise</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Search or type exercise name..."
-                placeholderTextColor="#999"
-                value={searchingIdx === idx ? searchQuery : interval.name}
-                onChangeText={val => handleExerciseSearch(idx, val)}
-                onFocus={() => {
-                  setSearchingIdx(idx);
-                  setSearchResults(searchMET('').slice(0, 6));
-                }}
-                returnKeyType="done"
-                onSubmitEditing={() => confirmCustomName(idx)}
-              />
-
-              {searchingIdx === idx && searchResults.length > 0 && (
-                <View style={styles.dropdown}>
-                  {searchResults.map((exercise, eidx) => (
-                    <TouchableOpacity
-                      key={eidx}
-                      style={styles.dropdownItem}
-                      onPress={() => selectExercise(idx, exercise)}
-                    >
-                      <Text style={styles.dropdownName}>{exercise.name}</Text>
-                      <Text style={styles.dropdownMeta}>{exercise.category} · MET {exercise.met}</Text>
-                    </TouchableOpacity>
-                  ))}
+        {mode === 'simple' && (
+          <View style={styles.simpleCard}>
+            <Text style={styles.label}>Exercise (optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Search exercise..."
+              placeholderTextColor="#999"
+              value={simpleExercise}
+              onChangeText={handleSimpleSearch}
+              returnKeyType="done"
+              blurOnSubmit={true}
+              onFocus={() => {
+                setSimpleSearching(true);
+                setSimpleSearchResults(searchMET('').slice(0, 6));
+              }}
+            />
+            {simpleSearching && simpleSearchResults.length > 0 && (
+              <View style={styles.dropdown}>
+                {simpleSearchResults.map((exercise, idx) => (
                   <TouchableOpacity
-                    style={styles.useCustomBtn}
-                    onPress={() => confirmCustomName(idx)}
+                    key={idx}
+                    style={styles.dropdownItem}
+                    onPress={() => selectSimpleExercise(exercise)}
                   >
-                    <Text style={styles.useCustomText}>
-                      {interval.name ? `Use "${interval.name}"` : 'Use custom name'}
-                    </Text>
+                    <Text style={styles.dropdownName}>{exercise.name}</Text>
+                    <Text style={styles.dropdownMeta}>{exercise.category} · MET {exercise.met}</Text>
                   </TouchableOpacity>
-                </View>
-              )}
+                ))}
+              </View>
+            )}
+            {simpleExercise && simpleMet ? (
+              <Text style={styles.metBadge}>MET: {simpleMet}</Text>
+            ) : null}
 
-              {interval.met && interval.name && searchingIdx !== idx ? (
-                <Text style={styles.metBadge}>MET: {interval.met}</Text>
-              ) : null}
-
-              <View style={styles.timeRow}>
-                <View style={styles.timeField}>
-                  <Text style={styles.timeLabel}>Work (sec)</Text>
-                  <TextInput
-                    style={styles.timeInput}
-                    keyboardType="numeric"
-                    value={interval.workSeconds}
-                    onChangeText={val => updateInterval(idx, 'workSeconds', val)}
-                  />
-                </View>
-                <View style={styles.timeField}>
-                  <Text style={styles.timeLabel}>Rest (sec)</Text>
-                  <TextInput
-                    style={styles.timeInput}
-                    keyboardType="numeric"
-                    value={interval.restSeconds}
-                    onChangeText={val => updateInterval(idx, 'restSeconds', val)}
-                  />
-                </View>
+            <Text style={styles.label}>Duration</Text>
+            <View style={styles.durationRow}>
+              <View style={styles.durationField}>
+                <TextInput
+                  style={styles.durationInput}
+                  placeholder="0"
+                  placeholderTextColor="#999"
+                  keyboardType="number-pad"
+                  inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                  value={simpleDurationMins}
+                  onChangeText={setSimpleDurationMins}
+                />
+                <Text style={styles.durationUnit}>min</Text>
+              </View>
+              <View style={styles.durationField}>
+                <TextInput
+                  style={styles.durationInput}
+                  placeholder="00"
+                  placeholderTextColor="#999"
+                  keyboardType="number-pad"
+                  inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                  value={simpleDurationSecs}
+                  onChangeText={setSimpleDurationSecs}
+                />
+                <Text style={styles.durationUnit}>sec</Text>
               </View>
             </View>
-          ))}
+          </View>
+        )}
 
-          <TouchableOpacity style={styles.addIntervalBtn} onPress={addInterval}>
-            <Text style={styles.addIntervalText}>+ Add Interval</Text>
-          </TouchableOpacity>
-        </>
+        {mode === 'complex' && (
+          <>
+            <Text style={styles.label}>Rounds</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="1"
+              placeholderTextColor="#999"
+              keyboardType="number-pad"
+              inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+              value={rounds}
+              onChangeText={setRounds}
+            />
+
+            <Text style={styles.label}>Intervals</Text>
+            {intervals.map((interval, idx) => (
+              <View key={idx} style={styles.intervalCard}>
+                <View style={styles.intervalHeader}>
+                  <Text style={styles.intervalNum}>Interval {idx + 1}</Text>
+                  <View style={styles.intervalActions}>
+                    {idx > 0 && (
+                      <TouchableOpacity onPress={() => moveInterval(idx, -1)} style={styles.moveBtn}>
+                        <Text style={styles.moveBtnText}>↑</Text>
+                      </TouchableOpacity>
+                    )}
+                    {idx < intervals.length - 1 && (
+                      <TouchableOpacity onPress={() => moveInterval(idx, 1)} style={styles.moveBtn}>
+                        <Text style={styles.moveBtnText}>↓</Text>
+                      </TouchableOpacity>
+                    )}
+                    {intervals.length > 1 && (
+                      <TouchableOpacity onPress={() => removeInterval(idx)}>
+                        <Text style={styles.removeText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                <Text style={styles.fieldLabel}>Exercise</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Search or type exercise name..."
+                  placeholderTextColor="#999"
+                  value={searchingIdx === idx ? searchQuery : interval.name}
+                  onChangeText={val => handleExerciseSearch(idx, val)}
+                  onFocus={() => {
+                    setSearchingIdx(idx);
+                    setSearchResults(searchMET('').slice(0, 6));
+                  }}
+                  returnKeyType="done"
+                  onSubmitEditing={() => confirmCustomName(idx)}
+                />
+
+                {searchingIdx === idx && searchResults.length > 0 && (
+                  <View style={styles.dropdown}>
+                    {searchResults.map((exercise, eidx) => (
+                      <TouchableOpacity
+                        key={eidx}
+                        style={styles.dropdownItem}
+                        onPress={() => selectExercise(idx, exercise)}
+                      >
+                        <Text style={styles.dropdownName}>{exercise.name}</Text>
+                        <Text style={styles.dropdownMeta}>{exercise.category} · MET {exercise.met}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                      style={styles.useCustomBtn}
+                      onPress={() => confirmCustomName(idx)}
+                    >
+                      <Text style={styles.useCustomText}>
+                        {interval.name ? `Use "${interval.name}"` : 'Use custom name'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {interval.met && interval.name && searchingIdx !== idx ? (
+                  <Text style={styles.metBadge}>MET: {interval.met}</Text>
+                ) : null}
+
+                <View style={styles.timeRow}>
+                  <View style={styles.timeField}>
+                    <Text style={styles.timeLabel}>Work (sec)</Text>
+                    <TextInput
+                      style={styles.timeInput}
+                      keyboardType="number-pad"
+                      inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                      value={interval.workSeconds}
+                      onChangeText={val => updateInterval(idx, 'workSeconds', val)}
+                    />
+                  </View>
+                  <View style={styles.timeField}>
+                    <Text style={styles.timeLabel}>Rest (sec)</Text>
+                    <TextInput
+                      style={styles.timeInput}
+                      keyboardType="number-pad"
+                      inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                      value={interval.restSeconds}
+                      onChangeText={val => updateInterval(idx, 'restSeconds', val)}
+                    />
+                  </View>
+                </View>
+              </View>
+            ))}
+
+            <TouchableOpacity style={styles.addIntervalBtn} onPress={addInterval}>
+              <Text style={styles.addIntervalText}>+ Add Interval</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        <View style={styles.sectionCard}>
+          <View style={styles.repeatRow}>
+            <Text style={styles.repeatLabel}>Repeat</Text>
+            <Switch
+              value={repeat}
+              onValueChange={setRepeat}
+              trackColor={{ false: '#D9D3C8', true: '#F77E2D' }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.label}>Cool Down</Text>
+          <View style={styles.durationRow}>
+            <View style={styles.durationField}>
+              <TextInput
+                style={styles.durationInput}
+                placeholder="0"
+                placeholderTextColor="#999"
+                keyboardType="number-pad"
+                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                value={coolDownMins}
+                onChangeText={setCoolDownMins}
+              />
+              <Text style={styles.durationUnit}>min</Text>
+            </View>
+            <View style={styles.durationField}>
+              <TextInput
+                style={styles.durationInput}
+                placeholder="00"
+                placeholderTextColor="#999"
+                keyboardType="number-pad"
+                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                value={coolDownSecs}
+                onChangeText={setCoolDownSecs}
+              />
+              <Text style={styles.durationUnit}>sec</Text>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+          <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {Platform.OS === 'ios' && (
+        <InputAccessoryView nativeID={INPUT_ACCESSORY_ID}>
+          <View style={styles.keyboardToolbar}>
+            <TouchableOpacity onPress={() => Keyboard.dismiss()} style={styles.keyboardDoneBtn}>
+              <Text style={styles.keyboardDoneText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </InputAccessoryView>
       )}
-
-      <View style={styles.sectionCard}>
-        <View style={styles.repeatRow}>
-          <Text style={styles.repeatLabel}>Repeat</Text>
-          <Switch
-            value={repeat}
-            onValueChange={setRepeat}
-            trackColor={{ false: '#D9D3C8', true: '#F77E2D' }}
-            thumbColor="#fff"
-          />
-        </View>
-      </View>
-
-      <View style={styles.sectionCard}>
-        <Text style={styles.label}>Cool Down</Text>
-        <View style={styles.durationRow}>
-          <View style={styles.durationField}>
-            <TextInput
-              style={styles.durationInput}
-              placeholder="0"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-              value={coolDownMins}
-              onChangeText={setCoolDownMins}
-            />
-            <Text style={styles.durationUnit}>min</Text>
-          </View>
-          <View style={styles.durationField}>
-            <TextInput
-              style={styles.durationInput}
-              placeholder="00"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-              value={coolDownSecs}
-              onChangeText={setCoolDownSecs}
-            />
-            <Text style={styles.durationUnit}>sec</Text>
-          </View>
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-        <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -539,5 +565,8 @@ const styles = StyleSheet.create({
   addIntervalBtn: { borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
   addIntervalText: { color: '#F77E2D', fontWeight: '700' },
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 40 },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 }
+  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  keyboardToolbar: { backgroundColor: '#D9D3C8', padding: 8, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#C4BEB4' },
+  keyboardDoneBtn: { paddingHorizontal: 16, paddingVertical: 6 },
+  keyboardDoneText: { color: '#F77E2D', fontWeight: '700', fontSize: 16 },
 });

@@ -2,10 +2,10 @@ const Workout = require('../models/Workout');
 
 const createWorkout = async (req, res) => {
   try {
-    const { name, type, intervals, rounds } = req.body;
+    const { name, type, mode, intervals, rounds, repeat, warmUp, coolDown } = req.body;
     const workout = await Workout.create({
       user: req.user._id,
-      name, type, intervals, rounds
+      name, type, mode, intervals, rounds, repeat, warmUp, coolDown
     });
     res.status(201).json(workout);
   } catch (err) {
@@ -36,11 +36,15 @@ const updateWorkout = async (req, res) => {
   try {
     const workout = await Workout.findOne({ _id: req.params.id, user: req.user._id });
     if (!workout) return res.status(404).json({ message: 'Workout not found' });
-    const { name, type, intervals, rounds } = req.body;
+    const { name, type, mode, intervals, rounds, repeat, warmUp, coolDown } = req.body;
     if (name) workout.name = name;
     if (type) workout.type = type;
+    if (mode) workout.mode = mode;
     if (intervals) workout.intervals = intervals;
     if (rounds) workout.rounds = rounds;
+    if (repeat !== undefined) workout.repeat = repeat;
+    if (warmUp !== undefined) workout.warmUp = warmUp;
+    if (coolDown !== undefined) workout.coolDown = coolDown;
     await workout.save();
     res.json(workout);
   } catch (err) {

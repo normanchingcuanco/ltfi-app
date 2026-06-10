@@ -14,6 +14,9 @@ const workoutSchema = new mongoose.Schema({
     }
   ],
   rounds: { type: Number, default: 1 },
+  repeat: { type: Boolean, default: false },
+  warmUp: { type: Number, default: 0 },
+  coolDown: { type: Number, default: 0 },
   caloriesBurned: { type: Number, default: 0 },
   completedAt: { type: Date }
 }, { timestamps: true });
