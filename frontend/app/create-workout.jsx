@@ -520,6 +520,5 @@ const styles = StyleSheet.create({
   addIntervalText: { color: '#F77E2D', fontWeight: '700' },
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 40 },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  floatingDone: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#D9D3C8', padding: 12, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#C4BEB4' },
   floatingDone: { backgroundColor: '#D9D3C8', padding: 12, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#C4BEB4' },
   floatingDoneText: { color: '#F77E2D', fontWeight: '700', fontSize: 16, paddingRight: 16 },
