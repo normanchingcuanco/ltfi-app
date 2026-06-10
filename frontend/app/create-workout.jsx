@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform, KeyboardAvoidingView, InputAccessoryView, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/api';
 import { searchMET } from '../src/utils/metValues';
 
 const WORKOUT_TYPES = ['HIIT', 'Tabata', 'circuit', 'custom'];
-const INPUT_ACCESSORY_ID = 'doneButton';
 
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {
@@ -28,6 +27,7 @@ export default function CreateWorkoutScreen() {
   const [warmUpSecs, setWarmUpSecs] = useState('00');
   const [coolDownMins, setCoolDownMins] = useState('');
   const [coolDownSecs, setCoolDownSecs] = useState('00');
+  const [numericFocused, setNumericFocused] = useState(false);
 
   const [simpleDurationMins, setSimpleDurationMins] = useState('');
   const [simpleDurationSecs, setSimpleDurationSecs] = useState('00');
@@ -208,9 +208,10 @@ export default function CreateWorkoutScreen() {
                 placeholder="0"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
-                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                 value={warmUpMins}
                 onChangeText={setWarmUpMins}
+                onFocus={() => setNumericFocused(true)}
+                onBlur={() => setNumericFocused(false)}
               />
               <Text style={styles.durationUnit}>min</Text>
             </View>
@@ -220,9 +221,10 @@ export default function CreateWorkoutScreen() {
                 placeholder="00"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
-                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                 value={warmUpSecs}
                 onChangeText={setWarmUpSecs}
+                onFocus={() => setNumericFocused(true)}
+                onBlur={() => setNumericFocused(false)}
               />
               <Text style={styles.durationUnit}>sec</Text>
             </View>
@@ -271,9 +273,10 @@ export default function CreateWorkoutScreen() {
                   placeholder="0"
                   placeholderTextColor="#999"
                   keyboardType="number-pad"
-                  inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                   value={simpleDurationMins}
                   onChangeText={setSimpleDurationMins}
+                  onFocus={() => setNumericFocused(true)}
+                  onBlur={() => setNumericFocused(false)}
                 />
                 <Text style={styles.durationUnit}>min</Text>
               </View>
@@ -283,9 +286,10 @@ export default function CreateWorkoutScreen() {
                   placeholder="00"
                   placeholderTextColor="#999"
                   keyboardType="number-pad"
-                  inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                   value={simpleDurationSecs}
                   onChangeText={setSimpleDurationSecs}
+                  onFocus={() => setNumericFocused(true)}
+                  onBlur={() => setNumericFocused(false)}
                 />
                 <Text style={styles.durationUnit}>sec</Text>
               </View>
@@ -301,9 +305,10 @@ export default function CreateWorkoutScreen() {
               placeholder="1"
               placeholderTextColor="#999"
               keyboardType="number-pad"
-              inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
               value={rounds}
               onChangeText={setRounds}
+              onFocus={() => setNumericFocused(true)}
+              onBlur={() => setNumericFocused(false)}
             />
 
             <Text style={styles.label}>Intervals</Text>
@@ -378,9 +383,10 @@ export default function CreateWorkoutScreen() {
                     <TextInput
                       style={styles.timeInput}
                       keyboardType="number-pad"
-                      inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                       value={interval.workSeconds}
                       onChangeText={val => updateInterval(idx, 'workSeconds', val)}
+                      onFocus={() => setNumericFocused(true)}
+                      onBlur={() => setNumericFocused(false)}
                     />
                   </View>
                   <View style={styles.timeField}>
@@ -388,9 +394,10 @@ export default function CreateWorkoutScreen() {
                     <TextInput
                       style={styles.timeInput}
                       keyboardType="number-pad"
-                      inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                       value={interval.restSeconds}
                       onChangeText={val => updateInterval(idx, 'restSeconds', val)}
+                      onFocus={() => setNumericFocused(true)}
+                      onBlur={() => setNumericFocused(false)}
                     />
                   </View>
                 </View>
@@ -424,9 +431,10 @@ export default function CreateWorkoutScreen() {
                 placeholder="0"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
-                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                 value={coolDownMins}
                 onChangeText={setCoolDownMins}
+                onFocus={() => setNumericFocused(true)}
+                onBlur={() => setNumericFocused(false)}
               />
               <Text style={styles.durationUnit}>min</Text>
             </View>
@@ -436,9 +444,10 @@ export default function CreateWorkoutScreen() {
                 placeholder="00"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
-                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                 value={coolDownSecs}
                 onChangeText={setCoolDownSecs}
+                onFocus={() => setNumericFocused(true)}
+                onBlur={() => setNumericFocused(false)}
               />
               <Text style={styles.durationUnit}>sec</Text>
             </View>
@@ -450,14 +459,13 @@ export default function CreateWorkoutScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {Platform.OS === 'ios' && (
-        <InputAccessoryView nativeID={INPUT_ACCESSORY_ID}>
-          <View style={styles.keyboardToolbar}>
-            <TouchableOpacity onPress={() => Keyboard.dismiss()} style={styles.keyboardDoneBtn}>
-              <Text style={styles.keyboardDoneText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </InputAccessoryView>
+      {numericFocused && Platform.OS === 'ios' && (
+        <TouchableOpacity
+          style={styles.floatingDone}
+          onPress={() => { Keyboard.dismiss(); setNumericFocused(false); }}
+        >
+          <Text style={styles.floatingDoneText}>Done</Text>
+        </TouchableOpacity>
       )}
     </KeyboardAvoidingView>
   );
@@ -512,7 +520,6 @@ const styles = StyleSheet.create({
   addIntervalText: { color: '#F77E2D', fontWeight: '700' },
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 40 },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  keyboardToolbar: { backgroundColor: '#D9D3C8', padding: 8, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#C4BEB4' },
-  keyboardDoneBtn: { paddingHorizontal: 16, paddingVertical: 6 },
-  keyboardDoneText: { color: '#F77E2D', fontWeight: '700', fontSize: 16 },
+  floatingDone: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#D9D3C8', padding: 12, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#C4BEB4' },
+  floatingDoneText: { color: '#F77E2D', fontWeight: '700', fontSize: 16, paddingRight: 16 },
 });
