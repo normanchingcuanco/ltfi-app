@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform, ActivityIndicator } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
 import { searchMET } from '../src/utils/metValues';
 
@@ -15,13 +15,16 @@ const showAlert = (title, message) => {
   }
 };
 
-export default function CreateWorkoutScreen() {
+export default function EditWorkoutScreen() {
   const router = useRouter();
+  const { workoutId } = useLocalSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [name, setName] = useState('');
   const [type, setType] = useState('custom');
   const [mode, setMode] = useState('simple');
   const [rounds, setRounds] = useState('1');
-  const [saving, setSaving] = useState(false);
   const [repeat, setRepeat] = useState(false);
   const [warmUpMins, setWarmUpMins] = useState('');
   const [warmUpSecs, setWarmUpSecs] = useState('00');
@@ -35,11 +38,54 @@ export default function CreateWorkoutScreen() {
   const [simpleSearchResults, setSimpleSearchResults] = useState([]);
   const [simpleSearching, setSimpleSearching] = useState(false);
 
-  const [intervals, setIntervals] = useState([{ name: '', workSeconds: '30', restSeconds: '10', met: 5.0 }]);
+  const [intervals, setIntervals] = useState([]);
   const [searchingIdx, setSearchingIdx] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [customInputIdx, setCustomInputIdx] = useState(null);
+
+  useEffect(() => {
+    fetchWorkout();
+  }, []);
+
+  const fetchWorkout = async () => {
+    try {
+      const res = await api.get(`/workouts/${workoutId}`);
+      const w = res.data;
+      setName(w.name);
+      setType(w.type);
+      setMode(w.mode);
+      setRounds(w.rounds?.toString() || '1');
+      setRepeat(w.repeat || false);
+
+      if (w.warmUp) {
+        setWarmUpMins(Math.floor(w.warmUp / 60).toString());
+        setWarmUpSecs((w.warmUp % 60).toString().padStart(2, '0'));
+      }
+      if (w.coolDown) {
+        setCoolDownMins(Math.floor(w.coolDown / 60).toString());
+        setCoolDownSecs((w.coolDown % 60).toString().padStart(2, '0'));
+      }
+
+      if (w.mode === 'simple') {
+        const secs = w.intervals[0]?.workSeconds || 0;
+        setSimpleDurationMins(Math.floor(secs / 60).toString());
+        setSimpleDurationSecs((secs % 60).toString().padStart(2, '0'));
+        setSimpleExercise(w.intervals[0]?.name || '');
+        setSimpleMet(w.intervals[0]?.met || 5.0);
+      } else {
+        setIntervals(w.intervals.map(i => ({
+          name: i.name,
+          workSeconds: i.workSeconds.toString(),
+          restSeconds: i.restSeconds.toString(),
+          met: i.met || 5.0
+        })));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addInterval = () => {
     setIntervals(prev => [...prev, { name: '', workSeconds: '30', restSeconds: '10', met: 5.0 }]);
@@ -68,7 +114,6 @@ export default function CreateWorkoutScreen() {
     setSearchQuery(query);
     updateInterval(idx, 'name', query);
     setSearchResults(searchMET(query).slice(0, 6));
-    setCustomInputIdx(null);
   };
 
   const selectExercise = (idx, exercise) => {
@@ -80,13 +125,11 @@ export default function CreateWorkoutScreen() {
     setSearchingIdx(null);
     setSearchQuery('');
     setSearchResults([]);
-    setCustomInputIdx(null);
   };
 
   const confirmCustomName = (idx) => {
     setSearchingIdx(null);
     setSearchResults([]);
-    setCustomInputIdx(null);
   };
 
   const handleSimpleSearch = (query) => {
@@ -116,13 +159,8 @@ export default function CreateWorkoutScreen() {
       if (totalSeconds <= 0) return showAlert('Error', 'Duration must be greater than 0');
 
       payload = {
-        name,
-        type,
-        mode: 'simple',
-        rounds: 1,
-        repeat,
-        warmUp: warmUpSeconds,
-        coolDown: coolDownSeconds,
+        name, type, mode: 'simple', rounds: 1, repeat,
+        warmUp: warmUpSeconds, coolDown: coolDownSeconds,
         intervals: [{
           name: simpleExercise || name,
           workSeconds: totalSeconds,
@@ -132,9 +170,7 @@ export default function CreateWorkoutScreen() {
       };
     } else {
       payload = {
-        name,
-        type,
-        mode: 'complex',
+        name, type, mode: 'complex',
         rounds: parseInt(rounds) || 1,
         repeat,
         warmUp: warmUpSeconds,
@@ -150,7 +186,7 @@ export default function CreateWorkoutScreen() {
 
     setSaving(true);
     try {
-      await api.post('/workouts', payload);
+      await api.put(`/workouts/${workoutId}`, payload);
       router.replace('/(tabs)/workout');
     } catch (err) {
       showAlert('Error', 'Failed to save workout.');
@@ -159,12 +195,18 @@ export default function CreateWorkoutScreen() {
     }
   };
 
+  if (loading) return (
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color="#F77E2D" />
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Create Workout</Text>
+      <Text style={styles.title}>Edit Workout</Text>
 
       <Text style={styles.label}>Name</Text>
       <TextInput
@@ -442,7 +484,7 @@ export default function CreateWorkoutScreen() {
       </View>
 
       <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-        <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Workout'}</Text>
+        <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Changes'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -451,6 +493,7 @@ export default function CreateWorkoutScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#EDE8DF' },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
   back: { color: '#F77E2D', fontSize: 14, marginBottom: 8 },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 24 },
   label: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },

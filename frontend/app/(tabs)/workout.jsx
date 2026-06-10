@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
 
 const confirmDelete = (onConfirm) => {
@@ -19,9 +19,11 @@ export default function WorkoutScreen() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchWorkouts();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchWorkouts();
+    }, [])
+  );
 
   const fetchWorkouts = async () => {
     try {
@@ -68,13 +70,28 @@ export default function WorkoutScreen() {
           <View key={workout._id} style={styles.workoutCard}>
             <View style={styles.workoutInfo}>
               <Text style={styles.workoutName}>{workout.name}</Text>
-              <Text style={styles.workoutMeta}>{workout.type} · {workout.rounds} round{workout.rounds > 1 ? 's' : ''} · {workout.intervals.length} interval{workout.intervals.length !== 1 ? 's' : ''}</Text>
+              <Text style={styles.workoutMeta}>
+                {workout.type} · {workout.rounds} round{workout.rounds > 1 ? 's' : ''} · {workout.intervals.length} interval{workout.intervals.length !== 1 ? 's' : ''}
+                {workout.repeat ? ' · Repeat' : ''}
+              </Text>
             </View>
             <View style={styles.workoutActions}>
-              <TouchableOpacity style={styles.startBtn} onPress={() => router.push({ pathname: '/timer', params: { workoutId: workout._id } })}>
+              <TouchableOpacity
+                style={styles.startBtn}
+                onPress={() => router.push({ pathname: '/timer', params: { workoutId: workout._id } })}
+              >
                 <Text style={styles.startBtnText}>▶</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteWorkout(workout._id)}>
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => router.push({ pathname: '/edit-workout', params: { workoutId: workout._id } })}
+              >
+                <Text style={styles.editBtnText}>✎</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => deleteWorkout(workout._id)}
+              >
                 <Text style={styles.deleteBtnText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -87,7 +104,7 @@ export default function WorkoutScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#EDE8DF' },
-  content: { padding: 24, paddingTop: 60 },
+  content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 24 },
   createBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
@@ -101,6 +118,8 @@ const styles = StyleSheet.create({
   workoutActions: { flexDirection: 'row', gap: 8 },
   startBtn: { backgroundColor: '#F77E2D', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   startBtnText: { color: '#fff', fontSize: 14 },
+  editBtn: { backgroundColor: '#D9D3C8', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#C4BEB4' },
+  editBtnText: { color: '#888', fontSize: 16 },
   deleteBtn: { backgroundColor: '#E8E2D8', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   deleteBtnText: { color: '#888', fontSize: 14 }
 });

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ScrollVi
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Speech from 'expo-speech';
 import api from '../src/utils/api';
+import { useAuth } from '../src/contexts/AuthContext';
 
 const speakWithVoice = (text, voiceURI) => {
   if (Platform.OS === 'web') {
@@ -43,8 +44,8 @@ const formatTime = (s) => {
 export default function TimerScreen() {
   const { workoutId } = useLocalSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [workout, setWorkout] = useState(null);
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [screen, setScreen] = useState('settings');
   const [running, setRunning] = useState(false);
@@ -54,18 +55,16 @@ export default function TimerScreen() {
   const [selectedVoice, setSelectedVoice] = useState(null);
   const intervalRef = useRef(null);
 
-  // Simple mode state
   const [simpleTimeLeft, setSimpleTimeLeft] = useState(0);
   const [simpleTotalTime, setSimpleTotalTime] = useState(0);
 
-  // Complex mode state
   const [currentRound, setCurrentRound] = useState(1);
   const [currentInterval, setCurrentInterval] = useState(0);
   const [phase, setPhase] = useState('work');
   const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
-    fetchData();
+    fetchWorkout();
     if (Platform.OS === 'web' && 'speechSynthesis' in window) {
       const loadVoices = () => {
         const v = window.speechSynthesis.getVoices();
@@ -77,16 +76,11 @@ export default function TimerScreen() {
     return () => clearInterval(intervalRef.current);
   }, []);
 
-  const fetchData = async () => {
+  const fetchWorkout = async () => {
     try {
-      const [workoutRes, userRes] = await Promise.all([
-        api.get(`/workouts/${workoutId}`),
-        api.get('/auth/me')
-      ]);
-      const w = workoutRes.data;
+      const res = await api.get(`/workouts/${workoutId}`);
+      const w = res.data;
       setWorkout(w);
-      setUser(userRes.data);
-
       if (w.mode === 'simple') {
         const totalSecs = w.intervals[0].workSeconds;
         setSimpleTimeLeft(totalSecs);
@@ -103,7 +97,6 @@ export default function TimerScreen() {
 
   const speak = (text) => speakWithVoice(text, selectedVoice);
 
-  // Simple timer tick
   useEffect(() => {
     if (!workout || workout.mode !== 'simple') return;
     if (running) {
@@ -131,7 +124,6 @@ export default function TimerScreen() {
     return () => clearInterval(intervalRef.current);
   }, [running, workout]);
 
-  // Complex timer tick
   useEffect(() => {
     if (!workout || workout.mode !== 'complex') return;
     if (running) {
@@ -182,6 +174,12 @@ export default function TimerScreen() {
       setPhase('work');
       setTimeLeft(intervals[0].workSeconds);
       speak(`Round ${nextRound}. ${intervals[0].name}`);
+    } else if (workout.repeat) {
+      setCurrentRound(1);
+      setCurrentInterval(0);
+      setPhase('work');
+      setTimeLeft(intervals[0].workSeconds);
+      speak(`Repeating. ${intervals[0].name}`);
     } else {
       setRunning(false);
       setDone(true);
@@ -222,6 +220,8 @@ export default function TimerScreen() {
       } else {
         setRunning(true);
       }
+    } else {
+      router.back();
     }
   };
 
@@ -246,7 +246,6 @@ export default function TimerScreen() {
     </View>
   );
 
-  // Settings screen
   if (screen === 'settings') return (
     <ScrollView style={styles.settingsContainer} contentContainerStyle={styles.settingsContent}>
       <TouchableOpacity onPress={() => router.back()}>
@@ -258,6 +257,7 @@ export default function TimerScreen() {
           ? formatTime(workout.intervals[0].workSeconds)
           : `${workout.rounds} round${workout.rounds > 1 ? 's' : ''} · ${workout.intervals.length} interval${workout.intervals.length !== 1 ? 's' : ''}`
         }
+        {workout.repeat ? ' · Repeat ON' : ''}
       </Text>
 
       {voices.length > 0 && (
@@ -278,6 +278,16 @@ export default function TimerScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+        </>
+      )}
+
+      {workout.warmUp > 0 && (
+        <>
+          <Text style={styles.sectionLabel}>Warm Up</Text>
+          <View style={styles.intervalPreview}>
+            <Text style={styles.intervalPreviewName}>Warm Up</Text>
+            <Text style={styles.intervalPreviewTime}>{formatTime(workout.warmUp)}</Text>
           </View>
         </>
       )}
@@ -304,13 +314,22 @@ export default function TimerScreen() {
         </>
       )}
 
+      {workout.coolDown > 0 && (
+        <>
+          <Text style={styles.sectionLabel}>Cool Down</Text>
+          <View style={styles.intervalPreview}>
+            <Text style={styles.intervalPreviewName}>Cool Down</Text>
+            <Text style={styles.intervalPreviewTime}>{formatTime(workout.coolDown)}</Text>
+          </View>
+        </>
+      )}
+
       <TouchableOpacity style={styles.startWorkoutBtn} onPress={() => setScreen('timer')}>
         <Text style={styles.startWorkoutBtnText}>Start Workout</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 
-  // Done screen
   if (done) return (
     <View style={styles.center}>
       <Text style={styles.doneTitle}>Workout Complete! 🎉</Text>
@@ -331,7 +350,6 @@ export default function TimerScreen() {
     </View>
   );
 
-  // Simple timer screen
   if (workout.mode === 'simple') {
     const progress = simpleTotalTime > 0 ? simpleTimeLeft / simpleTotalTime : 0;
     return (
@@ -368,7 +386,6 @@ export default function TimerScreen() {
     );
   }
 
-  // Complex timer screen
   const interval = workout.intervals[currentInterval];
   const isWork = phase === 'work';
 
@@ -405,7 +422,7 @@ export default function TimerScreen() {
                 ? workout.intervals[currentInterval + 1].name
                 : currentRound < workout.rounds
                   ? `Round ${currentRound + 1}`
-                  : 'Finish'}
+                  : workout.repeat ? 'Repeat' : 'Finish'}
           </Text>
         </View>
       )}
