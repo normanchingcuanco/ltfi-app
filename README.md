@@ -48,6 +48,7 @@ Current free services in use:
 - Gmail SMTP — free via app password
 - Expo — free for development and EAS free tier builds
 - EAS Build — free tier (30 builds/month)
+- EAS Update — free tier (1,000 OTA updates/month)
 - Vercel — free tier for frontend hosting
 - Render — free tier for backend hosting
 
@@ -72,7 +73,7 @@ An Expo-based mobile and web app that:
 - Tracks food intake via barcode scanning and AI food photo recognition
 - Lets users build custom foods and recipes with no paywall
 - Tracks daily calories, macros, and micronutrients
-- Logs workouts and runs HIIT / Tabata / circuit interval timers
+- Logs workouts and runs HIIT / Tabata / circuit interval timers with warmup, cooldown, and repeat
 - Syncs health data from Apple HealthKit and Colmi smart ring via QRing
 
 ---
@@ -116,6 +117,7 @@ An Expo-based mobile and web app that:
 | Hosting (Frontend) | Vercel free tier | Free |
 | Hosting (Backend) | Render free tier | Free |
 | Mobile Builds | EAS Build free tier | Free |
+| OTA Updates | EAS Update free tier | Free |
 
 ---
 
@@ -124,8 +126,8 @@ An Expo-based mobile and web app that:
 ```
 ltfi/
 ├── backend/
-│   ├── config/
 │   ├── controllers/
+│   │   ├── aiScanController.js
 │   │   ├── authController.js
 │   │   ├── foodController.js
 │   │   ├── mealController.js
@@ -142,6 +144,7 @@ ltfi/
 │   │   ├── Weight.js
 │   │   └── Workout.js
 │   ├── routes/
+│   │   ├── aiScan.js
 │   │   ├── auth.js
 │   │   ├── food.js
 │   │   ├── meals.js
@@ -157,11 +160,18 @@ ltfi/
 │   └── package.json
 ├── frontend/
 │   ├── assets/
+│   │   ├── icon.png
+│   │   ├── ltfi-dark.png
+│   │   ├── ltfi-light.png
+│   │   ├── ltfi-dark (w. tag).png
+│   │   └── ltfi-light (w. tag).png
 │   ├── src/
 │   │   ├── contexts/
 │   │   │   └── AuthContext.jsx
 │   │   └── utils/
-│   │       └── api.js
+│   │       ├── api.js
+│   │       ├── healthKit.js
+│   │       └── metValues.js
 │   ├── app/
 │   │   ├── (auth)/
 │   │   │   ├── login.jsx
@@ -171,11 +181,11 @@ ltfi/
 │   │   │   ├── _layout.jsx
 │   │   │   ├── dashboard.jsx
 │   │   │   ├── diary.jsx
-│   │   │   ├── recipes.jsx
-│   │   │   ├── workout.jsx
 │   │   │   ├── health.jsx
 │   │   │   ├── progress.jsx
-│   │   │   └── profile.jsx
+│   │   │   ├── profile.jsx
+│   │   │   ├── recipes.jsx
+│   │   │   └── workout.jsx
 │   │   ├── _layout.jsx
 │   │   ├── add-food.jsx
 │   │   ├── ai-food-scan.jsx
@@ -183,13 +193,16 @@ ltfi/
 │   │   ├── create-recipe.jsx
 │   │   ├── create-workout.jsx
 │   │   ├── custom-food.jsx
+│   │   ├── edit-workout.jsx
+│   │   ├── index.jsx
 │   │   ├── reset-password.jsx
 │   │   └── timer.jsx
 │   ├── app.json
 │   ├── babel.config.js
 │   ├── eas.json
 │   ├── metro.config.js
-│   └── package.json
+│   ├── package.json
+│   └── vercel.json
 ├── README.md
 └── .gitignore
 ```
@@ -224,7 +237,7 @@ ltfi/
 |-------|------|-------|
 | _id | ObjectId | PK |
 | user | ObjectId | Ref: User |
-| date | String | YYYY-MM-DD |
+| date | String | YYYY-MM-DD (local timezone) |
 | mealType | String | breakfast / lunch / dinner / snacks |
 | foods | Array | [{ foodId, name, quantity, unit, calories, protein, carbs, fat }] |
 | totalCalories | Number | Computed |
@@ -278,8 +291,12 @@ ltfi/
 | user | ObjectId | Ref: User |
 | name | String | |
 | type | String | HIIT / Tabata / circuit / custom |
-| intervals | Array | [{ name, workSeconds, restSeconds }] |
+| mode | String | simple / complex |
+| intervals | Array | [{ name, workSeconds, restSeconds, met }] |
 | rounds | Number | |
+| repeat | Boolean | Loop workout indefinitely |
+| warmUp | Number | Seconds |
+| coolDown | Number | Seconds |
 | caloriesBurned | Number | Optional |
 | completedAt | Date | |
 
@@ -307,7 +324,7 @@ ltfi/
 | Auto Calorie Calculation | Calculate daily calorie and macro goals on registration using TDEE formula | ✅ Done |
 | Login Screen | Email + password form with show/hide password | ✅ Done |
 | JWT Middleware | Protect all API routes | ✅ Done |
-| Session Persistence | JWT survives app restarts | ✅ Done |
+| Session Persistence | JWT survives app restarts — only clears on 401, not network errors | ✅ Done |
 | Password Reset | Forgot password flow via email using Gmail + Nodemailer | ✅ Done |
 | Profile Screen | Update name, weight, goals — recalculates TDEE on save | ✅ Done |
 
@@ -321,11 +338,14 @@ ltfi/
 | Delete Food from Diary | Remove logged food items from any meal | ✅ Done |
 | Edit Food in Diary | Edit quantity of logged food items with calorie preview | ✅ Done |
 | Date Navigation | Navigate to any past or future date in the diary | ✅ Done |
+| Timezone Fix | Diary uses local date formatting to prevent UTC date shift | ✅ Done |
 | Copy Previous Day | Copy all meals from previous day to current date | ✅ Done |
 | Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ✅ Done |
 | Web Barcode Scanner | Browser-based barcode scanning via ZXing library | ✅ Done |
-| Manual Barcode Entry | Type barcode number manually if scan fails | ✅ Done |
+| Manual Barcode Entry | Type barcode number manually with keyboard submit support | ✅ Done |
+| Barcode Back Button | Back button on barcode scanner screen | ✅ Done |
 | AI Food Photo Scan | Camera photo → Groq LLaMA Vision → food name + nutrition estimate | ✅ Done |
+| AI Scan Image Compression | Compress image to stay under Groq 4MB base64 limit | ✅ Done |
 | Custom Food Entry | Manual entry form for foods not in any database | ✅ Done |
 | My Foods | View and delete custom foods from the Add Food screen | ✅ Done |
 | Quantity Picker | Select serving size before adding food to diary with calorie preview | ✅ Done |
@@ -368,20 +388,28 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Workout Model | Mongoose schema for interval and workout sessions | ✅ Done |
+| Workout Model | Mongoose schema with warmUp, coolDown, repeat, mode fields | ✅ Done |
 | Simple Mode | Single countdown timer for straightforward workouts | ✅ Done |
 | Complex Mode | HIIT, Tabata, and circuit timer with work and rest periods | ✅ Done |
 | Custom Intervals | Set work duration, rest duration, rounds, and sets | ✅ Done |
 | Named Exercises | Label each interval with an exercise name | ✅ Done |
+| Custom Interval Names | Type a custom name not in the list and confirm with "Use custom name" | ✅ Done |
+| Interval Reordering | Move intervals up or down with arrow buttons | ✅ Done |
 | MET Lookup Table | 50+ exercises with accurate MET values for calorie calculation | ✅ Done |
 | MET-based Calorie Calc | Per-exercise MET values used for accurate calorie burn estimate | ✅ Done |
 | Saved Workout Presets | Save and reuse custom timer configurations | ✅ Done |
+| Edit Workout | Edit existing workout name, type, mode, intervals, rounds, warmup, cooldown, repeat | ✅ Done |
+| Warm Up | Optional warm-up timer before main intervals | ✅ Done |
+| Cool Down | Optional cool-down timer after main intervals | ✅ Done |
+| Repeat Toggle | Loop the entire workout indefinitely | ✅ Done |
 | Voice Announcements | Audio cues for interval changes with countdown | ✅ Done |
 | Voice Picker | Select from available system voices before starting workout | ✅ Done |
+| iOS Done Button | Floating done button above number-pad keyboard on iOS | ✅ Done |
 | Exercise Logging | Log workout type, duration, sets, reps | ✅ Done |
 | Calories Burned | MET-based auto-estimate on completion, editable before saving | ✅ Done |
-| Workout Settings Screen | Preview intervals and select voice before starting | ✅ Done |
+| Workout Settings Screen | Preview intervals, warmup, cooldown, repeat, and select voice before starting | ✅ Done |
 | Delete Workouts | Remove saved workouts | ✅ Done |
+| Workout Page Focus Refresh | Workout list refreshes on every tab focus | ✅ Done |
 | Background Timer | Timer continues running when app is backgrounded | ⬜ Deferred — requires native build |
 
 ---
@@ -419,7 +447,7 @@ ltfi/
 
 ---
 
-### Phase 4 — Deployment
+### Phase 4 — Deployment and Performance
 
 | Feature | Description | Status |
 |---------|-------------|--------|
@@ -429,8 +457,14 @@ ltfi/
 | SPA Routing Fix | Vercel rewrite rules for client-side routing | ✅ Done |
 | Cache Control | Static assets cached, HTML no-cache for instant updates | ✅ Done |
 | Tab Bar Icons | Ionicons on all tabs with safe area padding for Android | ✅ Done |
+| App Icon | Custom muscle map figure with lock icon — dark version | ✅ Done |
 | Android APK Build | EAS build for Android — sideload distribution, no Play Store needed | ✅ Done |
-| OTA Updates | expo-updates for seamless over-the-air app updates | ⬜ Not Built |
+| OTA Updates | expo-updates for seamless over-the-air app updates | ✅ Done |
+| Backend Warm-Up | Ping /health on app launch with retry to wake Render free tier | ✅ Done |
+| API Response Caching | Cache utility for food search and meal data | ✅ Done |
+| Lazy Tab Loading | Tabs load on demand with lazy: true | ✅ Done |
+| Session Persistence Fix | Token only cleared on 401, not on network timeout | ✅ Done |
+| Timezone Date Fix | Diary uses local date format to prevent UTC date shift | ✅ Done |
 | iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ Deferred |
 
 ---
@@ -504,18 +538,6 @@ Download and sideload the APK directly. No Google Play account needed.
 
 ---
 
-## Sharing Without App Store
-
-**Android (free):**
-1. Build the APK via `eas build -p android --profile preview`
-2. Share the EAS download link or the APK file directly via WhatsApp, Telegram, or Google Drive
-3. Recipients enable "Install from unknown sources" on their Android and install
-
-**iOS:**
-Requires Apple Developer account ($99/yr) for any distribution outside of Expo Go.
-
----
-
 ## Pushing OTA Updates
 
 For any JS/UI changes that don't require new native modules, push an OTA update instead of rebuilding the APK.
@@ -527,6 +549,7 @@ For any JS/UI changes that don't require new native modules, push an OTA update 
 | UI changes, bug fixes, new screens | OTA update |
 | New native library added | Rebuild APK |
 | app.json native config changed | Rebuild APK |
+| App icon changed | Rebuild APK |
 
 ### How to push an OTA update
 
@@ -546,4 +569,16 @@ Users get the update silently on next app launch. No new APK download needed.
 
 ---
 
-*Last updated: May 2026*
+## Sharing Without App Store
+
+**Android (free):**
+1. Build the APK via `eas build -p android --profile preview`
+2. Share the EAS download link or the APK file directly via WhatsApp, Telegram, or Google Drive
+3. Recipients enable "Install from unknown sources" on their Android and install
+
+**iOS:**
+Requires Apple Developer account ($99/yr) for any distribution outside of Expo Go.
+
+---
+
+*Last updated: June 2026*
