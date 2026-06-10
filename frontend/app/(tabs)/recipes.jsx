@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
 
@@ -139,6 +139,12 @@ export default function RecipesScreen() {
               >
                 <Text style={styles.addBtnText}>+ Diary</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => router.push(`/edit-recipe?id=${recipe._id}`)}
+              >
+                <Text style={styles.editBtnText}>✎</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteRecipe(recipe._id)}>
                 <Text style={styles.deleteBtnText}>✕</Text>
               </TouchableOpacity>
@@ -191,6 +197,8 @@ const styles = StyleSheet.create({
   recipeActions: { flexDirection: 'row', gap: 8, alignItems: 'center', marginLeft: 12 },
   addBtn: { backgroundColor: '#F77E2D', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 99 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  editBtn: { backgroundColor: '#E8E2D8', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  editBtnText: { color: '#1A1A1A', fontSize: 16 },
   deleteBtn: { backgroundColor: '#E8E2D8', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   deleteBtnText: { color: '#888', fontSize: 14 },
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
