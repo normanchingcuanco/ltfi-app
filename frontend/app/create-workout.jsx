@@ -522,3 +522,4 @@ const styles = StyleSheet.create({
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   floatingDone: { backgroundColor: '#D9D3C8', padding: 12, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#C4BEB4' },
   floatingDoneText: { color: '#F77E2D', fontWeight: '700', fontSize: 16, paddingRight: 16 },
+  });
