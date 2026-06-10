@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
 import api from '../../src/utils/api';
 
-const screenWidth = Dimensions.get('window').width - 48;
+const screenWidth = Dimensions.get('window').width - 88;
 
 const confirmDelete = (onConfirm) => {
   if (Platform.OS === 'web') {
@@ -78,6 +78,7 @@ export default function ProgressScreen() {
   const minWeight = history.length ? Math.min(...history.map(e => e.weight)) : 0;
   const range = maxWeight - minWeight || 1;
   const chartHeight = 160;
+  const dotRadius = 5;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -136,21 +137,21 @@ export default function ProgressScreen() {
           <View style={styles.chartCard}>
             <Text style={styles.chartTitle}>Weight Trend</Text>
             <View style={styles.chart}>
-              {history.map((entry, idx) => {
-                const x = (idx / Math.max(history.length - 1, 1)) * screenWidth;
-                const y = chartHeight - ((entry.weight - minWeight) / range) * chartHeight;
-                return <View key={idx} style={[styles.dot, { left: x - 5, top: y - 5 }]} />;
-              })}
               {history.length > 1 && history.map((entry, idx) => {
                 if (idx === 0) return null;
                 const prev = history[idx - 1];
                 const x1 = ((idx - 1) / Math.max(history.length - 1, 1)) * screenWidth;
-                const y1 = chartHeight - ((prev.weight - minWeight) / range) * chartHeight;
+                const y1 = chartHeight - ((prev.weight - minWeight) / range) * (chartHeight - dotRadius * 2) - dotRadius;
                 const x2 = (idx / Math.max(history.length - 1, 1)) * screenWidth;
-                const y2 = chartHeight - ((entry.weight - minWeight) / range) * chartHeight;
+                const y2 = chartHeight - ((entry.weight - minWeight) / range) * (chartHeight - dotRadius * 2) - dotRadius;
                 const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
                 const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
                 return <View key={`line-${idx}`} style={[styles.line, { left: x1, top: y1, width: length, transform: [{ rotate: `${angle}deg` }] }]} />;
+              })}
+              {history.map((entry, idx) => {
+                const x = (idx / Math.max(history.length - 1, 1)) * screenWidth;
+                const y = chartHeight - ((entry.weight - minWeight) / range) * (chartHeight - dotRadius * 2) - dotRadius;
+                return <View key={idx} style={[styles.dot, { left: x - dotRadius, top: y - dotRadius }]} />;
               })}
             </View>
             <View style={styles.chartLabels}>
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   chartCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 24 },
   chartTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 16 },
-  chart: { height: 160, position: 'relative', marginBottom: 8 },
+  chart: { height: 160, position: 'relative', marginBottom: 8, overflow: 'hidden' },
   dot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#F77E2D' },
   line: { position: 'absolute', height: 2, backgroundColor: '#F77E2D', opacity: 0.4, transformOrigin: 'left center' },
   chartLabels: { flexDirection: 'row', justifyContent: 'space-between' },

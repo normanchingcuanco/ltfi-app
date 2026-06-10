@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
 
@@ -48,6 +48,7 @@ export default function EditRecipeScreen() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchingIdx, setSearchingIdx] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [numericFocused, setNumericFocused] = useState(false);
 
   useEffect(() => {
     fetchRecipe();
@@ -140,6 +141,12 @@ export default function EditRecipeScreen() {
     setSearchingIdx(null);
   };
 
+  const confirmManualName = (idx) => {
+    setSearchResults([]);
+    setSearchingIdx(null);
+    Keyboard.dismiss();
+  };
+
   const handleSave = async () => {
     if (!name.trim()) return showAlert('Error', 'Recipe name is required');
     if (ingredients.some(i => !i.name.trim())) return showAlert('Error', 'All ingredients need a name');
@@ -175,124 +182,157 @@ export default function EditRecipeScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Edit Recipe</Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.back}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Edit Recipe</Text>
 
-      <Text style={styles.label}>Name</Text>
-      <TextInput style={styles.input} placeholder="e.g. Chicken Rice Bowl" placeholderTextColor="#999" value={name} onChangeText={setName} />
+        <Text style={styles.label}>Name</Text>
+        <TextInput style={styles.input} placeholder="e.g. Chicken Rice Bowl" placeholderTextColor="#999" value={name} onChangeText={setName} />
 
-      <Text style={styles.label}>Servings</Text>
-      <TextInput style={styles.input} placeholder="1" placeholderTextColor="#999" keyboardType="numeric" value={servings} onChangeText={setServings} />
+        <Text style={styles.label}>Servings</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="1"
+          placeholderTextColor="#999"
+          keyboardType="numeric"
+          value={servings}
+          onChangeText={setServings}
+          onFocus={() => setNumericFocused(true)}
+          onBlur={() => setNumericFocused(false)}
+        />
 
-      <Text style={styles.label}>Notes (optional)</Text>
-      <TextInput style={[styles.input, { height: 80 }]} placeholder="Cooking instructions..." placeholderTextColor="#999" value={notes} onChangeText={setNotes} multiline />
+        <Text style={styles.label}>Notes (optional)</Text>
+        <TextInput style={[styles.input, { height: 80 }]} placeholder="Cooking instructions..." placeholderTextColor="#999" value={notes} onChangeText={setNotes} multiline />
 
-      <Text style={styles.label}>Ingredients</Text>
+        <Text style={styles.label}>Ingredients</Text>
 
-      {ingredients.map((ingredient, idx) => (
-        <View key={idx} style={styles.ingredientCard}>
-          <View style={styles.ingredientHeader}>
-            <Text style={styles.ingredientNum}>Ingredient {idx + 1}</Text>
-            {ingredients.length > 1 && (
-              <TouchableOpacity onPress={() => removeIngredient(idx)}>
-                <Text style={styles.removeText}>Remove</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.searchRow}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search food or enter manually..."
-              placeholderTextColor="#999"
-              value={searchingIdx === idx ? search : ingredient.name}
-              onChangeText={val => {
-                setSearchingIdx(idx);
-                setSearch(val);
-                updateIngredient(idx, 'name', val);
-              }}
-              onSubmitEditing={() => searchFood(idx)}
-              returnKeyType="search"
-            />
-            <TouchableOpacity style={styles.searchBtn} onPress={() => searchFood(idx)}>
-              {searching && searchingIdx === idx
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.searchBtnText}>Search</Text>
-              }
-            </TouchableOpacity>
-          </View>
-
-          {searchingIdx === idx && searchResults.length > 0 && (
-            <View style={styles.dropdown}>
-              {searchResults.slice(0, 5).map((food, fidx) => (
-                <TouchableOpacity key={fidx} style={styles.dropdownItem} onPress={() => selectFood(idx, food)}>
-                  <Text style={styles.dropdownName}>{food.name}</Text>
-                  <Text style={styles.dropdownMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F</Text>
+        {ingredients.map((ingredient, idx) => (
+          <View key={idx} style={styles.ingredientCard}>
+            <View style={styles.ingredientHeader}>
+              <Text style={styles.ingredientNum}>Ingredient {idx + 1}</Text>
+              {ingredients.length > 1 && (
+                <TouchableOpacity onPress={() => removeIngredient(idx)}>
+                  <Text style={styles.removeText}>Remove</Text>
                 </TouchableOpacity>
-              ))}
+              )}
             </View>
-          )}
 
-          <View style={styles.qtyUnitRow}>
-            <View style={styles.qtyField}>
-              <Text style={styles.macroLabel}>QTY</Text>
+            <View style={styles.searchRow}>
               <TextInput
-                style={styles.macroInput}
-                keyboardType="numeric"
-                value={ingredient.quantity}
-                onChangeText={val => updateIngredient(idx, 'quantity', val)}
+                style={styles.searchInput}
+                placeholder="Search food or enter manually..."
                 placeholderTextColor="#999"
+                value={searchingIdx === idx ? search : ingredient.name}
+                onChangeText={val => {
+                  setSearchingIdx(idx);
+                  setSearch(val);
+                  updateIngredient(idx, 'name', val);
+                }}
+                onSubmitEditing={() => searchFood(idx)}
+                returnKeyType="search"
               />
+              <TouchableOpacity style={styles.searchBtn} onPress={() => searchFood(idx)}>
+                {searching && searchingIdx === idx
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.searchBtnText}>Search</Text>
+                }
+              </TouchableOpacity>
             </View>
-            <View style={styles.unitField}>
-              <Text style={styles.macroLabel}>UNIT</Text>
-              <View style={styles.unitPicker}>
-                {UNITS.map(u => (
-                  <TouchableOpacity
-                    key={u}
-                    style={[styles.unitBtn, ingredient.unit === u && styles.unitBtnActive]}
-                    onPress={() => updateIngredient(idx, 'unit', u)}
-                  >
-                    <Text style={[styles.unitBtnText, ingredient.unit === u && styles.unitBtnTextActive]}>{u}</Text>
+
+            {searchingIdx === idx && searchResults.length > 0 && (
+              <View style={styles.dropdown}>
+                {searchResults.slice(0, 5).map((food, fidx) => (
+                  <TouchableOpacity key={fidx} style={styles.dropdownItem} onPress={() => selectFood(idx, food)}>
+                    <Text style={styles.dropdownName}>{food.name}</Text>
+                    <Text style={styles.dropdownMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F</Text>
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity style={styles.manualConfirmBtn} onPress={() => confirmManualName(idx)}>
+                  <Text style={styles.manualConfirmText}>Use "{ingredient.name}"</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            )}
 
-          <View style={styles.macroRow}>
-            {[
-              { label: 'KCAL', key: 'calories' },
-              { label: 'PROTEIN', key: 'protein' },
-              { label: 'CARBS', key: 'carbs' },
-              { label: 'FAT', key: 'fat' },
-            ].map(field => (
-              <View key={field.key} style={styles.macroField}>
-                <Text style={styles.macroLabel}>{field.label}</Text>
+            {searchingIdx === idx && searchResults.length === 0 && ingredient.name.trim().length > 0 && !searching && (
+              <TouchableOpacity style={styles.manualConfirmBtn} onPress={() => confirmManualName(idx)}>
+                <Text style={styles.manualConfirmText}>Use "{ingredient.name}"</Text>
+              </TouchableOpacity>
+            )}
+
+            <View style={styles.qtyUnitRow}>
+              <View style={styles.qtyField}>
+                <Text style={styles.macroLabel}>QTY</Text>
                 <TextInput
                   style={styles.macroInput}
                   keyboardType="numeric"
-                  value={ingredient[field.key]}
-                  onChangeText={val => updateIngredient(idx, field.key, val)}
+                  value={ingredient.quantity}
+                  onChangeText={val => updateIngredient(idx, 'quantity', val)}
                   placeholderTextColor="#999"
+                  onFocus={() => setNumericFocused(true)}
+                  onBlur={() => setNumericFocused(false)}
                 />
               </View>
-            ))}
+              <View style={styles.unitField}>
+                <Text style={styles.macroLabel}>UNIT</Text>
+                <View style={styles.unitPicker}>
+                  {UNITS.map(u => (
+                    <TouchableOpacity
+                      key={u}
+                      style={[styles.unitBtn, ingredient.unit === u && styles.unitBtnActive]}
+                      onPress={() => updateIngredient(idx, 'unit', u)}
+                    >
+                      <Text style={[styles.unitBtnText, ingredient.unit === u && styles.unitBtnTextActive]}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.macroRow}>
+              {[
+                { label: 'KCAL', key: 'calories' },
+                { label: 'PROTEIN', key: 'protein' },
+                { label: 'CARBS', key: 'carbs' },
+                { label: 'FAT', key: 'fat' },
+              ].map(field => (
+                <View key={field.key} style={styles.macroField}>
+                  <Text style={styles.macroLabel}>{field.label}</Text>
+                  <TextInput
+                    style={styles.macroInput}
+                    keyboardType="numeric"
+                    value={ingredient[field.key]}
+                    onChangeText={val => updateIngredient(idx, field.key, val)}
+                    placeholderTextColor="#999"
+                    onFocus={() => setNumericFocused(true)}
+                    onBlur={() => setNumericFocused(false)}
+                  />
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
-      ))}
+        ))}
 
-      <TouchableOpacity style={styles.addIngredientBtn} onPress={addIngredient}>
-        <Text style={styles.addIngredientText}>+ Add Ingredient</Text>
-      </TouchableOpacity>
+        <TouchableOpacity style={styles.addIngredientBtn} onPress={addIngredient}>
+          <Text style={styles.addIngredientText}>+ Add Ingredient</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+        </TouchableOpacity>
+      </ScrollView>
+
+      {numericFocused && Platform.OS === 'ios' && (
+        <TouchableOpacity
+          style={styles.floatingDone}
+          onPress={() => { Keyboard.dismiss(); setNumericFocused(false); }}
+        >
+          <Text style={styles.floatingDoneText}>Done</Text>
+        </TouchableOpacity>
+      )}
+    </KeyboardAvoidingView>
   );
 }
 
@@ -316,6 +356,8 @@ const styles = StyleSheet.create({
   dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#D9D3C8' },
   dropdownName: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
   dropdownMacros: { fontSize: 11, color: '#888', marginTop: 2 },
+  manualConfirmBtn: { padding: 12, alignItems: 'center' },
+  manualConfirmText: { fontSize: 13, color: '#F77E2D', fontWeight: '700' },
   qtyUnitRow: { flexDirection: 'row', gap: 8, marginBottom: 8, alignItems: 'flex-start' },
   qtyField: { width: 80 },
   unitField: { flex: 1 },
@@ -332,4 +374,6 @@ const styles = StyleSheet.create({
   addIngredientText: { color: '#F77E2D', fontWeight: '700' },
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 40 },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  floatingDone: { backgroundColor: '#D9D3C8', padding: 12, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#C4BEB4' },
+  floatingDoneText: { color: '#F77E2D', fontWeight: '700', fontSize: 16, paddingRight: 16 },
 });
