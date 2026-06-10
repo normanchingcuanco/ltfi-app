@@ -39,7 +39,6 @@ export default function CreateWorkoutScreen() {
   const [searchingIdx, setSearchingIdx] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [customInputIdx, setCustomInputIdx] = useState(null);
 
   const addInterval = () => {
     setIntervals(prev => [...prev, { name: '', workSeconds: '30', restSeconds: '10', met: 5.0 }]);
@@ -68,7 +67,6 @@ export default function CreateWorkoutScreen() {
     setSearchQuery(query);
     updateInterval(idx, 'name', query);
     setSearchResults(searchMET(query).slice(0, 6));
-    setCustomInputIdx(null);
   };
 
   const selectExercise = (idx, exercise) => {
@@ -80,13 +78,11 @@ export default function CreateWorkoutScreen() {
     setSearchingIdx(null);
     setSearchQuery('');
     setSearchResults([]);
-    setCustomInputIdx(null);
   };
 
   const confirmCustomName = (idx) => {
     setSearchingIdx(null);
     setSearchResults([]);
-    setCustomInputIdx(null);
   };
 
   const handleSimpleSearch = (query) => {
@@ -116,13 +112,8 @@ export default function CreateWorkoutScreen() {
       if (totalSeconds <= 0) return showAlert('Error', 'Duration must be greater than 0');
 
       payload = {
-        name,
-        type,
-        mode: 'simple',
-        rounds: 1,
-        repeat,
-        warmUp: warmUpSeconds,
-        coolDown: coolDownSeconds,
+        name, type, mode: 'simple', rounds: 1, repeat,
+        warmUp: warmUpSeconds, coolDown: coolDownSeconds,
         intervals: [{
           name: simpleExercise || name,
           workSeconds: totalSeconds,
@@ -132,9 +123,7 @@ export default function CreateWorkoutScreen() {
       };
     } else {
       payload = {
-        name,
-        type,
-        mode: 'complex',
+        name, type, mode: 'complex',
         rounds: parseInt(rounds) || 1,
         repeat,
         warmUp: warmUpSeconds,
@@ -173,6 +162,8 @@ export default function CreateWorkoutScreen() {
         placeholderTextColor="#999"
         value={name}
         onChangeText={setName}
+        returnKeyType="done"
+        blurOnSubmit={true}
       />
 
       <Text style={styles.label}>Type</Text>
@@ -215,6 +206,8 @@ export default function CreateWorkoutScreen() {
               placeholder="0"
               placeholderTextColor="#999"
               keyboardType="numeric"
+              returnKeyType="done"
+              blurOnSubmit={true}
               value={warmUpMins}
               onChangeText={setWarmUpMins}
             />
@@ -226,6 +219,8 @@ export default function CreateWorkoutScreen() {
               placeholder="00"
               placeholderTextColor="#999"
               keyboardType="numeric"
+              returnKeyType="done"
+              blurOnSubmit={true}
               value={warmUpSecs}
               onChangeText={setWarmUpSecs}
             />
@@ -243,6 +238,8 @@ export default function CreateWorkoutScreen() {
             placeholderTextColor="#999"
             value={simpleExercise}
             onChangeText={handleSimpleSearch}
+            returnKeyType="done"
+            blurOnSubmit={true}
             onFocus={() => {
               setSimpleSearching(true);
               setSimpleSearchResults(searchMET('').slice(0, 6));
@@ -274,6 +271,8 @@ export default function CreateWorkoutScreen() {
                 placeholder="0"
                 placeholderTextColor="#999"
                 keyboardType="numeric"
+                returnKeyType="done"
+                blurOnSubmit={true}
                 value={simpleDurationMins}
                 onChangeText={setSimpleDurationMins}
               />
@@ -285,6 +284,8 @@ export default function CreateWorkoutScreen() {
                 placeholder="00"
                 placeholderTextColor="#999"
                 keyboardType="numeric"
+                returnKeyType="done"
+                blurOnSubmit={true}
                 value={simpleDurationSecs}
                 onChangeText={setSimpleDurationSecs}
               />
@@ -302,6 +303,8 @@ export default function CreateWorkoutScreen() {
             placeholder="1"
             placeholderTextColor="#999"
             keyboardType="numeric"
+            returnKeyType="done"
+            blurOnSubmit={true}
             value={rounds}
             onChangeText={setRounds}
           />
@@ -378,6 +381,8 @@ export default function CreateWorkoutScreen() {
                   <TextInput
                     style={styles.timeInput}
                     keyboardType="numeric"
+                    returnKeyType="done"
+                    blurOnSubmit={true}
                     value={interval.workSeconds}
                     onChangeText={val => updateInterval(idx, 'workSeconds', val)}
                   />
@@ -387,6 +392,8 @@ export default function CreateWorkoutScreen() {
                   <TextInput
                     style={styles.timeInput}
                     keyboardType="numeric"
+                    returnKeyType="done"
+                    blurOnSubmit={true}
                     value={interval.restSeconds}
                     onChangeText={val => updateInterval(idx, 'restSeconds', val)}
                   />
@@ -422,6 +429,8 @@ export default function CreateWorkoutScreen() {
               placeholder="0"
               placeholderTextColor="#999"
               keyboardType="numeric"
+              returnKeyType="done"
+              blurOnSubmit={true}
               value={coolDownMins}
               onChangeText={setCoolDownMins}
             />
@@ -433,6 +442,8 @@ export default function CreateWorkoutScreen() {
               placeholder="00"
               placeholderTextColor="#999"
               keyboardType="numeric"
+              returnKeyType="done"
+              blurOnSubmit={true}
               value={coolDownSecs}
               onChangeText={setCoolDownSecs}
             />
