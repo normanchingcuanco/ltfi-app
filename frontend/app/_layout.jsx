@@ -6,7 +6,14 @@ import api from '../src/utils/api';
 
 function WarmUpBackend() {
   useEffect(() => {
-    api.get('/health').catch(() => {});
+    const ping = async () => {
+      try {
+        await api.get('/health');
+      } catch {
+        setTimeout(() => api.get('/health').catch(() => {}), 3000);
+      }
+    };
+    ping();
   }, []);
   return null;
 }
