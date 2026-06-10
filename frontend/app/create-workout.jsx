@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform, KeyboardAvoidingView, InputAccessoryView, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/api';
 import { searchMET } from '../src/utils/metValues';
 
 const WORKOUT_TYPES = ['HIIT', 'Tabata', 'circuit', 'custom'];
+const INPUT_ACCESSORY_ID = 'doneButton';
 
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {
@@ -207,8 +208,7 @@ export default function CreateWorkoutScreen() {
                 placeholder="0"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
-                returnKeyType="done"
-                blurOnSubmit={true}
+                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                 value={warmUpMins}
                 onChangeText={setWarmUpMins}
               />
@@ -220,8 +220,7 @@ export default function CreateWorkoutScreen() {
                 placeholder="00"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
-                returnKeyType="done"
-                blurOnSubmit={true}
+                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                 value={warmUpSecs}
                 onChangeText={setWarmUpSecs}
               />
@@ -272,8 +271,7 @@ export default function CreateWorkoutScreen() {
                   placeholder="0"
                   placeholderTextColor="#999"
                   keyboardType="number-pad"
-                  returnKeyType="done"
-                  blurOnSubmit={true}
+                  inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                   value={simpleDurationMins}
                   onChangeText={setSimpleDurationMins}
                 />
@@ -285,8 +283,7 @@ export default function CreateWorkoutScreen() {
                   placeholder="00"
                   placeholderTextColor="#999"
                   keyboardType="number-pad"
-                  returnKeyType="done"
-                  blurOnSubmit={true}
+                  inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                   value={simpleDurationSecs}
                   onChangeText={setSimpleDurationSecs}
                 />
@@ -304,8 +301,7 @@ export default function CreateWorkoutScreen() {
               placeholder="1"
               placeholderTextColor="#999"
               keyboardType="number-pad"
-              returnKeyType="done"
-              blurOnSubmit={true}
+              inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
               value={rounds}
               onChangeText={setRounds}
             />
@@ -382,8 +378,7 @@ export default function CreateWorkoutScreen() {
                     <TextInput
                       style={styles.timeInput}
                       keyboardType="number-pad"
-                      returnKeyType="done"
-                      blurOnSubmit={true}
+                      inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                       value={interval.workSeconds}
                       onChangeText={val => updateInterval(idx, 'workSeconds', val)}
                     />
@@ -393,8 +388,7 @@ export default function CreateWorkoutScreen() {
                     <TextInput
                       style={styles.timeInput}
                       keyboardType="number-pad"
-                      returnKeyType="done"
-                      blurOnSubmit={true}
+                      inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                       value={interval.restSeconds}
                       onChangeText={val => updateInterval(idx, 'restSeconds', val)}
                     />
@@ -430,8 +424,7 @@ export default function CreateWorkoutScreen() {
                 placeholder="0"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
-                returnKeyType="done"
-                blurOnSubmit={true}
+                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                 value={coolDownMins}
                 onChangeText={setCoolDownMins}
               />
@@ -443,8 +436,7 @@ export default function CreateWorkoutScreen() {
                 placeholder="00"
                 placeholderTextColor="#999"
                 keyboardType="number-pad"
-                returnKeyType="done"
-                blurOnSubmit={true}
+                inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
                 value={coolDownSecs}
                 onChangeText={setCoolDownSecs}
               />
@@ -457,6 +449,16 @@ export default function CreateWorkoutScreen() {
           <Text style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save Workout'}</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {Platform.OS === 'ios' && (
+        <InputAccessoryView nativeID={INPUT_ACCESSORY_ID}>
+          <View style={styles.keyboardToolbar}>
+            <TouchableOpacity onPress={() => Keyboard.dismiss()} style={styles.keyboardDoneBtn}>
+              <Text style={styles.keyboardDoneText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </InputAccessoryView>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -509,5 +511,8 @@ const styles = StyleSheet.create({
   addIntervalBtn: { borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
   addIntervalText: { color: '#F77E2D', fontWeight: '700' },
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 40 },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 }
+  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  keyboardToolbar: { backgroundColor: '#D9D3C8', padding: 8, alignItems: 'flex-end', borderTopWidth: 1, borderTopColor: '#C4BEB4' },
+  keyboardDoneBtn: { paddingHorizontal: 16, paddingVertical: 6 },
+  keyboardDoneText: { color: '#F77E2D', fontWeight: '700', fontSize: 16 },
 });
