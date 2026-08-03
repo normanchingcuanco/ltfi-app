@@ -33,6 +33,7 @@ export default function AddFoodScreen() {
   const [tab, setTab] = useState('search');
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
+  const [myFoodMatches, setMyFoodMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [myFoods, setMyFoods] = useState([]);
@@ -69,9 +70,25 @@ export default function AddFoodScreen() {
   const searchFood = async () => {
     if (!search.trim()) return;
     setLoading(true);
+    setMyFoodMatches([]);
     try {
-      const res = await api.get(`/food/search?q=${search}`);
-      setResults(res.data);
+      const [searchRes, myRes] = await Promise.all([
+        api.get(`/food/search?q=${encodeURIComponent(search)}`),
+        api.get('/food/my')
+      ]);
+
+      const q = search.toLowerCase();
+      const matched = (myRes.data || []).filter(f =>
+        f.name.toLowerCase().includes(q)
+      );
+
+      const matchedIds = new Set(matched.map(f => f._id?.toString()));
+      const external = (searchRes.data || []).filter(f =>
+        !f._id || !matchedIds.has(f._id.toString())
+      );
+
+      setMyFoodMatches(matched);
+      setResults(external);
     } catch (err) {
       console.error(err);
     } finally {
@@ -82,8 +99,8 @@ export default function AddFoodScreen() {
   const handleAddPress = (food) => {
     setSelectedFood(food);
     setQuantity('1');
-    setUnit('pc');
-    setUnitGrams('100');
+    setUnit(food.servingUnit || 'pc');
+    setUnitGrams(food.servingSize?.toString() || '100');
     setShowQuantityPicker(true);
   };
 
@@ -138,6 +155,7 @@ export default function AddFoodScreen() {
           try {
             await api.delete(`/food/${food._id}`);
             setMyFoods(prev => prev.filter(f => f._id !== food._id));
+            setMyFoodMatches(prev => prev.filter(f => f._id !== food._id));
           } catch (err) {
             showAlert('Error', 'Could not delete food.');
           }
@@ -149,6 +167,35 @@ export default function AddFoodScreen() {
   const totalGrams = getTotalGrams();
   const calculatedCalories = selectedFood ? Math.round(selectedFood.calories * totalGrams / 100) : 0;
   const needsGramEquivalent = CUSTOM_UNITS.includes(unit) && !UNIT_TO_GRAMS[unit];
+
+  const renderFoodItem = (food, idx, showDelete = false) => (
+    <View key={idx} style={[styles.resultItem, food.source === 'custom' && styles.resultItemCustom]}>
+      <View style={styles.resultInfo}>
+        <View style={styles.resultNameRow}>
+          <Text style={styles.resultName}>{food.name}</Text>
+          {food.source === 'custom' && (
+            <View style={styles.myFoodBadge}>
+              <Text style={styles.myFoodBadgeText}>My Food</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.resultMacros}>
+          {food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F
+          {food.servingSize ? ` per ${food.servingSize}${food.servingUnit || 'g'}` : ' per 100g'}
+        </Text>
+      </View>
+      <View style={styles.myFoodActions}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => handleAddPress(food)} disabled={adding}>
+          <Text style={styles.addBtnText}>Add</Text>
+        </TouchableOpacity>
+        {showDelete && (
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteFood(food)}>
+            <Text style={styles.deleteBtnText}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -198,17 +245,15 @@ export default function AddFoodScreen() {
             </TouchableOpacity>
           </View>
 
-          {results.map((food, idx) => (
-            <View key={idx} style={styles.resultItem}>
-              <View style={styles.resultInfo}>
-                <Text style={styles.resultName}>{food.name}</Text>
-                <Text style={styles.resultMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F per 100g</Text>
-              </View>
-              <TouchableOpacity style={styles.addBtn} onPress={() => handleAddPress(food)} disabled={adding}>
-                <Text style={styles.addBtnText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+          {myFoodMatches.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>My Foods</Text>
+              {myFoodMatches.map((food, idx) => renderFoodItem(food, idx, true))}
+              {results.length > 0 && <Text style={styles.sectionLabel}>All Results</Text>}
+            </>
+          )}
+
+          {results.map((food, idx) => renderFoodItem(food, idx, false))}
         </>
       )}
 
@@ -221,22 +266,7 @@ export default function AddFoodScreen() {
               <Text style={styles.emptyText}>No custom foods yet.</Text>
             </View>
           ) : (
-            myFoods.map((food, idx) => (
-              <View key={idx} style={styles.resultItem}>
-                <View style={styles.resultInfo}>
-                  <Text style={styles.resultName}>{food.name}</Text>
-                  <Text style={styles.resultMacros}>{food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F</Text>
-                </View>
-                <View style={styles.myFoodActions}>
-                  <TouchableOpacity style={styles.addBtn} onPress={() => handleAddPress(food)} disabled={adding}>
-                    <Text style={styles.addBtnText}>Add</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteFood(food)}>
-                    <Text style={styles.deleteBtnText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
+            myFoods.map((food, idx) => renderFoodItem(food, idx, true))
           )}
         </>
       )}
@@ -322,9 +352,14 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
   actionBtn: { flex: 1, borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 12, alignItems: 'center' },
   actionBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 12 },
+  sectionLabel: { fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginTop: 4 },
   resultItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, marginBottom: 10 },
+  resultItemCustom: { borderWidth: 1.5, borderColor: '#F77E2D' },
   resultInfo: { flex: 1 },
-  resultName: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 2 },
+  resultNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' },
+  resultName: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
+  myFoodBadge: { backgroundColor: '#F77E2D', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
+  myFoodBadgeText: { fontSize: 10, color: '#fff', fontWeight: '700' },
   resultMacros: { fontSize: 12, color: '#888' },
   addBtn: { backgroundColor: '#F77E2D', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, marginLeft: 10 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
