@@ -168,7 +168,7 @@ export default function AddFoodScreen() {
   const calculatedCalories = selectedFood ? Math.round(selectedFood.calories * totalGrams / 100) : 0;
   const needsGramEquivalent = CUSTOM_UNITS.includes(unit) && !UNIT_TO_GRAMS[unit];
 
-  const renderFoodItem = (food, idx, showDelete = false) => (
+  const renderFoodItem = (food, idx, showActions = false) => (
     <View key={idx} style={[styles.resultItem, food.source === 'custom' && styles.resultItemCustom]}>
       <View style={styles.resultInfo}>
         <View style={styles.resultNameRow}>
@@ -184,14 +184,22 @@ export default function AddFoodScreen() {
           {food.servingSize ? ` per ${food.servingSize}${food.servingUnit || 'g'}` : ' per 100g'}
         </Text>
       </View>
-      <View style={styles.myFoodActions}>
+      <View style={styles.itemActions}>
         <TouchableOpacity style={styles.addBtn} onPress={() => handleAddPress(food)} disabled={adding}>
           <Text style={styles.addBtnText}>Add</Text>
         </TouchableOpacity>
-        {showDelete && (
-          <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteFood(food)}>
-            <Text style={styles.deleteBtnText}>✕</Text>
-          </TouchableOpacity>
+        {showActions && (
+          <>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() => router.push({ pathname: '/edit-food', params: { foodId: food._id, mealType, date } })}
+            >
+              <Text style={styles.editBtnText}>✎</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteFood(food)}>
+              <Text style={styles.deleteBtnText}>✕</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
     </View>
@@ -361,9 +369,11 @@ const styles = StyleSheet.create({
   myFoodBadge: { backgroundColor: '#F77E2D', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
   myFoodBadgeText: { fontSize: 10, color: '#fff', fontWeight: '700' },
   resultMacros: { fontSize: 12, color: '#888' },
-  addBtn: { backgroundColor: '#F77E2D', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, marginLeft: 10 },
+  itemActions: { flexDirection: 'row', gap: 6, alignItems: 'center', marginLeft: 8 },
+  addBtn: { backgroundColor: '#F77E2D', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99 },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  myFoodActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  editBtn: { backgroundColor: '#E8E2D8', width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  editBtnText: { color: '#1A1A1A', fontSize: 15 },
   deleteBtn: { backgroundColor: '#E8E2D8', width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   deleteBtnText: { color: '#888', fontSize: 12, fontWeight: '700' },
   emptyBox: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 24, alignItems: 'center' },

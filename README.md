@@ -193,6 +193,8 @@ ltfi/
 │   │   ├── create-recipe.jsx
 │   │   ├── create-workout.jsx
 │   │   ├── custom-food.jsx
+│   │   ├── edit-food.jsx
+│   │   ├── edit-recipe.jsx
 │   │   ├── edit-workout.jsx
 │   │   ├── index.jsx
 │   │   ├── reset-password.jsx
@@ -256,6 +258,8 @@ ltfi/
 | fiber | Number | |
 | sodium | Number | |
 | sugar | Number | |
+| servingSize | Number | Default 100 |
+| servingUnit | String | g / oz / ml / cup / tbsp / tsp / pc / serving |
 | source | String | usda / open_food_facts / ai_scan / custom / local |
 | createdBy | ObjectId | Ref: User — null if from public DB |
 
@@ -266,8 +270,9 @@ ltfi/
 | _id | ObjectId | PK |
 | user | ObjectId | Ref: User |
 | name | String | |
-| ingredients | Array | [{ foodId, name, quantity, unit }] |
+| ingredients | Array | [{ name, quantity, unit, calories, protein, carbs, fat }] |
 | servings | Number | |
+| notes | String | Optional |
 | totalCalories | Number | Computed |
 | totalProtein | Number | |
 | totalCarbs | Number | |
@@ -327,6 +332,7 @@ ltfi/
 | Session Persistence | JWT survives app restarts — only clears on 401, not network errors | ✅ Done |
 | Password Reset | Forgot password flow via email using Gmail + Nodemailer | ✅ Done |
 | Profile Screen | Update name, weight, goals — recalculates TDEE on save | ✅ Done |
+| Login Speed Fix | bcrypt rounds reduced from 12 to 10 for faster login | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -346,11 +352,14 @@ ltfi/
 | Barcode Back Button | Back button on barcode scanner screen | ✅ Done |
 | AI Food Photo Scan | Camera photo → Groq LLaMA Vision → food name + nutrition estimate | ✅ Done |
 | AI Scan Image Compression | Compress image to stay under Groq 4MB base64 limit | ✅ Done |
-| Custom Food Entry | Manual entry form for foods not in any database | ✅ Done |
-| My Foods | View and delete custom foods from the Add Food screen | ✅ Done |
+| Custom Food Entry | Manual entry form with unit picker (g, oz, ml, cup, tbsp, tsp, pc, serving) | ✅ Done |
+| Edit Custom Food | Edit name, macros, serving size and unit of saved custom foods | ✅ Done |
+| My Foods | View, edit, and delete custom foods from the Add Food screen | ✅ Done |
+| My Foods in Search | Custom foods pinned to top of search results with My Food badge | ✅ Done |
 | Quantity Picker | Select serving size before adding food to diary with calorie preview | ✅ Done |
-| Recipe Builder | Build a recipe from multiple ingredients, set servings, auto-calculate macros | ✅ Done |
-| Recipes Screen | View, delete, and add recipes to diary | ✅ Done |
+| Recipe Builder | Build a recipe from multiple ingredients with unit picker and macro scaling | ✅ Done |
+| Edit Recipe | Edit existing recipes with full ingredient unit picker and macro scaling | ✅ Done |
+| Recipes Screen | View, edit, delete, and add recipes to diary | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
 | Food Search | Search food database — USDA FoodData Central + Open Food Facts + custom entries | ✅ Done |
 | Philippine Food Database | Seeded local DB with Jollibee, McDonald's PH, and common Filipino dishes | ✅ Done |
@@ -365,6 +374,7 @@ ltfi/
 | Nutrition Summary | Per meal and per day breakdown | ✅ Done |
 | Progress Dashboard | Visual overview of daily and weekly nutrition | ✅ Done |
 | Weekly Weight Tracker | Log weight entries and view weekly trend chart | ✅ Done |
+| Progress Chart Fix | Chart overflow clipped correctly inside card | ✅ Done |
 | Delete Weight Entries | Remove incorrect weight log entries | ✅ Done |
 | Workout Calories Deducted | Calories burned from workouts added to remaining on dashboard | ✅ Done |
 | Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it | ✅ Done |
@@ -581,4 +591,4 @@ Requires Apple Developer account ($99/yr) for any distribution outside of Expo G
 
 ---
 
-*Last updated: June 2026*
+*Last updated: August 2026*

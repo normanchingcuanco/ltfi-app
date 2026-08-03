@@ -16,6 +16,31 @@ const createFood = async (req, res) => {
   }
 };
 
+const updateFood = async (req, res) => {
+  try {
+    const food = await Food.findById(req.params.id);
+    if (!food) return res.status(404).json({ message: 'Food not found' });
+    if (food.createdBy?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    const { name, calories, protein, carbs, fat, fiber, sodium, sugar, servingSize, servingUnit } = req.body;
+    if (name !== undefined) food.name = name;
+    if (calories !== undefined) food.calories = calories;
+    if (protein !== undefined) food.protein = protein;
+    if (carbs !== undefined) food.carbs = carbs;
+    if (fat !== undefined) food.fat = fat;
+    if (fiber !== undefined) food.fiber = fiber;
+    if (sodium !== undefined) food.sodium = sodium;
+    if (sugar !== undefined) food.sugar = sugar;
+    if (servingSize !== undefined) food.servingSize = servingSize;
+    if (servingUnit !== undefined) food.servingUnit = servingUnit;
+    await food.save();
+    res.json(food);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 const fetchWithTimeout = async (url, options = {}, ms = 8000) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ms);
@@ -186,4 +211,4 @@ const deleteFood = async (req, res) => {
   }
 };
 
-module.exports = { createFood, searchFood, getFoodByBarcode, getUserFoods, deleteFood };
+module.exports = { createFood, updateFood, searchFood, getFoodByBarcode, getUserFoods, deleteFood };
