@@ -179,7 +179,7 @@ export default function EditWorkoutScreen() {
         intervals: intervals.map(i => ({
           name: i.name.trim() || 'Interval',
           workSeconds: parseInt(i.workSeconds) || 30,
-          restSeconds: parseInt(i.restSeconds) || 10,
+          restSeconds: parseInt(i.restSeconds) ?? 0,
           met: i.met || 5.0
         }))
       };
