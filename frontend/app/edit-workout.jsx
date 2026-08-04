@@ -89,7 +89,7 @@ export default function EditWorkoutScreen() {
   };
 
   const addInterval = () => {
-    setIntervals(prev => [...prev, { name: '', workSeconds: '30', restSeconds: '10', met: 5.0 }]);
+    setIntervals(prev => [...prev, { name: '', workSeconds: '30', restSeconds: '0', met: 5.0 }]);
   };
 
   const removeInterval = (idx) => {
