@@ -145,7 +145,7 @@ export default function ProfileScreen() {
 
           <View style={styles.activityCard}>
             <Text style={styles.cardLabel}>Gender</Text>
-            <Text style={styles.activityValue}>{user?.gender || 'Not set'}</Text>
+            <Text style={styles.activityValue}>{user?.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Not set'}</Text>
           </View>
 
           <View style={styles.activityCard}>

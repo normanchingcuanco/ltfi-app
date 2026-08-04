@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Speech from 'expo-speech';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import api from '../src/utils/api';
 import { useAuth } from '../src/contexts/AuthContext';
 
@@ -141,6 +142,15 @@ export default function TimerScreen() {
     }
     return () => clearInterval(intervalRef.current);
   }, [running, currentInterval, currentRound, phase, selectedVoice, workout]);
+
+    useEffect(() => {
+      if (running) {
+        activateKeepAwakeAsync();
+      } else {
+        deactivateKeepAwake();
+      }
+      return () => deactivateKeepAwake();
+    }, [running]);
 
   const advance = () => {
     if (!workout) return;
