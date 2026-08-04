@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ScrollVi
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { Audio } from 'expo-av';
 import api from '../src/utils/api';
 import { useAuth } from '../src/contexts/AuthContext';
 
@@ -55,6 +56,44 @@ export default function TimerScreen() {
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const intervalRef = useRef(null);
+    const dingSound = useRef(null);
+    const beepSound = useRef(null);
+    const chimeSound = useRef(null);
+
+    useEffect(() => {
+      const loadSounds = async () => {
+        const { sound: ding } = await Audio.Sound.createAsync(require('../assets/ding.mp3'));
+        const { sound: beep } = await Audio.Sound.createAsync(require('../assets/beep.mp3'));
+        const { sound: chime } = await Audio.Sound.createAsync(require('../assets/chime.mp3'));
+        dingSound.current = ding;
+        beepSound.current = beep;
+        chimeSound.current = chime;
+      };
+      loadSounds();
+      return () => {
+        dingSound.current?.unloadAsync();
+        beepSound.current?.unloadAsync();
+        chimeSound.current?.unloadAsync();
+      };
+    }, []);
+
+    const playDing = async () => {
+      try {
+        await dingSound.current?.replayAsync();
+      } catch (e) { console.error(e); }
+    };
+
+    const playBeep = async () => {
+      try {
+        await beepSound.current?.replayAsync();
+      } catch (e) { console.error(e); }
+    };
+
+    const playChime = async () => {
+      try {
+        await chimeSound.current?.replayAsync();
+      } catch (e) { console.error(e); }
+    };
 
   const [simpleTimeLeft, setSimpleTimeLeft] = useState(0);
   const [simpleTotalTime, setSimpleTotalTime] = useState(0);
@@ -152,19 +191,22 @@ export default function TimerScreen() {
       return () => deactivateKeepAwake();
     }, [running]);
 
-  const advance = () => {
+const advance = () => {
     if (!workout) return;
     const intervals = workout.intervals;
     if (phase === 'work') {
       const restTime = intervals[currentInterval].restSeconds;
       if (restTime > 0) {
+        playBeep();
         setPhase('rest');
         setTimeLeft(restTime);
         speak('Rest');
       } else {
+        playDing();
         nextInterval();
       }
     } else {
+      playDing();
       nextInterval();
     }
   };
@@ -191,6 +233,7 @@ export default function TimerScreen() {
       setTimeLeft(intervals[0].workSeconds);
       speak(`Repeating. ${intervals[0].name}`);
     } else {
+      playChime();
       setRunning(false);
       setDone(true);
       speak('Workout complete. Great job!');
@@ -199,7 +242,6 @@ export default function TimerScreen() {
       }
     }
   };
-
   const handleStart = () => {
     if (!running && workout) {
       if (workout.mode === 'simple') {
