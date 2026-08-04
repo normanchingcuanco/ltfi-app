@@ -36,13 +36,13 @@ export default function CreateWorkoutScreen() {
   const [simpleSearchResults, setSimpleSearchResults] = useState([]);
   const [simpleSearching, setSimpleSearching] = useState(false);
 
-  const [intervals, setIntervals] = useState([{ name: '', workSeconds: '30', restSeconds: '10', met: 5.0 }]);
+  const [intervals, setIntervals] = useState([{ name: '', workSeconds: '30', restSeconds: '0', met: 5.0 }]);
   const [searchingIdx, setSearchingIdx] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
   const addInterval = () => {
-    setIntervals(prev => [...prev, { name: '', workSeconds: '30', restSeconds: '10', met: 5.0 }]);
+    setIntervals(prev => [...prev, { name: '', workSeconds: '30', restSeconds: '0', met: 5.0 }]);
   };
 
   const removeInterval = (idx) => {
@@ -132,7 +132,7 @@ export default function CreateWorkoutScreen() {
         intervals: intervals.map(i => ({
           name: i.name.trim() || 'Interval',
           workSeconds: parseInt(i.workSeconds) || 30,
-          restSeconds: parseInt(i.restSeconds) || 10,
+          restSeconds: parseInt(i.restSeconds) || 0,
           met: i.met || 5.0
         }))
       };
