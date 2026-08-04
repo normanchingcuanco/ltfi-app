@@ -62,6 +62,15 @@ export default function TimerScreen() {
 
     useEffect(() => {
       const loadSounds = async () => {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+          allowsRecordingIOS: false,
+          interruptionModeIOS: 1,
+          interruptionModeAndroid: 2,
+        });
         const { sound: ding } = await Audio.Sound.createAsync(require('../assets/ding.mp3'));
         const { sound: beep } = await Audio.Sound.createAsync(require('../assets/beep.mp3'));
         const { sound: chime } = await Audio.Sound.createAsync(require('../assets/chime.mp3'));
