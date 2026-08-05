@@ -106,6 +106,7 @@ export default function TimerScreen() {
 
   const [simpleTimeLeft, setSimpleTimeLeft] = useState(0);
   const [simpleTotalTime, setSimpleTotalTime] = useState(0);
+  const [simplePhase, setSimplePhase] = useState('warmup');
 
   const [currentRound, setCurrentRound] = useState(1);
   const [currentInterval, setCurrentInterval] = useState(0);
@@ -131,9 +132,16 @@ export default function TimerScreen() {
       const w = res.data;
       setWorkout(w);
       if (w.mode === 'simple') {
-        const totalSecs = w.intervals[0].workSeconds;
-        setSimpleTimeLeft(totalSecs);
+        const workSecs = w.intervals[0].workSeconds;
+        const totalSecs = workSecs + (w.warmUp || 0) + (w.coolDown || 0);
         setSimpleTotalTime(totalSecs);
+        if (w.warmUp > 0) {
+          setSimplePhase('warmup');
+          setSimpleTimeLeft(w.warmUp);
+        } else {
+          setSimplePhase('work');
+          setSimpleTimeLeft(workSecs);
+        }
       } else {
         if (w.warmUp > 0) {
           setPhase('warmup');
@@ -159,13 +167,28 @@ export default function TimerScreen() {
         setSimpleTimeLeft(prev => {
           if (prev <= 1) {
             clearInterval(intervalRef.current);
-            setRunning(false);
-            setDone(true);
-            speak('Workout complete. Great job!');
-            if (user?.currentWeight) {
-              setCaloriesBurned(calculateCalories(workout, user.currentWeight).toString());
+            if (simplePhase === 'warmup') {
+              playDing();
+              setSimplePhase('work');
+              setSimpleTimeLeft(workout.intervals[0].workSeconds);
+              speak(workout.intervals[0].name || workout.name);
+              return workout.intervals[0].workSeconds;
+            } else if (simplePhase === 'work' && workout.coolDown > 0) {
+              playBeep();
+              setSimplePhase('cooldown');
+              setSimpleTimeLeft(workout.coolDown);
+              speak('Cool down');
+              return workout.coolDown;
+            } else {
+              playChime();
+              setRunning(false);
+              setDone(true);
+              speak('Workout complete. Great job!');
+              if (user?.currentWeight) {
+                setCaloriesBurned(calculateCalories(workout, user.currentWeight).toString());
+              }
+              return 0;
             }
-            return 0;
           }
           if (prev === 4) speak('3');
           if (prev === 3) speak('2');
@@ -177,7 +200,7 @@ export default function TimerScreen() {
       clearInterval(intervalRef.current);
     }
     return () => clearInterval(intervalRef.current);
-  }, [running, workout]);
+  }, [running, workout, simplePhase]);
 
   useEffect(() => {
     if (!workout || workout.mode !== 'complex') return;
@@ -322,10 +345,16 @@ export default function TimerScreen() {
 
   const resetSimple = () => {
     setRunning(false);
-    setSimpleTimeLeft(simpleTotalTime);
     setDone(false);
+    if (workout.warmUp > 0) {
+      setSimplePhase('warmup');
+      setSimpleTimeLeft(workout.warmUp);
+    } else {
+      setSimplePhase('work');
+      setSimpleTimeLeft(workout.intervals[0].workSeconds);
+    }
   };
-
+  
   const resetComplex = () => {
     setRunning(false);
     setCurrentRound(1);
@@ -451,13 +480,23 @@ export default function TimerScreen() {
   );
 
   if (workout.mode === 'simple') {
-    const progress = simpleTotalTime > 0 ? simpleTimeLeft / simpleTotalTime : 0;
+    const workSecs = workout.intervals[0].workSeconds;
+      const elapsed =
+        simplePhase === 'warmup' ? (workout.warmUp - simpleTimeLeft) :
+        simplePhase === 'work' ? (workout.warmUp || 0) + (workSecs - simpleTimeLeft) :
+        (workout.warmUp || 0) + workSecs + ((workout.coolDown || 0) - simpleTimeLeft);
+      const progress = simpleTotalTime > 0 ? elapsed / simpleTotalTime : 0;
     return (
       <View style={[styles.container, { backgroundColor: '#1A1A1A' }]}>
         <TouchableOpacity style={styles.closeBtn} onPress={handleQuit}>
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
-        <Text style={styles.simpleWorkoutName}>{workout.name}</Text>
+        <Text style={styles.simpleWorkoutName}>
+          {simplePhase === 'warmup' ? 'Warm Up' : simplePhase === 'cooldown' ? 'Cool Down' : workout.name}
+        </Text>
+        <Text style={styles.phase}>
+          {simplePhase === 'warmup' ? 'WARM UP' : simplePhase === 'cooldown' ? 'COOL DOWN' : 'WORK'}
+        </Text>
         <Text style={styles.timer}>{formatTime(simpleTimeLeft)}</Text>
         <View style={styles.simpleProgressBar}>
           <View style={[styles.simpleProgressFill, { width: `${progress * 100}%` }]} />
