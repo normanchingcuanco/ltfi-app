@@ -74,6 +74,15 @@ export default function WorkoutScreen() {
                 {workout.type} · {workout.rounds} round{workout.rounds > 1 ? 's' : ''} · {workout.intervals.length} interval{workout.intervals.length !== 1 ? 's' : ''}
                 {workout.repeat ? ' · Repeat' : ''}
               </Text>
+              <Text style={styles.workoutDuration}>
+                {(() => {
+                  const intervalTime = workout.intervals.reduce((sum, i) => sum + (i.workSeconds || 0) + (i.restSeconds || 0), 0);
+                  const totalSecs = (intervalTime * (workout.rounds || 1)) + (workout.warmUp || 0) + (workout.coolDown || 0);
+                  const m = Math.floor(totalSecs / 60);
+                  const s = totalSecs % 60;
+                  return `${m}:${s.toString().padStart(2, '0')} total`;
+                })()}
+              </Text>
             </View>
             <View style={styles.workoutActions}>
               <TouchableOpacity
@@ -114,7 +123,7 @@ const styles = StyleSheet.create({
   workoutCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
   workoutInfo: { flex: 1 },
   workoutName: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', marginBottom: 4 },
-  workoutMeta: { fontSize: 12, color: '#888', textTransform: 'capitalize' },
+  workoutDuration: { fontSize: 11, color: '#F77E2D', marginTop: 2, fontWeight: '600' },
   workoutActions: { flexDirection: 'row', gap: 8 },
   startBtn: { backgroundColor: '#F77E2D', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   startBtnText: { color: '#fff', fontSize: 14 },

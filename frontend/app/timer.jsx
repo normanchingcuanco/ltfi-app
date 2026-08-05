@@ -109,7 +109,7 @@ export default function TimerScreen() {
 
   const [currentRound, setCurrentRound] = useState(1);
   const [currentInterval, setCurrentInterval] = useState(0);
-  const [phase, setPhase] = useState('work');
+  const [phase, setPhase] = useState('warmup');
   const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
@@ -135,7 +135,13 @@ export default function TimerScreen() {
         setSimpleTimeLeft(totalSecs);
         setSimpleTotalTime(totalSecs);
       } else {
-        setTimeLeft(w.intervals[0].workSeconds);
+        if (w.warmUp > 0) {
+          setPhase('warmup');
+          setTimeLeft(w.warmUp);
+        } else {
+          setPhase('work');
+          setTimeLeft(w.intervals[0].workSeconds);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -200,9 +206,26 @@ export default function TimerScreen() {
       return () => deactivateKeepAwake();
     }, [running]);
 
-const advance = () => {
+    const advance = () => {
     if (!workout) return;
     const intervals = workout.intervals;
+    if (phase === 'warmup') {
+      playDing();
+      setPhase('work');
+      setTimeLeft(intervals[0].workSeconds);
+      speak(intervals[0].name);
+      return;
+    }
+    if (phase === 'cooldown') {
+      playChime();
+      setRunning(false);
+      setDone(true);
+      speak('Workout complete. Great job!');
+      if (user?.currentWeight) {
+        setCaloriesBurned(calculateCalories(workout, user.currentWeight).toString());
+      }
+      return;
+    }
     if (phase === 'work') {
       const restTime = intervals[currentInterval].restSeconds;
       if (restTime > 0) {
@@ -242,12 +265,19 @@ const advance = () => {
       setTimeLeft(intervals[0].workSeconds);
       speak(`Repeating. ${intervals[0].name}`);
     } else {
-      playChime();
-      setRunning(false);
-      setDone(true);
-      speak('Workout complete. Great job!');
-      if (user?.currentWeight) {
-        setCaloriesBurned(calculateCalories(workout, user.currentWeight).toString());
+      if (workout.coolDown > 0) {
+        playBeep();
+        setPhase('cooldown');
+        setTimeLeft(workout.coolDown);
+        speak('Cool down');
+      } else {
+        playChime();
+        setRunning(false);
+        setDone(true);
+        speak('Workout complete. Great job!');
+        if (user?.currentWeight) {
+          setCaloriesBurned(calculateCalories(workout, user.currentWeight).toString());
+        }
       }
     }
   };
@@ -255,6 +285,10 @@ const advance = () => {
     if (!running && workout) {
       if (workout.mode === 'simple') {
         speak(workout.name);
+      } else if (phase === 'warmup') {
+        speak('Warm up');
+      } else if (phase === 'cooldown') {
+        speak('Cool down');
       } else {
         speak(workout.intervals[currentInterval].name);
       }
@@ -296,8 +330,13 @@ const advance = () => {
     setRunning(false);
     setCurrentRound(1);
     setCurrentInterval(0);
-    setPhase('work');
-    setTimeLeft(workout.intervals[0].workSeconds);
+    if (workout.warmUp > 0) {
+      setPhase('warmup');
+      setTimeLeft(workout.warmUp);
+    } else {
+      setPhase('work');
+      setTimeLeft(workout.intervals[0].workSeconds);
+    }
     setDone(false);
   };
 
@@ -448,19 +487,25 @@ const advance = () => {
   }
 
   const interval = workout.intervals[currentInterval];
-  const isWork = phase === 'work';
+    const isWork = phase === 'work';
+    const isWarmup = phase === 'warmup';
+    const isCooldown = phase === 'cooldown';
 
-  return (
-    <View style={[styles.container, { backgroundColor: isWork ? '#1A1A1A' : '#2C4A2E' }]}>
-      <TouchableOpacity style={styles.closeBtn} onPress={handleQuit}>
-        <Text style={styles.closeBtnText}>✕</Text>
-      </TouchableOpacity>
-      <View style={styles.meta}>
-        <Text style={styles.metaText}>Round {currentRound} / {workout.rounds}</Text>
-        <Text style={styles.metaText}>Interval {currentInterval + 1} / {workout.intervals.length}</Text>
-      </View>
-      <Text style={styles.phase}>{isWork ? 'WORK' : 'REST'}</Text>
-      <Text style={styles.exerciseName}>{interval.name}</Text>
+    const bgColor = isWarmup ? '#1A3A4A' : isCooldown ? '#2A2A4A' : isWork ? '#1A1A1A' : '#2C4A2E';
+    const phaseLabel = isWarmup ? 'WARM UP' : isCooldown ? 'COOL DOWN' : isWork ? 'WORK' : 'REST';
+    const exerciseLabel = isWarmup ? 'Warm Up' : isCooldown ? 'Cool Down' : interval.name;
+
+    return (
+      <View style={[styles.container, { backgroundColor: bgColor }]}>
+        <TouchableOpacity style={styles.closeBtn} onPress={handleQuit}>
+          <Text style={styles.closeBtnText}>✕</Text>
+        </TouchableOpacity>
+        <View style={styles.meta}>
+          <Text style={styles.metaText}>Round {currentRound} / {workout.rounds}</Text>
+          <Text style={styles.metaText}>Interval {currentInterval + 1} / {workout.intervals.length}</Text>
+        </View>
+        <Text style={styles.phase}>{phaseLabel}</Text>
+        <Text style={styles.exerciseName}>{exerciseLabel}</Text>
       <Text style={styles.timer}>{formatTime(timeLeft)}</Text>
       <View style={styles.controls}>
         <TouchableOpacity style={styles.controlBtn} onPress={resetComplex}>
