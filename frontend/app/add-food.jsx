@@ -181,7 +181,9 @@ export default function AddFoodScreen() {
         </View>
         <Text style={styles.resultMacros}>
           {food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F
-          {food.servingSize ? ` per ${food.servingSize}${food.servingUnit || 'g'}` : ' per 100g'}
+          {food.servingSize && food.source !== 'usda' && food.source !== 'open_food_facts' && food.servingSize !== 100
+            ? ` per ${food.servingSize}${food.servingUnit || 'g'}`
+            : ''}
         </Text>
       </View>
       <View style={styles.itemActions}>
