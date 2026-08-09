@@ -242,27 +242,44 @@ const getFoodByBarcode = async (req, res) => {
       8000
     );
     const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-    const data = await response.json();
-    if (data.status !== 1) return res.status(404).json({ message: 'Product not found' });
 
-    const p = data.product.nutriments;
-    food = await Food.create({
-      name: data.product.product_name || 'Unknown Product',
-      barcode,
-      calories: Math.round(p['energy-kcal_100g'] || 0),
-      protein: Math.round(p.proteins_100g || 0),
-      carbs: Math.round(p.carbohydrates_100g || 0),
-      fat: Math.round(p.fat_100g || 0),
-      fiber: Math.round(p.fiber_100g || 0),
-      sodium: Math.round(p.sodium_100g || 0),
-      sugar: Math.round(p.sugars_100g || 0),
-      source: 'open_food_facts',
-      createdBy: null
-    });
-    res.json(food);
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      if (data.status === 1 && data.product) {
+        const p = data.product.nutriments;
+        const productName = data.product.product_name || data.product.product_name_en || 'Unknown Product';
+        food = await Food.create({
+          name: productName,
+          barcode,
+          calories: Math.round(p['energy-kcal_100g'] || 0),
+          protein: Math.round(p.proteins_100g || 0),
+          carbs: Math.round(p.carbohydrates_100g || 0),
+          fat: Math.round(p.fat_100g || 0),
+          fiber: Math.round(p.fiber_100g || 0),
+          sodium: Math.round(p.sodium_100g || 0),
+          sugar: Math.round(p.sugars_100g || 0),
+          source: 'open_food_facts',
+          createdBy: null
+        });
+        return res.json(food);
+      }
+    }
+
+    // OFF failed -- fall through to all sources using barcode as search query
+    const [usdaFoods, offFoods, calorieApiFoods, apinFoods] = await Promise.all([
+      searchUSDA(barcode),
+      searchOFF(barcode),
+      searchCalorieAPI(barcode),
+      searchAPINinjas(barcode)
+    ]);
+
+    const allResults = deduplicateResults([...usdaFoods, ...offFoods, ...calorieApiFoods, ...apinFoods]);
+
+    if (allResults.length > 0) {
+      return res.json(allResults[0]);
+    }
+
+    res.status(404).json({ message: 'Product not found' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
