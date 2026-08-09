@@ -44,6 +44,8 @@ Current free services in use:
 - MongoDB Atlas — free tier (512MB)
 - Open Food Facts API — completely free, no key required
 - USDA FoodData Central — completely free, no key required
+- Calorie API — free tier, 1,000 calls/month, no credit card
+- API Ninjas Nutrition API — free tier, no credit card
 - Groq API — free tier with generous limits for LLaMA vision
 - Gmail SMTP — free via app password
 - Expo — free for development and EAS free tier builds
@@ -96,7 +98,7 @@ An Expo-based mobile and web app that:
 |-------------|-----|
 | Frontend (Web) | https://ltfi-app.vercel.app |
 | Backend | https://ltfi-backend.onrender.com |
-| Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/e9ba3d36-6729-4ed1-b40b-d9b499fc1550 |
+| Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/00d76ff8-779a-4837-92d0-6bacdad57ffe |
 | iOS Native Build | Deferred — requires Apple Developer account ($99/yr) |
 
 ---
@@ -109,7 +111,7 @@ An Expo-based mobile and web app that:
 | Backend | Node.js + Express | Free |
 | Database | MongoDB Atlas (free tier) | Free |
 | Auth | JWT + Email/Password | Free |
-| Food Data | USDA FoodData Central + Open Food Facts API | Free |
+| Food Data | USDA + Open Food Facts + Calorie API + API Ninjas | Free |
 | AI Food Scanning | Groq API — LLaMA Vision (free tier) | Free |
 | Email | Gmail SMTP via Nodemailer | Free |
 | Health Data | Apple HealthKit (deferred) | Free |
@@ -151,6 +153,8 @@ ltfi/
 │   │   ├── recipes.js
 │   │   ├── weight.js
 │   │   └── workouts.js
+│   ├── scripts/
+│   │   └── seedPhilippineFoods.js
 │   ├── utils/
 │   │   ├── calorieCalculator.js
 │   │   └── mailer.js
@@ -164,7 +168,10 @@ ltfi/
 │   │   ├── ltfi-dark.png
 │   │   ├── ltfi-light.png
 │   │   ├── ltfi-dark (w. tag).png
-│   │   └── ltfi-light (w. tag).png
+│   │   ├── ltfi-light (w. tag).png
+│   │   ├── ding.mp3
+│   │   ├── beep.mp3
+│   │   └── chime.mp3
 │   ├── src/
 │   │   ├── contexts/
 │   │   │   └── AuthContext.jsx
@@ -260,7 +267,7 @@ ltfi/
 | sugar | Number | |
 | servingSize | Number | Default 100 |
 | servingUnit | String | g / oz / ml / cup / tbsp / tsp / pc / serving |
-| source | String | usda / open_food_facts / ai_scan / custom / local |
+| source | String | usda / open_food_facts / calorie_api / api_ninjas / ai_scan / custom / local |
 | createdBy | ObjectId | Ref: User — null if from public DB |
 
 ### Recipe
@@ -333,6 +340,7 @@ ltfi/
 | Password Reset | Forgot password flow via email using Gmail + Nodemailer | ✅ Done |
 | Profile Screen | Update name, weight, goals — recalculates TDEE on save | ✅ Done |
 | Login Speed Fix | bcrypt rounds reduced from 12 to 10 for faster login | ✅ Done |
+| Cached Auth | User data cached in AsyncStorage — no backend call on startup | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -356,12 +364,14 @@ ltfi/
 | Edit Custom Food | Edit name, macros, serving size and unit of saved custom foods | ✅ Done |
 | My Foods | View, edit, and delete custom foods from the Add Food screen | ✅ Done |
 | My Foods in Search | Custom foods pinned to top of search results with My Food badge | ✅ Done |
-| Quantity Picker | Select serving size before adding food to diary with calorie preview | ✅ Done |
+| Quantity Picker | Select serving size and auto-scale macros before adding food to diary | ✅ Done |
 | Recipe Builder | Build a recipe from multiple ingredients with unit picker and macro scaling | ✅ Done |
 | Edit Recipe | Edit existing recipes with full ingredient unit picker and macro scaling | ✅ Done |
 | Recipes Screen | View, edit, delete, and add recipes to diary | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
-| Food Search | Search food database — USDA FoodData Central + Open Food Facts + custom entries | ✅ Done |
+| Food Search | Search food database — USDA + Open Food Facts + Calorie API + API Ninjas + custom entries | ✅ Done |
+| Search Ranking | Exact and partial name matches ranked above unrelated results | ✅ Done |
+| Search Deduplication | Duplicate food names across sources filtered out | ✅ Done |
 | Philippine Food Database | Seeded local DB with Jollibee, McDonald's PH, and common Filipino dishes | ✅ Done |
 
 #### 4. Nutrition Dashboard
@@ -389,6 +399,7 @@ ltfi/
 | Macro Formula | Updated to 25% protein / 45% carbs / 30% fat industry standard split | ✅ Done |
 | TDEE Formula | Mifflin-St Jeor with activity multiplier and gender | ✅ Done |
 | Gender Field | Male/female selector on registration and profile for accurate TDEE | ✅ Done |
+| Gender Display Fix | Gender field now displays correctly after save | ✅ Done |
 | Context Sync | User context updates immediately after profile save | ✅ Done |
 | Logout | Moved to Profile tab only | ✅ Done |
 
@@ -409,8 +420,11 @@ ltfi/
 | MET-based Calorie Calc | Per-exercise MET values used for accurate calorie burn estimate | ✅ Done |
 | Saved Workout Presets | Save and reuse custom timer configurations | ✅ Done |
 | Edit Workout | Edit existing workout name, type, mode, intervals, rounds, warmup, cooldown, repeat | ✅ Done |
-| Warm Up | Optional warm-up timer before main intervals | ✅ Done |
-| Cool Down | Optional cool-down timer after main intervals | ✅ Done |
+| Warm Up Timer | Warmup phase runs before main intervals in both simple and complex mode | ✅ Done |
+| Cool Down Timer | Cooldown phase runs after main intervals in both simple and complex mode | ✅ Done |
+| Warmup Cooldown in Total Time | Warmup and cooldown seconds included in total workout time calculation | ✅ Done |
+| Total Workout Time on Card | Each saved workout card shows total duration including warmup and cooldown | ✅ Done |
+| Default Rest Time Fix | New intervals default to 0s rest instead of 10s | ✅ Done |
 | Repeat Toggle | Loop the entire workout indefinitely | ✅ Done |
 | Voice Announcements | Audio cues for interval changes with countdown | ✅ Done |
 | Voice Picker | Select from available system voices before starting workout | ✅ Done |
@@ -420,7 +434,11 @@ ltfi/
 | Workout Settings Screen | Preview intervals, warmup, cooldown, repeat, and select voice before starting | ✅ Done |
 | Delete Workouts | Remove saved workouts | ✅ Done |
 | Workout Page Focus Refresh | Workout list refreshes on every tab focus | ✅ Done |
+| Keep Screen Awake | Screen stays on while timer is running via expo-keep-awake | ✅ Done |
+| Sound Effects | Ding, beep, and chime sounds on interval transitions — Android only | ✅ Done |
+| Audio Mix Mode | Timer sounds duck background audio without interrupting it — Android only | ✅ Done |
 | Background Timer | Timer continues running when app is backgrounded | ⬜ Deferred — requires native build |
+| iOS Sound Effects | Timer sound effects on iPhone | ⬜ Deferred — requires Apple Developer account |
 
 ---
 
@@ -490,6 +508,8 @@ ltfi/
 - Expo Go app on Android for local testing
 - Groq account (free tier) for AI food scanning — https://console.groq.com
 - Gmail account with app password enabled for password reset emails
+- Calorie API key (free) — https://calorieapi.com
+- API Ninjas key (free) — https://api-ninjas.com
 - Open Food Facts API (no key required)
 - USDA FoodData Central (no key required)
 
@@ -519,6 +539,9 @@ PORT=5000
 GROQ_API_KEY=your_groq_api_key
 EMAIL_USER=your_gmail@gmail.com
 EMAIL_PASS=your_gmail_app_password
+USDA_API_KEY=your_usda_key
+CALORIE_API_KEY=your_calorie_api_key
+API_NINJAS_KEY=your_api_ninjas_key
 ```
 
 ### 4. Run locally
@@ -576,6 +599,17 @@ Users get the update silently on next app launch. No new APK download needed.
 |--------|----------|
 | preview | Internal testing and distribution |
 | production | App Store / Play Store (future) |
+
+---
+
+## Known Limitations
+
+| Limitation | Platform | Resolution |
+|------------|----------|------------|
+| Timer voice announcements interrupt background music | iOS | Requires Apple Developer account for native build |
+| Sound effects (ding, beep, chime) not available | iOS | Requires Apple Developer account for native build |
+| Timer pauses when app is backgrounded | iOS + Android | Requires native build |
+| Background timer | Both | Deferred — requires native build |
 
 ---
 
