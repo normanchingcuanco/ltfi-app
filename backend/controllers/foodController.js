@@ -315,7 +315,7 @@ const deleteFood = async (req, res) => {
   try {
     const food = await Food.findById(req.params.id);
     if (!food) return res.status(404).json({ message: 'Food not found' });
-    if (food.createdBy?.toString() !== req.user._id.toString()) {
+    if (food.createdBy && food.createdBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
     await food.deleteOne();
