@@ -181,7 +181,7 @@ export default function AddFoodScreen() {
         </View>
         <Text style={styles.resultMacros}>
           {food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F
-          {food.servingSize ? ` per ${food.servingSize}${food.servingUnit || 'g'}` : ' per 100g'}
+          {food.servingSize && food.servingSize !== 100 ? ` per ${food.servingSize}${food.servingUnit || 'g'}` : ''}
         </Text>
       </View>
       <View style={styles.itemActions}>
@@ -290,7 +290,14 @@ export default function AddFoodScreen() {
                 style={styles.quantityInput}
                 keyboardType="numeric"
                 value={quantity}
-                onChangeText={setQuantity}
+                onChangeText={(val) => {
+                  setQuantity(val);
+                  if (unit === 'g' || unit === 'ml') {
+                    const grams = parseFloat(val) || 0;
+                    const ratio = grams / 100;
+                    setUnitGrams(val);
+                  }
+                }}
                 autoFocus
               />
               <Text style={styles.quantityUnit}>{unit}</Text>
