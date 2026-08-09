@@ -51,6 +51,25 @@ const fetchWithTimeout = async (url, options = {}, ms = 8000) => {
   }
 };
 
+const rankScore = (name, q) => {
+  const n = name.toLowerCase();
+  const query = q.toLowerCase();
+  if (n === query) return 3;
+  if (n.startsWith(query)) return 2;
+  if (n.includes(query)) return 1;
+  return 0;
+};
+
+const deduplicateResults = (results) => {
+  const seen = new Set();
+  return results.filter(f => {
+    const key = f.name.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const searchUSDA = async (q) => {
   try {
     const res = await fetchWithTimeout(
@@ -107,7 +126,7 @@ const searchOFF = async (q) => {
     }
     const offData = await offRes.json();
     return (offData.products || [])
-      .filter(p => p.product_name && p.nutriments && p.product_name.toLowerCase().includes(q.toLowerCase()))
+      .filter(p => p.product_name && p.nutriments)
       .map(p => ({
         _id: null,
         name: p.product_name,
@@ -128,6 +147,62 @@ const searchOFF = async (q) => {
   }
 };
 
+const searchCalorieAPI = async (q) => {
+  try {
+    const res = await fetchWithTimeout(
+      `https://api.calorieapi.com/api/v1/search/foods?q=${encodeURIComponent(q)}&page_size=10`,
+      { headers: { 'X-API-Key': process.env.CALORIE_API_KEY, 'User-Agent': 'LTFI/1.0' } },
+      8000
+    );
+    const data = await res.json();
+    return (data.foods || data.results || []).map(f => ({
+      _id: null,
+      name: f.name || f.food_name,
+      calories: Math.round(f.calories || f.nf_calories || 0),
+      protein: Math.round(f.protein || f.nf_protein || 0),
+      carbs: Math.round(f.carbs || f.nf_total_carbohydrate || 0),
+      fat: Math.round(f.fat || f.nf_total_fat || 0),
+      fiber: Math.round(f.fiber || f.nf_dietary_fiber || 0),
+      sodium: Math.round(f.sodium || f.nf_sodium || 0),
+      sugar: Math.round(f.sugar || f.nf_sugars || 0),
+      servingSize: f.serving_size || 100,
+      servingUnit: f.serving_unit || 'g',
+      source: 'calorie_api'
+    })).filter(f => f.name);
+  } catch (err) {
+    console.error('Calorie API error:', err.message);
+    return [];
+  }
+};
+
+const searchAPINinjas = async (q) => {
+  try {
+    const res = await fetchWithTimeout(
+      `https://api.api-ninjas.com/v1/nutrition?query=${encodeURIComponent(q)}`,
+      { headers: { 'X-Api-Key': process.env.API_NINJAS_KEY, 'User-Agent': 'LTFI/1.0' } },
+      8000
+    );
+    const data = await res.json();
+    return (Array.isArray(data) ? data : []).map(f => ({
+      _id: null,
+      name: f.name,
+      calories: Math.round(f.calories || 0),
+      protein: Math.round(f.protein_g || 0),
+      carbs: Math.round(f.carbohydrates_total_g || 0),
+      fat: Math.round(f.fat_total_g || 0),
+      fiber: Math.round(f.fiber_g || 0),
+      sodium: Math.round(f.sodium_mg || 0),
+      sugar: Math.round(f.sugar_g || 0),
+      servingSize: f.serving_size_g || 100,
+      servingUnit: 'g',
+      source: 'api_ninjas'
+    })).filter(f => f.name);
+  } catch (err) {
+    console.error('API Ninjas error:', err.message);
+    return [];
+  }
+};
+
 const searchFood = async (req, res) => {
   try {
     const { q } = req.query;
@@ -138,12 +213,17 @@ const searchFood = async (req, res) => {
       $or: [{ createdBy: null }, { createdBy: req.user._id }]
     }).limit(10);
 
-    const [usdaFoods, offFoods] = await Promise.all([
+    const [usdaFoods, offFoods, calorieApiFoods, apinFoods] = await Promise.all([
       searchUSDA(q),
-      searchOFF(q)
+      searchOFF(q),
+      searchCalorieAPI(q),
+      searchAPINinjas(q)
     ]);
 
-    const combined = [...localFoods, ...usdaFoods, ...offFoods].slice(0, 20);
+    const external = [...usdaFoods, ...offFoods, ...calorieApiFoods, ...apinFoods]
+      .sort((a, b) => rankScore(b.name, q) - rankScore(a.name, q));
+
+    const combined = deduplicateResults([...localFoods, ...external]).slice(0, 25);
     res.json(combined);
   } catch (err) {
     res.status(500).json({ message: err.message });
