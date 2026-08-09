@@ -259,13 +259,12 @@ const getFoodByBarcode = async (req, res) => {
           sodium: Math.round(p.sodium_100g || 0),
           sugar: Math.round(p.sugars_100g || 0),
           source: 'open_food_facts',
-          createdBy: null
+          createdBy: req.user._id
         });
         return res.json(food);
       }
     }
 
-    // OFF failed -- fall through to all sources using barcode as search query
     const [usdaFoods, offFoods, calorieApiFoods, apinFoods] = await Promise.all([
       searchUSDA(barcode),
       searchOFF(barcode),
@@ -287,7 +286,12 @@ const getFoodByBarcode = async (req, res) => {
 
 const getUserFoods = async (req, res) => {
   try {
-    const foods = await Food.find({ createdBy: req.user._id });
+    const foods = await Food.find({
+      $or: [
+        { createdBy: req.user._id },
+        { source: 'custom', createdBy: req.user._id }
+      ]
+    });
     res.json(foods);
   } catch (err) {
     res.status(500).json({ message: err.message });
