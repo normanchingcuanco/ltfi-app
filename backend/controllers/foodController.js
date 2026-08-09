@@ -286,12 +286,25 @@ const getFoodByBarcode = async (req, res) => {
 
 const getUserFoods = async (req, res) => {
   try {
+    const Meal = require('../models/Meal');
+    const meals = await Meal.find({ user: req.user._id });
+    const loggedFoodIds = new Set();
+    const loggedFoodNames = new Set();
+    meals.forEach(meal => {
+      (meal.foods || []).forEach(f => {
+        if (f.foodId) loggedFoodIds.add(f.foodId.toString());
+        if (f.name) loggedFoodNames.add(f.name.toLowerCase());
+      });
+    });
+
     const foods = await Food.find({
       $or: [
         { createdBy: req.user._id },
-        { source: 'custom', createdBy: req.user._id }
+        { _id: { $in: [...loggedFoodIds] } },
+        { name: { $in: [...loggedFoodNames].map(n => new RegExp(`^${n}$`, 'i')) } }
       ]
     });
+
     res.json(foods);
   } catch (err) {
     res.status(500).json({ message: err.message });
