@@ -55,17 +55,39 @@ export default function AddFoodScreen() {
     if (tab === 'myfoods') fetchMyFoods();
   }, [tab]);
 
-  const fetchMyFoods = async () => {
-    setMyFoodsLoading(true);
-    try {
-      const res = await api.get('/food/my');
-      setMyFoods(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setMyFoodsLoading(false);
-    }
-  };
+  const [myFoodsSearch, setMyFoodsSearch] = useState('');
+    const [myFoodsPage, setMyFoodsPage] = useState(1);
+    const [myFoodsTotal, setMyFoodsTotal] = useState(0);
+    const [myFoodsLoadingMore, setMyFoodsLoadingMore] = useState(false);
+
+    const fetchMyFoods = async (page = 1, search = '', append = false) => {
+      if (page === 1) setMyFoodsLoading(true);
+      else setMyFoodsLoadingMore(true);
+      try {
+        const res = await api.get(`/food/my?page=${page}&limit=20${search ? `&q=${encodeURIComponent(search)}` : ''}`);
+        const { foods, total } = res.data;
+        if (append) {
+          setMyFoods(prev => [...prev, ...foods]);
+        } else {
+          setMyFoods(foods);
+        }
+        setMyFoodsTotal(total);
+        setMyFoodsPage(page);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setMyFoodsLoading(false);
+        setMyFoodsLoadingMore(false);
+      }
+    };
+
+    const handleMyFoodsSearch = () => {
+      fetchMyFoods(1, myFoodsSearch);
+    };
+
+    const loadMoreMyFoods = () => {
+      fetchMyFoods(myFoodsPage + 1, myFoodsSearch, true);
+    };
 
   const searchFood = async () => {
     if (!search.trim()) return;
@@ -73,19 +95,20 @@ export default function AddFoodScreen() {
     setMyFoodMatches([]);
     try {
       const [searchRes, myRes] = await Promise.all([
-        api.get(`/food/search?q=${encodeURIComponent(search)}`),
-        api.get('/food/my')
-      ]);
+            api.get(`/food/search?q=${encodeURIComponent(search)}`),
+            api.get(`/food/my?q=${encodeURIComponent(search)}&limit=5`)
+          ]);
 
-      const q = search.toLowerCase();
-      const matched = (myRes.data || []).filter(f =>
-        f.name.toLowerCase().includes(q)
-      );
+          const q = search.toLowerCase();
+          const myFoodsData = myRes.data.foods || myRes.data || [];
+          const matched = myFoodsData.filter(f =>
+            f.name.toLowerCase().includes(q)
+          );
 
-      const matchedIds = new Set(matched.map(f => f._id?.toString()));
-      const external = (searchRes.data || []).filter(f =>
-        !f._id || !matchedIds.has(f._id.toString())
-      );
+    const matchedIds = new Set(matched.map(f => f._id?.toString()));
+    const external = (searchRes.data || []).filter(f =>
+      !f._id || !matchedIds.has(f._id.toString())
+    );
 
       setMyFoodMatches(matched);
       setResults(external);
@@ -275,14 +298,38 @@ export default function AddFoodScreen() {
           >
             <Text style={styles.addToMyFoodsBtnText}>+ Add to My Foods</Text>
           </TouchableOpacity>
+          <View style={styles.searchRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Search my foods..."
+              placeholderTextColor="#999"
+              value={myFoodsSearch}
+              onChangeText={setMyFoodsSearch}
+              onSubmitEditing={handleMyFoodsSearch}
+              returnKeyType="search"
+            />
+            <TouchableOpacity style={styles.searchBtn} onPress={handleMyFoodsSearch}>
+              <Text style={styles.searchBtnText}>Search</Text>
+            </TouchableOpacity>
+          </View>
           {myFoodsLoading ? (
             <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />
           ) : myFoods.length === 0 ? (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>No custom foods yet.</Text>
+              <Text style={styles.emptyText}>No foods found.</Text>
             </View>
           ) : (
-            myFoods.map((food, idx) => renderFoodItem(food, idx, true))
+            <>
+              {myFoods.map((food, idx) => renderFoodItem(food, idx, true))}
+              {myFoods.length < myFoodsTotal && (
+                <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMoreMyFoods} disabled={myFoodsLoadingMore}>
+                  {myFoodsLoadingMore
+                    ? <ActivityIndicator color="#F77E2D" />
+                    : <Text style={styles.loadMoreBtnText}>Load More</Text>
+                  }
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </>
       )}
@@ -393,6 +440,8 @@ const styles = StyleSheet.create({
   deleteBtnText: { color: '#888', fontSize: 12, fontWeight: '700' },
   addToMyFoodsBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
   addToMyFoodsBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  loadMoreBtn: { borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
+  loadMoreBtnText: { color: '#F77E2D', fontWeight: '700' },
   emptyBox: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 24, alignItems: 'center' },
   emptyText: { color: '#888', fontSize: 14 },
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },

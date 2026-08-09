@@ -286,26 +286,26 @@ const getFoodByBarcode = async (req, res) => {
 
 const getUserFoods = async (req, res) => {
   try {
-    const Meal = require('../models/Meal');
-    const meals = await Meal.find({ user: req.user._id });
-    const loggedFoodIds = new Set();
-    const loggedFoodNames = new Set();
-    meals.forEach(meal => {
-      (meal.foods || []).forEach(f => {
-        if (f.foodId) loggedFoodIds.add(f.foodId.toString());
-        if (f.name) loggedFoodNames.add(f.name.toLowerCase());
-      });
-    });
+    const { q, page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const foods = await Food.find({
+    const baseQuery = {
       $or: [
         { createdBy: req.user._id },
-        { _id: { $in: [...loggedFoodIds] } },
-        { name: { $in: [...loggedFoodNames].map(n => new RegExp(`^${n}$`, 'i')) } }
+        { source: 'custom', createdBy: null }
       ]
-    });
+    };
 
-    res.json(foods);
+    if (q) {
+      baseQuery.name = { $regex: q, $options: 'i' };
+    }
+
+    const [foods, total] = await Promise.all([
+      Food.find(baseQuery).skip(skip).limit(parseInt(limit)).sort({ name: 1 }),
+      Food.countDocuments(baseQuery)
+    ]);
+
+    res.json({ foods, total, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
