@@ -269,6 +269,12 @@ export default function AddFoodScreen() {
 
       {tab === 'myfoods' && (
         <>
+          <TouchableOpacity
+            style={styles.addToMyFoodsBtn}
+            onPress={() => router.push('/add-to-my-foods')}
+          >
+            <Text style={styles.addToMyFoodsBtnText}>+ Add to My Foods</Text>
+          </TouchableOpacity>
           {myFoodsLoading ? (
             <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />
           ) : myFoods.length === 0 ? (
@@ -385,6 +391,8 @@ const styles = StyleSheet.create({
   editBtnText: { color: '#1A1A1A', fontSize: 15 },
   deleteBtn: { backgroundColor: '#E8E2D8', width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   deleteBtnText: { color: '#888', fontSize: 12, fontWeight: '700' },
+  addToMyFoodsBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
+  addToMyFoodsBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   emptyBox: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 24, alignItems: 'center' },
   emptyText: { color: '#888', fontSize: 14 },
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
