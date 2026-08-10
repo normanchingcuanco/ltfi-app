@@ -103,7 +103,7 @@ export default function DashboardScreen() {
       </View>
 
       <TouchableOpacity style={styles.diaryBtn} onPress={() => router.push('/(tabs)/diary')}>
-        <Text style={styles.diaryBtnText}>+ Log Food</Text>
+        <Text style={styles.diaryBtnText}>Go to Diary</Text>
       </TouchableOpacity>
     </ScrollView>
   );

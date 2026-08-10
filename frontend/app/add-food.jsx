@@ -28,9 +28,9 @@ const showAlert = (title, message, buttons) => {
 };
 
 export default function AddFoodScreen() {
-  const { mealType, date, prefillFood } = useLocalSearchParams();
+  const { mealType, date, prefillFood, defaultTab } = useLocalSearchParams();
   const router = useRouter();
-  const [tab, setTab] = useState('search');
+  const [tab, setTab] = useState(defaultTab || 'search');
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
   const [myFoodMatches, setMyFoodMatches] = useState([]);
@@ -192,7 +192,7 @@ export default function AddFoodScreen() {
 
   const totalGrams = getTotalGrams();
   const calculatedCalories = selectedFood ? Math.round(selectedFood.calories * totalGrams / 100) : 0;
-  const needsGramEquivalent = CUSTOM_UNITS.includes(unit) && !UNIT_TO_GRAMS[unit];
+  const needsGramEquivalent = CUSTOM_UNITS.includes(unit) && !UNIT_TO_GRAMS[unit] && unit !== 'serving' && unit !== 'pc';
 
   const renderFoodItem = (food, idx, showActions = false) => (
     <View key={idx} style={[styles.resultItem, food.source === 'custom' && styles.resultItemCustom]}>

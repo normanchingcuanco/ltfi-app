@@ -214,7 +214,11 @@ export default function DiaryScreen() {
         </TouchableOpacity>
       )}
 
-      {MEAL_TYPES.map(mealType => {
+      <TouchableOpacity style={styles.myFoodsBtn} onPress={() => router.push({ pathname: '/add-food', params: { mealType: 'breakfast', date: formatDate(selectedDate), defaultTab: 'myfoods' } })}>
+          <Text style={styles.myFoodsBtnText}>📋 My Foods</Text>
+        </TouchableOpacity>
+
+        {MEAL_TYPES.map(mealType => {
         const meal = summary?.meals?.find(m => m.mealType === mealType);
         return (
           <View key={mealType} style={styles.mealSection}>
@@ -309,6 +313,10 @@ const styles = StyleSheet.create({
   microValue: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
   summaryLabel: { fontSize: 11, color: '#888', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
   copyBtn: { borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
+  myFoodsBtn: { backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
+  myFoodsBtnText: { color: '#1A1A1A', fontWeight: '700', fontSize: 14 },
+  myFoodsBtn: { backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
+  myFoodsBtnText: { color: '#1A1A1A', fontWeight: '700', fontSize: 14 },
   copyBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 14 },
   mealSection: { marginBottom: 24 },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
