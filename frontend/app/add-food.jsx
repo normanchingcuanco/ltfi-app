@@ -28,7 +28,7 @@ const showAlert = (title, message, buttons) => {
 };
 
 export default function AddFoodScreen() {
-  const { mealType, date, prefillFood, defaultTab } = useLocalSearchParams();
+  const { mealType, date, prefillFood, defaultTab, productNotFound } = useLocalSearchParams();
   const router = useRouter();
   const [tab, setTab] = useState(defaultTab || 'search');
   const [search, setSearch] = useState('');
@@ -50,6 +50,12 @@ export default function AddFoodScreen() {
       setResults([JSON.parse(prefillFood)]);
     }
   }, [prefillFood]);
+
+  useEffect(() => {
+    if (productNotFound === 'true') {
+      showAlert('Product Not Found', 'This barcode is not in our database yet. You can search manually or add it as a custom food.');
+    }
+  }, [productNotFound]);
 
   useEffect(() => {
     if (tab === 'myfoods') fetchMyFoods();

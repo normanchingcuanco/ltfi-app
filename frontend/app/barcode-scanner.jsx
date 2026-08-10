@@ -95,8 +95,8 @@ export default function BarcodeScannerScreen() {
       const res = await api.get(`/food/barcode/${data}`);
       router.replace({ pathname: '/add-food', params: { ...params, prefillFood: JSON.stringify(res.data) } });
     } catch (err) {
-      alert('Product not found. Try adding it manually.');
       setScanned(false);
+      router.replace({ pathname: '/add-food', params: { ...params, productNotFound: 'true' } });
     } finally {
       setLoading(false);
     }
@@ -128,7 +128,7 @@ export default function BarcodeScannerScreen() {
         style={StyleSheet.absoluteFillObject}
         facing={facing}
         onBarcodeScanned={({ data }) => handleScanned(data)}
-        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'qr', 'itf14', 'codabar'] }}
       />
       <TouchableOpacity style={styles.flipBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
         <Text style={styles.flipText}>⇄ Flip</Text>
