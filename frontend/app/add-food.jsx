@@ -129,6 +129,9 @@ export default function AddFoodScreen() {
 
   const getTotalGrams = () => {
     const qty = parseFloat(quantity) || 0;
+    if (unit === 'serving' || unit === 'pc') {
+      return qty * 100;
+    }
     if (UNIT_TO_GRAMS[unit] !== undefined) {
       return qty * UNIT_TO_GRAMS[unit];
     }
