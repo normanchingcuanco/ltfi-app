@@ -32,8 +32,9 @@ export default function EditFoodScreen() {
 
   const fetchFood = async () => {
     try {
-      const res = await api.get('/food/my');
-      const food = res.data.find(f => f._id === foodId);
+      const res = await api.get(`/food/my?limit=200`);
+      const foodList = res.data.foods || res.data || [];
+      const food = foodList.find(f => f._id?.toString() === foodId?.toString());
       if (!food) {
         showAlert('Error', 'Food not found.');
         router.back();

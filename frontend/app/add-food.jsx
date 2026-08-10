@@ -152,7 +152,7 @@ export default function AddFoodScreen() {
         date,
         mealType,
         food: {
-          foodId: selectedFood._id,
+          foodId: selectedFood._id || null,
           name: selectedFood.name,
           quantity: qty,
           unit,
@@ -180,8 +180,8 @@ export default function AddFoodScreen() {
         text: 'Delete', style: 'destructive', onPress: async () => {
           try {
             await api.delete(`/food/${food._id}`);
-            setMyFoods(prev => prev.filter(f => f._id !== food._id));
-            setMyFoodMatches(prev => prev.filter(f => f._id !== food._id));
+            setMyFoods(prev => prev.filter(f => f._id?.toString() !== food._id?.toString()));
+            setMyFoodMatches(prev => prev.filter(f => f._id?.toString() !== food._id?.toString()));
           } catch (err) {
             showAlert('Error', 'Could not delete food.');
           }
@@ -195,11 +195,11 @@ export default function AddFoodScreen() {
   const needsGramEquivalent = CUSTOM_UNITS.includes(unit) && !UNIT_TO_GRAMS[unit] && unit !== 'serving' && unit !== 'pc';
 
   const renderFoodItem = (food, idx, showActions = false) => (
-    <View key={idx} style={[styles.resultItem, food.source === 'custom' && styles.resultItemCustom]}>
+    <View key={idx} style={[styles.resultItem, (food.source === 'custom' || food.source === 'open_food_facts' || food.createdBy) && styles.resultItemCustom]}>
       <View style={styles.resultInfo}>
         <View style={styles.resultNameRow}>
           <Text style={styles.resultName}>{food.name}</Text>
-          {food.source === 'custom' && (
+          {(food.source === 'custom' || food.createdBy) && (
             <View style={styles.myFoodBadge}>
               <Text style={styles.myFoodBadgeText}>My Food</Text>
             </View>

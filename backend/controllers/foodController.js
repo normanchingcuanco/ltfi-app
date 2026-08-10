@@ -300,10 +300,23 @@ const getUserFoods = async (req, res) => {
       baseQuery.name = { $regex: q, $options: 'i' };
     }
 
-    const [foods, total] = await Promise.all([
-      Food.find(baseQuery).skip(skip).limit(parseInt(limit)).sort({ name: 1 }),
-      Food.countDocuments(baseQuery)
-    ]);
+    const allFoods = await Food.find(baseQuery).sort({ name: 1 });
+
+    const seen = new Map();
+    allFoods.forEach(f => {
+      const key = f.name.toLowerCase().trim();
+      if (!seen.has(key)) {
+        seen.set(key, f);
+      } else {
+        if (f.createdBy?.toString() === req.user._id.toString()) {
+          seen.set(key, f);
+        }
+      }
+    });
+
+    const deduped = Array.from(seen.values());
+    const total = deduped.length;
+    const foods = deduped.slice(skip, skip + parseInt(limit));
 
     res.json({ foods, total, page: parseInt(page), limit: parseInt(limit) });
   } catch (err) {
