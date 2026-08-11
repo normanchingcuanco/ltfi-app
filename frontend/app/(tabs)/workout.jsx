@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput, Linking } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
 
@@ -37,6 +37,7 @@ export default function WorkoutScreen() {
   const [expandedExercise, setExpandedExercise] = useState(null);
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [newSet, setNewSet] = useState({ weight: '', reps: '' });
+  const [exerciseNotes, setExerciseNotes] = useState({});
   const router = useRouter();
 
   useFocusEffect(
@@ -101,7 +102,8 @@ export default function WorkoutScreen() {
         exercise,
         date: localDate(),
         week: getCurrentWeek(),
-        sets: newSets
+        sets: newSets,
+        notes: exerciseNotes[exercise] || ''
       });
       setNewSet({ weight: '', reps: '' });
       fetchExerciseLogs(exercise);
@@ -299,6 +301,25 @@ export default function WorkoutScreen() {
                           <Text style={styles.addSetBtnText}>+ Add</Text>
                         </TouchableOpacity>
                       </View>
+                      <TextInput
+                        style={styles.notesInput}
+                        placeholder="Notes, links, video URLs..."
+                        placeholderTextColor="#999"
+                        multiline
+                        value={exerciseNotes[ex.exercise] || todayLog?.notes || ''}
+                        onChangeText={v => setExerciseNotes(prev => ({ ...prev, [ex.exercise]: v }))}
+                      />
+                      {(exerciseNotes[ex.exercise] || todayLog?.notes || '').match(/https?:\/\/[^\s]+/) && (
+                        <TouchableOpacity
+                          style={styles.linkBtn}
+                          onPress={() => {
+                            const url = (exerciseNotes[ex.exercise] || todayLog?.notes || '').match(/https?:\/\/[^\s]+/)[0];
+                            Linking.openURL(url);
+                          }}
+                        >
+                          <Text style={styles.linkBtnText}>🔗 Open Link</Text>
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity style={styles.historyBtn} onPress={() => router.push({ pathname: '/exercise-history', params: { exercise: ex.exercise } })}>
                         <Text style={styles.historyBtnText}>View History</Text>
                       </TouchableOpacity>
@@ -364,5 +385,8 @@ const styles = StyleSheet.create({
   addSetBtn: { backgroundColor: '#F77E2D', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
   addSetBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   historyBtn: { marginTop: 10, borderWidth: 1, borderColor: '#F77E2D', borderRadius: 8, padding: 10, alignItems: 'center' },
-  historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 }
+  historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 },
+  notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 60, textAlignVertical: 'top' },
+  linkBtn: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, alignItems: 'center', marginTop: 6 },
+  linkBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 }
 });
