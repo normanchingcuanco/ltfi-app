@@ -23,6 +23,7 @@ app.use('/api/weight', require('./routes/weight'));
 app.use('/api/recipes', require('./routes/recipes'));
 app.use('/api/ai-scan', require('./routes/aiScan'));
 app.use('/api/workouts', require('./routes/workouts'));
+app.use('/api/exercises', require('./routes/exercises'));
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
