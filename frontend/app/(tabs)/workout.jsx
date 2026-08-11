@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput, Linking } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
@@ -38,6 +38,7 @@ export default function WorkoutScreen() {
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [newSet, setNewSet] = useState({ weight: '', reps: '' });
   const [exerciseNotes, setExerciseNotes] = useState({});
+  const notesTimers = useRef({});
   const router = useRouter();
 
   useFocusEffect(
@@ -86,6 +87,28 @@ export default function WorkoutScreen() {
       setExpandedExercise(exercise);
       if (!exerciseLogs[exercise]) fetchExerciseLogs(exercise);
     }
+  };
+
+  const saveNotes = (exercise, value) => {
+    setExerciseNotes(prev => ({ ...prev, [exercise]: value }));
+    if (notesTimers.current[exercise]) clearTimeout(notesTimers.current[exercise]);
+    notesTimers.current[exercise] = setTimeout(async () => {
+      const logs = exerciseLogs[exercise] || [];
+      const todayLog = logs.find(l => l.date === localDate());
+      try {
+        await api.post('/exercises', {
+          exercise,
+          date: localDate(),
+          week: getCurrentWeek(),
+          sets: todayLog?.sets || [],
+          notes: value
+        });
+        fetchExerciseLogs(exercise);
+        fetchExercises();
+      } catch (err) {
+        console.error(err);
+      }
+    }, 800);
   };
 
   const addSet = async (exercise) => {
@@ -306,8 +329,8 @@ export default function WorkoutScreen() {
                         placeholder="Notes, links, video URLs..."
                         placeholderTextColor="#999"
                         multiline
-                        value={exerciseNotes[ex.exercise] || todayLog?.notes || ''}
-                        onChangeText={v => setExerciseNotes(prev => ({ ...prev, [ex.exercise]: v }))}
+                        value={exerciseNotes[ex.exercise] !== undefined ? exerciseNotes[ex.exercise] : (todayLog?.notes || '')}
+                        onChangeText={v => saveNotes(ex.exercise, v)}
                       />
                       {(exerciseNotes[ex.exercise] || todayLog?.notes || '').match(/https?:\/\/[^\s]+/) && (
                         <TouchableOpacity
