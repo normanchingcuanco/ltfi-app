@@ -142,7 +142,7 @@ export default function ProgressScreen() {
   };
 
   const uploadPhotoToCloudinary = async () => {
-    if (!photoDataUrl) return null;
+    if (!photoDataUrl) return { url: null, publicId: null };
     setUploadingPhoto(true);
     try {
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
@@ -154,10 +154,10 @@ export default function ProgressScreen() {
         })
       });
       const data = await res.json();
-      return data.secure_url || null;
+      return { url: data.secure_url || null, publicId: data.public_id || null };
     } catch (err) {
       console.error(err);
-      return null;
+      return { url: null, publicId: null };
     } finally {
       setUploadingPhoto(false);
     }
@@ -167,8 +167,8 @@ export default function ProgressScreen() {
     if (!weight) return;
     setLogging(true);
     try {
-      const photoUrl = await uploadPhotoToCloudinary();
-      await api.post('/weight', { weight: parseFloat(weight), notes, photoUrl });
+      const { url: photoUrl, publicId: photoPublicId } = await uploadPhotoToCloudinary();
+      await api.post('/weight', { weight: parseFloat(weight), notes, photoUrl, photoPublicId });
       setWeight('');
       setNotes('');
       setPhotoUri(null);
@@ -262,78 +262,6 @@ export default function ProgressScreen() {
           </TouchableOpacity>
         </View>
       )}
-
-      {/* Weekly Calorie History */}
-      <Text style={styles.sectionTitle}>Weekly Calorie Intake</Text>
-      <View style={styles.chartCard}>
-        <View style={styles.weekNav}>
-            <TouchableOpacity onPress={() => setWeekOffset(prev => prev - 1)} style={styles.weekNavBtn}>
-              <Text style={styles.weekNavText}>‹</Text>
-            </TouchableOpacity>
-            <Text style={styles.chartTitle}>
-              {(() => {
-                const days = getWeekDays(weekOffset);
-                const start = new Date(days[0] + 'T12:00:00');
-                const end = new Date(days[6] + 'T12:00:00');
-                return weekOffset === 0 ? 'This Week' :
-                  `${start.toLocaleDateString('en', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en', { month: 'short', day: 'numeric' })}`;
-              })()}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setWeekOffset(prev => Math.min(prev + 1, 0))}
-              style={[styles.weekNavBtn, weekOffset === 0 && styles.weekNavBtnDisabled]}
-              disabled={weekOffset === 0}
-            >
-              <Text style={[styles.weekNavText, weekOffset === 0 && { color: '#ccc' }]}>›</Text>
-            </TouchableOpacity>
-          </View>
-        {weeklyLoading ? (
-          <ActivityIndicator color="#F77E2D" />
-        ) : (
-          <>
-            <View style={styles.barChart}>
-              {weeklyCalories.map((day, idx) => {
-                const barHeight = maxCalories > 0 ? (day.calories / maxCalories) * barChartHeight : 0;
-                const goalHeight = (goal / maxCalories) * barChartHeight;
-                const isSelected = selectedDay?.date === day.date;
-                const dayLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' });
-                return (
-                  <TouchableOpacity key={idx} style={styles.barCol} onPress={() => setSelectedDay(isSelected ? null : day)}>
-                    <View style={styles.barWrapper}>
-                      <View style={[styles.goalLine, { bottom: goalHeight }]} />
-                      <View style={[styles.bar, {
-                        height: Math.max(barHeight, 2),
-                        backgroundColor: isSelected ? '#E05A2B' : day.calories >= goal ? '#E05A2B' : '#F77E2D',
-                        opacity: day.calories === 0 ? 0.3 : 1
-                      }]} />
-                    </View>
-                    <Text style={styles.barLabel}>{dayLabel}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <View style={styles.barLegend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#F77E2D' }]} />
-                <Text style={styles.legendText}>Calories</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#888' }]} />
-                <Text style={styles.legendText}>Goal ({goal})</Text>
-              </View>
-            </View>
-            {selectedDay && (
-              <View style={styles.dayDetail}>
-                <Text style={styles.dayDetailDate}>{new Date(selectedDay.date + 'T12:00:00').toDateString()}</Text>
-                <View style={styles.dayDetailRow}>
-                  <Text style={styles.dayDetailCal}>{selectedDay.calories} kcal</Text>
-                  <Text style={styles.dayDetailMacros}>{selectedDay.protein}g P · {selectedDay.carbs}g C · {selectedDay.fat}g F</Text>
-                </View>
-              </View>
-            )}
-          </>
-        )}
-      </View>
 
       {history.length === 0 ? (
         <View style={styles.emptyBox}>
@@ -435,6 +363,78 @@ export default function ProgressScreen() {
           </View>
         </>
       )}
+
+      {/* Weekly Calorie History */}
+      <Text style={styles.sectionTitle}>Weekly Calorie Intake</Text>
+      <View style={styles.chartCard}>
+        <View style={styles.weekNav}>
+            <TouchableOpacity onPress={() => setWeekOffset(prev => prev - 1)} style={styles.weekNavBtn}>
+              <Text style={styles.weekNavText}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.chartTitle}>
+              {(() => {
+                const days = getWeekDays(weekOffset);
+                const start = new Date(days[0] + 'T12:00:00');
+                const end = new Date(days[6] + 'T12:00:00');
+                return weekOffset === 0 ? 'This Week' :
+                  `${start.toLocaleDateString('en', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en', { month: 'short', day: 'numeric' })}`;
+              })()}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setWeekOffset(prev => Math.min(prev + 1, 0))}
+              style={[styles.weekNavBtn, weekOffset === 0 && styles.weekNavBtnDisabled]}
+              disabled={weekOffset === 0}
+            >
+              <Text style={[styles.weekNavText, weekOffset === 0 && { color: '#ccc' }]}>›</Text>
+            </TouchableOpacity>
+          </View>
+        {weeklyLoading ? (
+          <ActivityIndicator color="#F77E2D" />
+        ) : (
+          <>
+            <View style={styles.barChart}>
+              {weeklyCalories.map((day, idx) => {
+                const barHeight = maxCalories > 0 ? (day.calories / maxCalories) * barChartHeight : 0;
+                const goalHeight = (goal / maxCalories) * barChartHeight;
+                const isSelected = selectedDay?.date === day.date;
+                const dayLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' });
+                return (
+                  <TouchableOpacity key={idx} style={styles.barCol} onPress={() => setSelectedDay(isSelected ? null : day)}>
+                    <View style={styles.barWrapper}>
+                      <View style={[styles.goalLine, { bottom: goalHeight }]} />
+                      <View style={[styles.bar, {
+                        height: Math.max(barHeight, 2),
+                        backgroundColor: isSelected ? '#E05A2B' : day.calories >= goal ? '#E05A2B' : '#F77E2D',
+                        opacity: day.calories === 0 ? 0.3 : 1
+                      }]} />
+                    </View>
+                    <Text style={styles.barLabel}>{dayLabel}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.barLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#F77E2D' }]} />
+                <Text style={styles.legendText}>Calories</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#888' }]} />
+                <Text style={styles.legendText}>Goal ({goal})</Text>
+              </View>
+            </View>
+            {selectedDay && (
+              <View style={styles.dayDetail}>
+                <Text style={styles.dayDetailDate}>{new Date(selectedDay.date + 'T12:00:00').toDateString()}</Text>
+                <View style={styles.dayDetailRow}>
+                  <Text style={styles.dayDetailCal}>{selectedDay.calories} kcal</Text>
+                  <Text style={styles.dayDetailMacros}>{selectedDay.protein}g P · {selectedDay.carbs}g C · {selectedDay.fat}g F</Text>
+                </View>
+              </View>
+            )}
+          </>
+        )}
+      </View>
     </ScrollView>
   );
 }
