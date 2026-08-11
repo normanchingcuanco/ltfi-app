@@ -36,7 +36,7 @@ export default function WorkoutScreen() {
   const [showNewExercise, setShowNewExercise] = useState(false);
   const [expandedExercise, setExpandedExercise] = useState(null);
   const [exerciseLogs, setExerciseLogs] = useState({});
-  const [newSet, setNewSet] = useState({ weight: '', reps: '' });
+  const [newSet, setNewSet] = useState({ sets: '1', weight: '', reps: '' });
   const [exerciseNotes, setExerciseNotes] = useState({});
   const [notesEditing, setNotesEditing] = useState({});
   const notesTimers = useRef({});
@@ -143,11 +143,15 @@ export default function WorkoutScreen() {
     const logs = exerciseLogs[exercise] || [];
     const todayLog = logs.find(l => l.date === localDate());
     const existingSets = todayLog?.sets || [];
-    const newSets = [...existingSets, {
-      setNumber: existingSets.length + 1,
-      weight: parseFloat(newSet.weight) || 0,
-      reps: parseInt(newSet.reps) || 0
-    }];
+    const count = parseInt(newSet.sets) || 1;
+    const weight = parseFloat(newSet.weight) || 0;
+    const reps = parseInt(newSet.reps) || 0;
+    const addedSets = Array.from({ length: count }, (_, i) => ({
+      setNumber: existingSets.length + i + 1,
+      weight,
+      reps
+    }));
+    const newSets = [...existingSets, ...addedSets];
     try {
       await api.post('/exercises', {
         exercise,
@@ -156,7 +160,7 @@ export default function WorkoutScreen() {
         sets: newSets,
         notes: exerciseNotes[exercise] || ''
       });
-      setNewSet({ weight: '', reps: '' });
+      setNewSet({ sets: '1', weight: '', reps: '' });
       fetchExerciseLogs(exercise);
       fetchExercises();
     } catch (err) {
@@ -332,6 +336,14 @@ export default function WorkoutScreen() {
                         </>
                       )}
                       <View style={styles.addSetRow}>
+                        <TextInput
+                          style={styles.setInput}
+                          placeholder="sets"
+                          placeholderTextColor="#999"
+                          keyboardType="numeric"
+                          value={newSet.sets}
+                          onChangeText={v => setNewSet(prev => ({ ...prev, sets: v }))}
+                        />
                         <TextInput
                           style={styles.setInput}
                           placeholder="kg"
