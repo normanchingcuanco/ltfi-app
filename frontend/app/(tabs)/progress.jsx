@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 const screenWidth = Dimensions.get('window').width - 88;
 
@@ -15,17 +17,41 @@ const confirmDelete = (onConfirm) => {
   }
 };
 
+const localDate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getLast7Days = () => {
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(localDate(d));
+  }
+  return days;
+};
+
 export default function ProgressScreen() {
+  const { user } = useAuth();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [weight, setWeight] = useState('');
   const [notes, setNotes] = useState('');
   const [logging, setLogging] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [weeklyCalories, setWeeklyCalories] = useState([]);
+  const [weeklyLoading, setWeeklyLoading] = useState(true);
+  const [selectedDay, setSelectedDay] = useState(null);
 
-  useEffect(() => {
-    fetchHistory();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchHistory();
+      fetchWeeklyCalories();
+    }, [])
+  );
 
   const fetchHistory = async () => {
     try {
@@ -35,6 +61,27 @@ export default function ProgressScreen() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWeeklyCalories = async () => {
+    setWeeklyLoading(true);
+    try {
+      const days = getLast7Days();
+      const results = await Promise.all(
+        days.map(date => api.get(`/meals/summary?date=${date}`).catch(() => ({ data: { totalCalories: 0 } })))
+      );
+      setWeeklyCalories(days.map((date, idx) => ({
+        date,
+        calories: results[idx].data?.totalCalories || 0,
+        protein: results[idx].data?.totalProtein || 0,
+        carbs: results[idx].data?.totalCarbs || 0,
+        fat: results[idx].data?.totalFat || 0,
+      })));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setWeeklyLoading(false);
     }
   };
 
@@ -65,11 +112,9 @@ export default function ProgressScreen() {
     });
   };
 
-  if (loading) return (
-    <View style={styles.center}>
-      <ActivityIndicator size="large" color="#F77E2D" />
-    </View>
-  );
+  const goal = user?.dailyCalorieGoal || 2000;
+  const maxCalories = Math.max(...weeklyCalories.map(d => d.calories), goal);
+  const barChartHeight = 120;
 
   const latest = history[history.length - 1];
   const first = history[0];
@@ -80,9 +125,66 @@ export default function ProgressScreen() {
   const chartHeight = 160;
   const dotRadius = 5;
 
+  if (loading) return (
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color="#F77E2D" />
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Progress</Text>
+
+      {/* Weekly Calorie History */}
+      <View style={styles.chartCard}>
+        <Text style={styles.chartTitle}>Weekly Calories</Text>
+        {weeklyLoading ? (
+          <ActivityIndicator color="#F77E2D" />
+        ) : (
+          <>
+            <View style={styles.barChart}>
+              {weeklyCalories.map((day, idx) => {
+                const barHeight = maxCalories > 0 ? (day.calories / maxCalories) * barChartHeight : 0;
+                const goalHeight = (goal / maxCalories) * barChartHeight;
+                const isSelected = selectedDay?.date === day.date;
+                const dayLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' });
+                return (
+                  <TouchableOpacity key={idx} style={styles.barCol} onPress={() => setSelectedDay(isSelected ? null : day)}>
+                    <View style={styles.barWrapper}>
+                      <View style={[styles.goalLine, { bottom: goalHeight }]} />
+                      <View style={[styles.bar, {
+                        height: Math.max(barHeight, 2),
+                        backgroundColor: isSelected ? '#E05A2B' : day.calories >= goal ? '#E05A2B' : '#F77E2D',
+                        opacity: day.calories === 0 ? 0.3 : 1
+                      }]} />
+                    </View>
+                    <Text style={styles.barLabel}>{dayLabel}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.barLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#F77E2D' }]} />
+                <Text style={styles.legendText}>Calories</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#888' }]} />
+                <Text style={styles.legendText}>Goal ({goal})</Text>
+              </View>
+            </View>
+            {selectedDay && (
+              <View style={styles.dayDetail}>
+                <Text style={styles.dayDetailDate}>{new Date(selectedDay.date + 'T12:00:00').toDateString()}</Text>
+                <View style={styles.dayDetailRow}>
+                  <Text style={styles.dayDetailCal}>{selectedDay.calories} kcal</Text>
+                  <Text style={styles.dayDetailMacros}>{selectedDay.protein}g P · {selectedDay.carbs}g C · {selectedDay.fat}g F</Text>
+                </View>
+              </View>
+            )}
+          </>
+        )}
+      </View>
 
       <TouchableOpacity style={styles.logBtn} onPress={() => setShowForm(!showForm)}>
         <Text style={styles.logBtnText}>{showForm ? 'Cancel' : '+ Log Weight'}</Text>
@@ -136,7 +238,7 @@ export default function ProgressScreen() {
 
           <View style={styles.chartCard}>
             <Text style={styles.chartTitle}>Weight Trend</Text>
-            <View style={styles.chart}>
+            <View style={[styles.chart, { overflow: 'hidden' }]}>
               {history.length > 1 && history.map((entry, idx) => {
                 if (idx === 0) return null;
                 const prev = history[idx - 1];
@@ -197,7 +299,22 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   chartCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 24 },
   chartTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 16 },
-  chart: { height: 160, position: 'relative', marginBottom: 8, overflow: 'hidden' },
+  barChart: { flexDirection: 'row', alignItems: 'flex-end', height: 140, marginBottom: 8, gap: 4 },
+  barCol: { flex: 1, alignItems: 'center' },
+  barWrapper: { width: '100%', height: 120, justifyContent: 'flex-end', position: 'relative' },
+  bar: { width: '100%', borderRadius: 4, minHeight: 2 },
+  goalLine: { position: 'absolute', left: 0, right: 0, height: 1.5, backgroundColor: '#888', opacity: 0.5 },
+  barLabel: { fontSize: 9, color: '#888', marginTop: 4 },
+  barLegend: { flexDirection: 'row', gap: 16, marginTop: 4 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 11, color: '#888' },
+  dayDetail: { backgroundColor: '#EDE8DF', borderRadius: 12, padding: 14, marginTop: 12 },
+  dayDetailDate: { fontSize: 12, color: '#888', marginBottom: 4 },
+  dayDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dayDetailCal: { fontSize: 18, fontWeight: '800', color: '#F77E2D' },
+  dayDetailMacros: { fontSize: 12, color: '#888' },
+  chart: { height: 160, position: 'relative', marginBottom: 8 },
   dot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#F77E2D' },
   line: { position: 'absolute', height: 2, backgroundColor: '#F77E2D', opacity: 0.4, transformOrigin: 'left center' },
   chartLabels: { flexDirection: 'row', justifyContent: 'space-between' },
