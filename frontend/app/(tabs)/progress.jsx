@@ -76,6 +76,7 @@ export default function ProgressScreen() {
   const [selectedDay, setSelectedDay] = useState(null);
   const [weekOffset, setWeekOffset] = useState(0);
   const [entriesPage, setEntriesPage] = useState(0);
+  const [showPhotos, setShowPhotos] = useState(false);
   const ENTRIES_PER_PAGE = 10;
 
   useFocusEffect(
@@ -216,6 +217,52 @@ export default function ProgressScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Progress</Text>
 
+      <TouchableOpacity style={styles.logBtn} onPress={() => setShowForm(!showForm)}>
+        <Text style={styles.logBtnText}>{showForm ? 'Cancel' : '+ Log Weight'}</Text>
+      </TouchableOpacity>
+
+      {showForm && (
+        <View style={styles.formCard}>
+          <TextInput
+            style={styles.input}
+            placeholder="Weight (kg)"
+            placeholderTextColor="#999"
+            keyboardType="decimal-pad"
+            value={weight}
+            onChangeText={setWeight}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Notes (optional)"
+            placeholderTextColor="#999"
+            value={notes}
+            onChangeText={setNotes}
+          />
+          {photoUri ? (
+            <View style={styles.photoPreviewWrap}>
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+              <TouchableOpacity style={styles.removePhotoBtn} onPress={() => { setPhotoUri(null); setPhotoDataUrl(null); }}>
+                <Text style={styles.removePhotoBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.photoButtonsRow}>
+              {Platform.OS !== 'web' && (
+                <TouchableOpacity style={styles.photoBtn} onPress={() => pickPhoto(true)}>
+                  <Text style={styles.photoBtnText}>📷 Camera</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.photoBtn} onPress={() => pickPhoto(false)}>
+                <Text style={styles.photoBtnText}>🖼️ Add Photo</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <TouchableOpacity style={styles.submitBtn} onPress={logWeight} disabled={logging}>
+            <Text style={styles.submitBtnText}>{uploadingPhoto ? 'Uploading photo...' : logging ? 'Saving...' : 'Save'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Weekly Calorie History */}
       <Text style={styles.sectionTitle}>Weekly Calorie Intake</Text>
       <View style={styles.chartCard}>
@@ -288,52 +335,6 @@ export default function ProgressScreen() {
         )}
       </View>
 
-      <TouchableOpacity style={styles.logBtn} onPress={() => setShowForm(!showForm)}>
-        <Text style={styles.logBtnText}>{showForm ? 'Cancel' : '+ Log Weight'}</Text>
-      </TouchableOpacity>
-
-      {showForm && (
-        <View style={styles.formCard}>
-          <TextInput
-            style={styles.input}
-            placeholder="Weight (kg)"
-            placeholderTextColor="#999"
-            keyboardType="decimal-pad"
-            value={weight}
-            onChangeText={setWeight}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Notes (optional)"
-            placeholderTextColor="#999"
-            value={notes}
-            onChangeText={setNotes}
-          />
-          {photoUri ? (
-            <View style={styles.photoPreviewWrap}>
-              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
-              <TouchableOpacity style={styles.removePhotoBtn} onPress={() => { setPhotoUri(null); setPhotoDataUrl(null); }}>
-                <Text style={styles.removePhotoBtnText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.photoButtonsRow}>
-              {Platform.OS !== 'web' && (
-                <TouchableOpacity style={styles.photoBtn} onPress={() => pickPhoto(true)}>
-                  <Text style={styles.photoBtnText}>📷 Camera</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={styles.photoBtn} onPress={() => pickPhoto(false)}>
-                <Text style={styles.photoBtnText}>🖼️ Add Photo</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          <TouchableOpacity style={styles.submitBtn} onPress={logWeight} disabled={logging}>
-            <Text style={styles.submitBtnText}>{uploadingPhoto ? 'Uploading photo...' : logging ? 'Saving...' : 'Save'}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {history.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyText}>No weight entries yet. Log your first entry above.</Text>
@@ -384,13 +385,24 @@ export default function ProgressScreen() {
           </View>
 
           <View style={styles.logList}>
-            <Text style={styles.logTitle}>Recent Entries</Text>
+            <View style={styles.logListHeader}>
+              <Text style={styles.logTitle}>Recent Entries</Text>
+              <TouchableOpacity onPress={() => setShowPhotos(prev => !prev)}>
+                <Text style={styles.togglePhotosText}>{showPhotos ? 'Hide Photos' : 'Show Photos'}</Text>
+              </TouchableOpacity>
+            </View>
             {[...history].reverse().slice(entriesPage * ENTRIES_PER_PAGE, entriesPage * ENTRIES_PER_PAGE + ENTRIES_PER_PAGE).map((entry, idx) => (
               <View key={idx} style={styles.logItem}>
-                {entry.photoUrl ? (
-                  <Image source={{ uri: entry.photoUrl }} style={styles.logThumb} />
+                {showPhotos ? (
+                  entry.photoUrl ? (
+                    <Image source={{ uri: entry.photoUrl }} style={styles.logThumb} />
+                  ) : (
+                    <View style={styles.logThumbPlaceholder} />
+                  )
                 ) : (
-                  <View style={styles.logThumbPlaceholder} />
+                  <View style={styles.logThumbHidden}>
+                    <Text style={styles.logThumbHiddenIcon}>🔒</Text>
+                  </View>
                 )}
                 <Text style={styles.logDate}>{new Date(entry.loggedAt).toDateString()}</Text>
                 <Text style={styles.logWeight}>{entry.weight} kg</Text>
@@ -472,10 +484,14 @@ const styles = StyleSheet.create({
   chartLabels: { flexDirection: 'row', justifyContent: 'space-between' },
   chartLabel: { fontSize: 11, color: '#888' },
   logList: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20 },
-  logTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
+  logListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  logTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
+  togglePhotosText: { fontSize: 12, color: '#F77E2D', fontWeight: '700' },
   logItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#C5BFB4', gap: 10 },
   logThumb: { width: 36, height: 36, borderRadius: 8 },
   logThumbPlaceholder: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#EDE8DF' },
+  logThumbHidden: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#EDE8DF', justifyContent: 'center', alignItems: 'center' },
+  logThumbHiddenIcon: { fontSize: 14 },
   logDate: { fontSize: 13, color: '#555', flex: 1 },
   logWeight: { fontSize: 13, fontWeight: '700', color: '#F77E2D', marginRight: 12 },
   deleteBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#C5BFB4', justifyContent: 'center', alignItems: 'center' },
