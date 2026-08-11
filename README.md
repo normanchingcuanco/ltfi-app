@@ -33,7 +33,7 @@ To ensure efficient collaboration during the build process, the following rules 
 **Every tool, service, and API used in this project must have a free tier or be completely free.** No paid subscriptions, no trial-only services, no features locked behind a paywall — at any layer of the stack.
 
 This applies to:
-- All third-party APIs (AI, food data, health data)
+- All third-party APIs (AI, food data, health data, image hosting)
 - All hosting and infrastructure
 - All development tools and SDKs
 - All database services
@@ -47,6 +47,7 @@ Current free services in use:
 - Calorie API — free tier, 1,000 calls/month, no credit card
 - API Ninjas Nutrition API — free tier, no credit card
 - Groq API — free tier with generous limits for LLaMA vision
+- Cloudinary — free tier (25GB storage, 25GB bandwidth/month, includes Admin API for deletes)
 - Gmail SMTP — free via app password
 - Expo — free for development and EAS free tier builds
 - EAS Build — free tier (30 builds/month)
@@ -77,6 +78,7 @@ An Expo-based mobile and web app that:
 - Tracks daily calories, macros, and micronutrients
 - Logs workouts and runs HIIT / Tabata / circuit interval timers with warmup, cooldown, and repeat
 - Tracks strength training with sets, reps, weight, and progressive overload
+- Logs body weight with optional progress photos, stored on Cloudinary
 - Syncs health data from Apple HealthKit and Colmi smart ring via QRing
 
 ---
@@ -114,6 +116,7 @@ An Expo-based mobile and web app that:
 | Auth | JWT + Email/Password | Free |
 | Food Data | USDA + Open Food Facts + Calorie API + API Ninjas | Free |
 | AI Food Scanning | Groq API — LLaMA Vision (free tier) | Free |
+| Image Hosting | Cloudinary (free tier, unsigned upload preset + Admin API delete) | Free |
 | Email | Gmail SMTP via Nodemailer | Free |
 | Health Data | Apple HealthKit (deferred) | Free |
 | Wearable | Colmi Ring via QRing → HealthKit pipeline (deferred) | Free |
@@ -161,6 +164,7 @@ ltfi/
 │   │   └── seedPhilippineFoods.js
 │   ├── utils/
 │   │   ├── calorieCalculator.js
+│   │   ├── cloudinary.js
 │   │   └── mailer.js
 │   ├── server.js
 │   ├── .env
@@ -302,6 +306,8 @@ ltfi/
 | weight | Number | kg |
 | loggedAt | Date | |
 | notes | String | Optional |
+| photoUrl | String | Optional — Cloudinary secure_url for progress photo |
+| photoPublicId | String | Optional — Cloudinary public_id, used to delete image from storage when entry is deleted |
 
 ### Workout
 
@@ -329,8 +335,8 @@ ltfi/
 | exercise | String | Exercise name |
 | date | String | YYYY-MM-DD |
 | week | Number | Week number for progressive overload tracking |
-| sets | Array | [{ setNumber, weight, reps, notes }] |
-| notes | String | Session notes, supports URLs |
+| sets | Array | [{ setNumber, weight, reps }] |
+| notes | String | Session notes, supports inline clickable URLs |
 
 ---
 
@@ -345,7 +351,8 @@ ltfi/
 | Expo App Setup | Expo SDK 54 + React Native Web with navigation | ✅ Done |
 | Backend Server Setup | Express app with helmet, morgan, rate limiting | ✅ Done |
 | MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ✅ Done |
-| Environment Config | .env for DB URI, JWT secret, Groq API key, email, frontend URL | ✅ Done |
+| Environment Config | .env for DB URI, JWT secret, Groq API key, Cloudinary keys, email, frontend URL | ✅ Done |
+| Rate Limit Tuning | Raised global limit from 100 to 500 req/15min, health checks excluded | ✅ Done |
 
 #### 2. Authentication
 
@@ -409,14 +416,19 @@ ltfi/
 | Micronutrients | Sodium, sugar, fiber breakdown per day in diary | ✅ Done |
 | Nutrition Summary | Per meal and per day breakdown | ✅ Done |
 | Progress Dashboard | Visual overview of daily and weekly nutrition | ✅ Done |
-| Weekly Calorie History | Bar chart of daily calories vs goal with Mon-Sun week navigation | ✅ Done |
+| Weekly Calorie History | Bar chart of daily calories vs goal with Mon-Sun week navigation, titled section, positioned at bottom of Progress page | ✅ Done |
 | Weekly Weight Tracker | Log weight entries and view weekly trend chart | ✅ Done |
+| Weight Trend Range | Weight Trend chart limited to last 4 weeks of entries | ✅ Done |
 | Progress Chart Fix | Chart overflow clipped correctly inside card | ✅ Done |
 | Delete Weight Entries | Remove incorrect weight log entries | ✅ Done |
+| Recent Entries Pagination | Weight log list paginated 10 entries per page with Prev/Next | ✅ Done |
+| Progress Photos | Attach a camera or gallery photo to a weight entry, uploaded to Cloudinary | ✅ Done |
+| Progress Photo Thumbnails | Recent Entries list shows a thumbnail per logged photo | ✅ Done |
+| Show/Hide Photos Toggle | Photos hidden by default behind a lock icon, toggle to reveal | ✅ Done |
+| Progress Photo Cleanup | Deleting a weight entry also deletes its photo from Cloudinary via Admin API | ✅ Done — applies to entries logged after this fix; earlier entries lack the stored public_id |
 | Workout Calories Deducted | Calories burned from workouts added to remaining on dashboard | ✅ Done |
 | Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it | ✅ Done |
 | Diary Focus Refresh | Diary re-fetches data every time user navigates to it | ✅ Done |
-| Progress Photos | Upload weekly progress photos, view as collage or reel | ⬜ Needs Cloudinary account |
 
 #### 5. Profile
 
@@ -467,8 +479,11 @@ ltfi/
 | Audio Mix Mode | Timer sounds duck background audio without interrupting it — Android only | ✅ Done |
 | Workout Timer/Tracker Tabs | Workout page split into Timer tab and Tracker tab | ✅ Done |
 | Exercise Tracker | Log sets, reps, weight per exercise with progressive overload tracking | ✅ Done |
-| Exercise Notes | Notes field per exercise session with clickable URL detection | ✅ Done |
-| Exercise History Screen | View progressive overload history per exercise | ⬜ Not built |
+| Dynamic Per-Set Rows | Add multiple set rows at once, each with its own weight and reps, saved together | ✅ Done |
+| Exercise Notes Auto-Save | Notes save automatically 800ms after typing stops, independent of logging a set | ✅ Done |
+| Exercise Notes Inline Links | Saved notes render as plain text with URLs shown as tappable, underlined hyperlinks; tap the note to re-enter edit mode | ✅ Done |
+| Exercise History Screen | View progressive overload history per exercise — all-time best weight, per-session volume, PR badge, delete individual logs | ✅ Done |
+| Back Navigation Fix | Root layout switched from Slot to Stack so pushed screens (e.g. exercise history) correctly pop back to the previous tab instead of resetting to Home | ✅ Done |
 | Background Timer | Timer continues running when app is backgrounded | ⬜ Deferred — requires native build |
 | iOS Sound Effects | Timer sound effects on iPhone | ⬜ Deferred — requires Apple Developer account |
 
@@ -513,7 +528,7 @@ ltfi/
 |---------|-------------|--------|
 | Backend Deployment | Deploy Express backend to Render free tier | ✅ Done |
 | Frontend Deployment | Deploy Expo web to Vercel | ✅ Done |
-| Environment Config (Production) | Set production env vars on Render and Vercel | ✅ Done |
+| Environment Config (Production) | Set production env vars on Render and Vercel, including Cloudinary credentials | ✅ Done |
 | SPA Routing Fix | Vercel rewrite rules for client-side routing | ✅ Done |
 | Cache Control | Static assets cached, HTML no-cache for instant updates | ✅ Done |
 | Tab Bar Icons | Ionicons on all tabs with safe area padding for Android | ✅ Done |
@@ -525,6 +540,7 @@ ltfi/
 | Lazy Tab Loading | Tabs load on demand with lazy: true | ✅ Done |
 | Session Persistence Fix | Token only cleared on 401, not on network timeout | ✅ Done |
 | Timezone Date Fix | All date formatting uses local time to prevent UTC date shift | ✅ Done |
+| Rate Limit Tuning | Global limiter raised to 500 req/15min with health checks excluded, preventing false "data lost" symptoms from 429s during normal multi-request screens | ✅ Done |
 | iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ Deferred |
 
 ---
@@ -537,6 +553,7 @@ ltfi/
 | Sound effects (ding, beep, chime) not available | iOS | Requires Apple Developer account for native build |
 | Timer pauses when app is backgrounded | iOS + Android | Requires native build |
 | Background timer | Both | Deferred — requires native build |
+| Progress photos logged before the Cloudinary cleanup fix have no stored public_id | Both | Those images will remain in Cloudinary storage even after the weight entry is deleted; negligible at current free-tier usage (25GB) |
 
 ---
 
@@ -555,6 +572,7 @@ ltfi/
 - API Ninjas key (free) — https://api-ninjas.com
 - Open Food Facts API (no key required)
 - USDA FoodData Central (no key required)
+- Cloudinary account (free tier) for progress photos — https://cloudinary.com
 
 ### 1. Clone the repo
 
@@ -585,7 +603,14 @@ EMAIL_PASS=your_gmail_app_password
 USDA_API_KEY=your_usda_key
 CALORIE_API_KEY=your_calorie_api_key
 API_NINJAS_KEY=your_api_ninjas_key
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
+
+These same `CLOUDINARY_*` values also need to be set as environment variables on Render for the deployed backend — `.env` is gitignored and never reaches production on its own.
+
+The frontend's Cloudinary cloud name and unsigned upload preset are set directly in `frontend/app/(tabs)/progress.jsx` as `CLOUDINARY_CLOUD_NAME` and `CLOUDINARY_UPLOAD_PRESET` constants, since unsigned uploads are safe to expose client-side.
 
 ### 4. Run locally
 
