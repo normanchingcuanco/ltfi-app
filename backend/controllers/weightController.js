@@ -2,12 +2,13 @@ const Weight = require('../models/Weight');
 
 const logWeight = async (req, res) => {
   try {
-    const { weight, notes, loggedAt } = req.body;
+    const { weight, notes, loggedAt, photoUrl } = req.body;
 
     const entry = await Weight.create({
       user: req.user._id,
       weight,
       notes,
+      photoUrl,
       loggedAt: loggedAt || Date.now()
     });
 
@@ -21,7 +22,7 @@ const getWeightHistory = async (req, res) => {
   try {
     const entries = await Weight.find({ user: req.user._id })
       .sort({ loggedAt: 1 })
-      .limit(30);
+      .limit(200);
 
     res.json(entries);
   } catch (err) {

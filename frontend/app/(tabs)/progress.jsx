@@ -1,8 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions, TouchableOpacity, TextInput, Alert, Platform, Image } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import api from '../../src/utils/api';
 import { useAuth } from '../../src/contexts/AuthContext';
+
+const CLOUDINARY_CLOUD_NAME = 'de6cwgvio';
+const CLOUDINARY_UPLOAD_PRESET = 'ltfi_progress';
+
+const compressImageWeb = (uri) => {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxWidth = 800;
+      const scale = Math.min(1, maxWidth / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.src = uri;
+  });
+};
 
 const screenWidth = Dimensions.get('window').width - 88;
 
@@ -47,10 +68,15 @@ export default function ProgressScreen() {
   const [notes, setNotes] = useState('');
   const [logging, setLogging] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [photoUri, setPhotoUri] = useState(null);
+  const [photoDataUrl, setPhotoDataUrl] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [weeklyCalories, setWeeklyCalories] = useState([]);
   const [weeklyLoading, setWeeklyLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(null);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [entriesPage, setEntriesPage] = useState(0);
+  const ENTRIES_PER_PAGE = 10;
 
   useFocusEffect(
     useCallback(() => {
@@ -96,14 +122,58 @@ export default function ProgressScreen() {
     }
   };
 
+  const pickPhoto = async (useCamera) => {
+    const options = { base64: true, quality: 0.5, allowsEditing: true, aspect: [3, 4] };
+    const source = useCamera
+      ? await ImagePicker.launchCameraAsync(options)
+      : await ImagePicker.launchImageLibraryAsync(options);
+
+    if (!source.canceled) {
+      const asset = source.assets[0];
+      setPhotoUri(asset.uri);
+      if (Platform.OS === 'web') {
+        const dataUrl = await compressImageWeb(asset.uri);
+        setPhotoDataUrl(dataUrl);
+      } else {
+        setPhotoDataUrl(`data:image/jpeg;base64,${asset.base64}`);
+      }
+    }
+  };
+
+  const uploadPhotoToCloudinary = async () => {
+    if (!photoDataUrl) return null;
+    setUploadingPhoto(true);
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file: photoDataUrl,
+          upload_preset: CLOUDINARY_UPLOAD_PRESET
+        })
+      });
+      const data = await res.json();
+      return data.secure_url || null;
+    } catch (err) {
+      console.error(err);
+      return null;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const logWeight = async () => {
     if (!weight) return;
     setLogging(true);
     try {
-      await api.post('/weight', { weight: parseFloat(weight), notes });
+      const photoUrl = await uploadPhotoToCloudinary();
+      await api.post('/weight', { weight: parseFloat(weight), notes, photoUrl });
       setWeight('');
       setNotes('');
+      setPhotoUri(null);
+      setPhotoDataUrl(null);
       setShowForm(false);
+      setEntriesPage(0);
       await fetchHistory();
     } catch (err) {
       console.error(err);
@@ -147,6 +217,7 @@ export default function ProgressScreen() {
       <Text style={styles.title}>Progress</Text>
 
       {/* Weekly Calorie History */}
+      <Text style={styles.sectionTitle}>Weekly Calorie Intake</Text>
       <View style={styles.chartCard}>
         <View style={styles.weekNav}>
             <TouchableOpacity onPress={() => setWeekOffset(prev => prev - 1)} style={styles.weekNavBtn}>
@@ -238,8 +309,27 @@ export default function ProgressScreen() {
             value={notes}
             onChangeText={setNotes}
           />
+          {photoUri ? (
+            <View style={styles.photoPreviewWrap}>
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+              <TouchableOpacity style={styles.removePhotoBtn} onPress={() => { setPhotoUri(null); setPhotoDataUrl(null); }}>
+                <Text style={styles.removePhotoBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.photoButtonsRow}>
+              {Platform.OS !== 'web' && (
+                <TouchableOpacity style={styles.photoBtn} onPress={() => pickPhoto(true)}>
+                  <Text style={styles.photoBtnText}>📷 Camera</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.photoBtn} onPress={() => pickPhoto(false)}>
+                <Text style={styles.photoBtnText}>🖼️ Add Photo</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <TouchableOpacity style={styles.submitBtn} onPress={logWeight} disabled={logging}>
-            <Text style={styles.submitBtnText}>{logging ? 'Saving...' : 'Save'}</Text>
+            <Text style={styles.submitBtnText}>{uploadingPhoto ? 'Uploading photo...' : logging ? 'Saving...' : 'Save'}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -295,8 +385,13 @@ export default function ProgressScreen() {
 
           <View style={styles.logList}>
             <Text style={styles.logTitle}>Recent Entries</Text>
-            {[...history].reverse().slice(0, 10).map((entry, idx) => (
+            {[...history].reverse().slice(entriesPage * ENTRIES_PER_PAGE, entriesPage * ENTRIES_PER_PAGE + ENTRIES_PER_PAGE).map((entry, idx) => (
               <View key={idx} style={styles.logItem}>
+                {entry.photoUrl ? (
+                  <Image source={{ uri: entry.photoUrl }} style={styles.logThumb} />
+                ) : (
+                  <View style={styles.logThumbPlaceholder} />
+                )}
                 <Text style={styles.logDate}>{new Date(entry.loggedAt).toDateString()}</Text>
                 <Text style={styles.logWeight}>{entry.weight} kg</Text>
                 <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteEntry(entry._id)}>
@@ -304,6 +399,27 @@ export default function ProgressScreen() {
                 </TouchableOpacity>
               </View>
             ))}
+            {history.length > ENTRIES_PER_PAGE && (
+              <View style={styles.paginationRow}>
+                <TouchableOpacity
+                  style={[styles.pageBtn, entriesPage === 0 && styles.pageBtnDisabled]}
+                  disabled={entriesPage === 0}
+                  onPress={() => setEntriesPage(p => p - 1)}
+                >
+                  <Text style={[styles.pageBtnText, entriesPage === 0 && styles.pageBtnTextDisabled]}>‹ Prev</Text>
+                </TouchableOpacity>
+                <Text style={styles.pageIndicator}>
+                  Page {entriesPage + 1} of {Math.ceil(history.length / ENTRIES_PER_PAGE)}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.pageBtn, (entriesPage + 1) * ENTRIES_PER_PAGE >= history.length && styles.pageBtnDisabled]}
+                  disabled={(entriesPage + 1) * ENTRIES_PER_PAGE >= history.length}
+                  onPress={() => setEntriesPage(p => p + 1)}
+                >
+                  <Text style={[styles.pageBtnText, (entriesPage + 1) * ENTRIES_PER_PAGE >= history.length && styles.pageBtnTextDisabled]}>Next ›</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </>
       )}
@@ -316,6 +432,7 @@ const styles = StyleSheet.create({
   content: { padding: 24, paddingTop: 60 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 24 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   logBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
   logBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   formCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 24, gap: 12 },
@@ -356,9 +473,24 @@ const styles = StyleSheet.create({
   chartLabel: { fontSize: 11, color: '#888' },
   logList: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20 },
   logTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
-  logItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#C5BFB4' },
+  logItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#C5BFB4', gap: 10 },
+  logThumb: { width: 36, height: 36, borderRadius: 8 },
+  logThumbPlaceholder: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#EDE8DF' },
   logDate: { fontSize: 13, color: '#555', flex: 1 },
   logWeight: { fontSize: 13, fontWeight: '700', color: '#F77E2D', marginRight: 12 },
   deleteBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#C5BFB4', justifyContent: 'center', alignItems: 'center' },
-  deleteBtnText: { color: '#888', fontSize: 11, fontWeight: '700' }
+  deleteBtnText: { color: '#888', fontSize: 11, fontWeight: '700' },
+  photoButtonsRow: { flexDirection: 'row', gap: 12 },
+  photoBtn: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 10, padding: 12, alignItems: 'center' },
+  photoBtnText: { color: '#1A1A1A', fontWeight: '600', fontSize: 13 },
+  photoPreviewWrap: { position: 'relative', alignSelf: 'flex-start' },
+  photoPreview: { width: 100, height: 130, borderRadius: 10 },
+  removePhotoBtn: { position: 'absolute', top: -8, right: -8, width: 24, height: 24, borderRadius: 12, backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' },
+  removePhotoBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  paginationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 },
+  pageBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#EDE8DF', borderRadius: 8 },
+  pageBtnDisabled: { opacity: 0.4 },
+  pageBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 13 },
+  pageBtnTextDisabled: { color: '#888' },
+  pageIndicator: { fontSize: 12, color: '#888' }
 });
