@@ -76,6 +76,7 @@ An Expo-based mobile and web app that:
 - Lets users build custom foods and recipes with no paywall
 - Tracks daily calories, macros, and micronutrients
 - Logs workouts and runs HIIT / Tabata / circuit interval timers with warmup, cooldown, and repeat
+- Tracks strength training with sets, reps, weight, and progressive overload
 - Syncs health data from Apple HealthKit and Colmi smart ring via QRing
 
 ---
@@ -131,6 +132,7 @@ ltfi/
 │   ├── controllers/
 │   │   ├── aiScanController.js
 │   │   ├── authController.js
+│   │   ├── exerciseController.js
 │   │   ├── foodController.js
 │   │   ├── mealController.js
 │   │   ├── recipeController.js
@@ -140,6 +142,7 @@ ltfi/
 │   │   └── auth.js
 │   ├── models/
 │   │   ├── User.js
+│   │   ├── ExerciseLog.js
 │   │   ├── Food.js
 │   │   ├── Meal.js
 │   │   ├── Recipe.js
@@ -148,6 +151,7 @@ ltfi/
 │   ├── routes/
 │   │   ├── aiScan.js
 │   │   ├── auth.js
+│   │   ├── exercises.js
 │   │   ├── food.js
 │   │   ├── meals.js
 │   │   ├── recipes.js
@@ -195,6 +199,7 @@ ltfi/
 │   │   │   └── workout.jsx
 │   │   ├── _layout.jsx
 │   │   ├── add-food.jsx
+│   │   ├── add-to-my-foods.jsx
 │   │   ├── ai-food-scan.jsx
 │   │   ├── barcode-scanner.jsx
 │   │   ├── create-recipe.jsx
@@ -203,6 +208,7 @@ ltfi/
 │   │   ├── edit-food.jsx
 │   │   ├── edit-recipe.jsx
 │   │   ├── edit-workout.jsx
+│   │   ├── exercise-history.jsx
 │   │   ├── index.jsx
 │   │   ├── reset-password.jsx
 │   │   └── timer.jsx
@@ -227,13 +233,15 @@ ltfi/
 | _id | ObjectId | PK |
 | email | String | Unique |
 | name | String | |
-| password | String | bcrypt hashed |
+| password | String | bcrypt hashed (10 rounds) |
 | age | Number | |
 | height | Number | cm |
 | currentWeight | Number | kg |
 | goalWeight | Number | kg |
 | activityLevel | String | sedentary / light / moderate / active / very active |
 | dietPreference | String | Optional |
+| gender | String | male / female |
+| timezone | String | IANA timezone string e.g. Asia/Manila |
 | dailyCalorieGoal | Number | Auto-calculated on registration |
 | macroGoals | Object | { protein, carbs, fat } in grams |
 | avatarInitials | String | Auto-generated from name |
@@ -312,6 +320,18 @@ ltfi/
 | caloriesBurned | Number | Optional |
 | completedAt | Date | |
 
+### Exercise Log
+
+| Field | Type | Notes |
+|-------|------|-------|
+| _id | ObjectId | PK |
+| user | ObjectId | Ref: User |
+| exercise | String | Exercise name |
+| date | String | YYYY-MM-DD |
+| week | Number | Week number for progressive overload tracking |
+| sets | Array | [{ setNumber, weight, reps, notes }] |
+| notes | String | Session notes, supports URLs |
+
 ---
 
 ## MVP Feature Build Roadmap
@@ -341,6 +361,7 @@ ltfi/
 | Profile Screen | Update name, weight, goals — recalculates TDEE on save | ✅ Done |
 | Login Speed Fix | bcrypt rounds reduced from 12 to 10 for faster login | ✅ Done |
 | Cached Auth | User data cached in AsyncStorage — no backend call on startup | ✅ Done |
+| Timezone Selector | User can set their timezone in profile — used across all date calculations | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -357,49 +378,56 @@ ltfi/
 | Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ✅ Done |
 | Web Barcode Scanner | Browser-based barcode scanning via ZXing library | ✅ Done |
 | Manual Barcode Entry | Type barcode number manually with keyboard submit support | ✅ Done |
-| Barcode Back Button | Back button on barcode scanner screen | ✅ Done |
-| AI Food Photo Scan | Camera photo → Groq LLaMA Vision → food name + nutrition estimate | ✅ Done |
+| Barcode Fallback | When OFF fails, falls through to all 4 search sources | ✅ Done |
+| Global Barcode Types | Supports EAN13, EAN8, UPC, Code128, Code39, QR, ITF14, Codabar | ✅ Done |
+| AI Food Photo Scan | Camera photo → Groq LLaMA Vision → searches all food DBs for best match | ✅ Done |
 | AI Scan Image Compression | Compress image to stay under Groq 4MB base64 limit | ✅ Done |
 | Custom Food Entry | Manual entry form with unit picker (g, oz, ml, cup, tbsp, tsp, pc, serving) | ✅ Done |
 | Edit Custom Food | Edit name, macros, serving size and unit of saved custom foods | ✅ Done |
-| My Foods | View, edit, and delete custom foods from the Add Food screen | ✅ Done |
+| Add to My Foods | Add food to library without logging to a meal | ✅ Done |
+| My Foods | View, edit, search, paginate, and delete custom foods | ✅ Done |
 | My Foods in Search | Custom foods pinned to top of search results with My Food badge | ✅ Done |
+| My Foods Shortcut | Quick access to My Foods from the diary page | ✅ Done |
+| Seeded PH Foods | Jollibee, McDonald's PH, Chowking, Starbucks PH, eggs seeded to DB | ✅ Done |
 | Quantity Picker | Select serving size and auto-scale macros before adding food to diary | ✅ Done |
+| Serving/PC Unit Fix | 1 serving or 1 pc correctly maps to 100% of calories without 100g lock | ✅ Done |
 | Recipe Builder | Build a recipe from multiple ingredients with unit picker and macro scaling | ✅ Done |
 | Edit Recipe | Edit existing recipes with full ingredient unit picker and macro scaling | ✅ Done |
 | Recipes Screen | View, edit, delete, and add recipes to diary | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
-| Food Search | Search food database — USDA + Open Food Facts + Calorie API + API Ninjas + custom entries | ✅ Done |
+| Food Search | USDA + Open Food Facts + Calorie API + API Ninjas + custom entries | ✅ Done |
 | Search Ranking | Exact and partial name matches ranked above unrelated results | ✅ Done |
 | Search Deduplication | Duplicate food names across sources filtered out | ✅ Done |
-| Philippine Food Database | Seeded local DB with Jollibee, McDonald's PH, and common Filipino dishes | ✅ Done |
 
 #### 4. Nutrition Dashboard
 
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Daily Calorie Counter | Shows calories eaten vs remaining vs goal with progress bar | ✅ Done |
+| Dashboard UTC Fix | Dashboard uses local date formatting to prevent showing yesterday's data | ✅ Done |
 | Macros Tracking | Protein, carbs, fat progress bars vs goals | ✅ Done |
 | Micronutrients | Sodium, sugar, fiber breakdown per day in diary | ✅ Done |
 | Nutrition Summary | Per meal and per day breakdown | ✅ Done |
 | Progress Dashboard | Visual overview of daily and weekly nutrition | ✅ Done |
+| Weekly Calorie History | Bar chart of daily calories vs goal with Mon-Sun week navigation | ✅ Done |
 | Weekly Weight Tracker | Log weight entries and view weekly trend chart | ✅ Done |
 | Progress Chart Fix | Chart overflow clipped correctly inside card | ✅ Done |
 | Delete Weight Entries | Remove incorrect weight log entries | ✅ Done |
 | Workout Calories Deducted | Calories burned from workouts added to remaining on dashboard | ✅ Done |
 | Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it | ✅ Done |
 | Diary Focus Refresh | Diary re-fetches data every time user navigates to it | ✅ Done |
+| Progress Photos | Upload weekly progress photos, view as collage or reel | ⬜ Needs Cloudinary account |
 
 #### 5. Profile
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Profile Stats View | Shows current weight, goal weight, height, age, gender, activity level | ✅ Done |
+| Profile Stats View | Shows current weight, goal weight, height, age, gender, activity level, timezone | ✅ Done |
 | Weight Loss Plan | Shows daily deficit target, 500 kcal deficit, and estimated weeks to goal | ✅ Done |
 | Macro Formula | Updated to 25% protein / 45% carbs / 30% fat industry standard split | ✅ Done |
 | TDEE Formula | Mifflin-St Jeor with activity multiplier and gender | ✅ Done |
 | Gender Field | Male/female selector on registration and profile for accurate TDEE | ✅ Done |
-| Gender Display Fix | Gender field now displays correctly after save | ✅ Done |
+| Timezone Selector | IANA timezone picker in profile — used across all date calculations | ✅ Done |
 | Context Sync | User context updates immediately after profile save | ✅ Done |
 | Logout | Moved to Profile tab only | ✅ Done |
 
@@ -434,9 +462,13 @@ ltfi/
 | Workout Settings Screen | Preview intervals, warmup, cooldown, repeat, and select voice before starting | ✅ Done |
 | Delete Workouts | Remove saved workouts | ✅ Done |
 | Workout Page Focus Refresh | Workout list refreshes on every tab focus | ✅ Done |
-| Keep Screen Awake | Screen stays on while timer is running via expo-keep-awake | ✅ Done |
+| Keep Screen Awake | Screen stays on globally while app is open via expo-keep-awake | ✅ Done |
 | Sound Effects | Ding, beep, and chime sounds on interval transitions — Android only | ✅ Done |
 | Audio Mix Mode | Timer sounds duck background audio without interrupting it — Android only | ✅ Done |
+| Workout Timer/Tracker Tabs | Workout page split into Timer tab and Tracker tab | ✅ Done |
+| Exercise Tracker | Log sets, reps, weight per exercise with progressive overload tracking | ✅ Done |
+| Exercise Notes | Notes field per exercise session with clickable URL detection | ✅ Done |
+| Exercise History Screen | View progressive overload history per exercise | ⬜ Not built |
 | Background Timer | Timer continues running when app is backgrounded | ⬜ Deferred — requires native build |
 | iOS Sound Effects | Timer sound effects on iPhone | ⬜ Deferred — requires Apple Developer account |
 
@@ -492,8 +524,19 @@ ltfi/
 | API Response Caching | Cache utility for food search and meal data | ✅ Done |
 | Lazy Tab Loading | Tabs load on demand with lazy: true | ✅ Done |
 | Session Persistence Fix | Token only cleared on 401, not on network timeout | ✅ Done |
-| Timezone Date Fix | Diary uses local date format to prevent UTC date shift | ✅ Done |
+| Timezone Date Fix | All date formatting uses local time to prevent UTC date shift | ✅ Done |
 | iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ Deferred |
+
+---
+
+## Known Limitations
+
+| Limitation | Platform | Resolution |
+|------------|----------|------------|
+| Timer voice announcements interrupt background music | iOS | Requires Apple Developer account for native build |
+| Sound effects (ding, beep, chime) not available | iOS | Requires Apple Developer account for native build |
+| Timer pauses when app is backgrounded | iOS + Android | Requires native build |
+| Background timer | Both | Deferred — requires native build |
 
 ---
 
@@ -599,17 +642,6 @@ Users get the update silently on next app launch. No new APK download needed.
 |--------|----------|
 | preview | Internal testing and distribution |
 | production | App Store / Play Store (future) |
-
----
-
-## Known Limitations
-
-| Limitation | Platform | Resolution |
-|------------|----------|------------|
-| Timer voice announcements interrupt background music | iOS | Requires Apple Developer account for native build |
-| Sound effects (ding, beep, chime) not available | iOS | Requires Apple Developer account for native build |
-| Timer pauses when app is backgrounded | iOS + Android | Requires native build |
-| Background timer | Both | Deferred — requires native build |
 
 ---
 
