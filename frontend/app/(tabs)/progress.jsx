@@ -24,11 +24,16 @@ const localDate = (date) => {
   return `${y}-${m}-${d}`;
 };
 
-const getLast7Days = () => {
+const getWeekDays = (weekOffset = 0) => {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday + weekOffset * 7);
   const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
     days.push(localDate(d));
   }
   return days;
@@ -45,6 +50,7 @@ export default function ProgressScreen() {
   const [weeklyCalories, setWeeklyCalories] = useState([]);
   const [weeklyLoading, setWeeklyLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(null);
+  const [weekOffset, setWeekOffset] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,6 +58,11 @@ export default function ProgressScreen() {
       fetchWeeklyCalories();
     }, [])
   );
+
+  useEffect(() => {
+    fetchWeeklyCalories();
+    setSelectedDay(null);
+  }, [weekOffset]);
 
   const fetchHistory = async () => {
     try {
@@ -67,7 +78,7 @@ export default function ProgressScreen() {
   const fetchWeeklyCalories = async () => {
     setWeeklyLoading(true);
     try {
-      const days = getLast7Days();
+      const days = getWeekDays(weekOffset);
       const results = await Promise.all(
         days.map(date => api.get(`/meals/summary?date=${date}`).catch(() => ({ data: { totalCalories: 0 } })))
       );
@@ -137,7 +148,27 @@ export default function ProgressScreen() {
 
       {/* Weekly Calorie History */}
       <View style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Weekly Calories</Text>
+        <View style={styles.weekNav}>
+            <TouchableOpacity onPress={() => setWeekOffset(prev => prev - 1)} style={styles.weekNavBtn}>
+              <Text style={styles.weekNavText}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.chartTitle}>
+              {(() => {
+                const days = getWeekDays(weekOffset);
+                const start = new Date(days[0] + 'T12:00:00');
+                const end = new Date(days[6] + 'T12:00:00');
+                return weekOffset === 0 ? 'This Week' :
+                  `${start.toLocaleDateString('en', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en', { month: 'short', day: 'numeric' })}`;
+              })()}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setWeekOffset(prev => Math.min(prev + 1, 0))}
+              style={[styles.weekNavBtn, weekOffset === 0 && styles.weekNavBtnDisabled]}
+              disabled={weekOffset === 0}
+            >
+              <Text style={[styles.weekNavText, weekOffset === 0 && { color: '#ccc' }]}>›</Text>
+            </TouchableOpacity>
+          </View>
         {weeklyLoading ? (
           <ActivityIndicator color="#F77E2D" />
         ) : (
@@ -298,7 +329,11 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 18, fontWeight: '800', color: '#F77E2D' },
   statLabel: { fontSize: 11, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
   chartCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 24 },
-  chartTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A', marginBottom: 16 },
+  chartTitle: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
+  weekNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  weekNavBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
+  weekNavBtnDisabled: { opacity: 0.3 },
+  weekNavText: { fontSize: 24, color: '#F77E2D', fontWeight: '700' },
   barChart: { flexDirection: 'row', alignItems: 'flex-end', height: 140, marginBottom: 8, gap: 4 },
   barCol: { flex: 1, alignItems: 'center' },
   barWrapper: { width: '100%', height: 120, justifyContent: 'flex-end', position: 'relative' },
