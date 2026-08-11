@@ -67,7 +67,7 @@ const getMe = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, currentWeight, goalWeight, height, age, activityLevel, dietPreference, gender } = req.body;
+    const { name, currentWeight, goalWeight, height, age, activityLevel, dietPreference, gender, timezone } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -78,7 +78,7 @@ const updateProfile = async (req, res) => {
     if (age) user.age = age;
     if (activityLevel) user.activityLevel = activityLevel;
     if (dietPreference !== undefined) user.dietPreference = dietPreference;
-    if (gender) user.gender = gender;
+    if (timezone) user.timezone = timezone;
 
     const dailyCalorieGoal = calculateTDEE({
       age: user.age,

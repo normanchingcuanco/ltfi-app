@@ -6,6 +6,22 @@ import api from '../../src/utils/api';
 
 const ACTIVITY_LEVELS = ['sedentary', 'light', 'moderate', 'active', 'very active'];
 
+const COMMON_TIMEZONES = [
+  'Asia/Manila', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai',
+  'Asia/Dubai', 'Asia/Kolkata', 'Europe/London', 'Europe/Paris',
+  'Europe/Berlin', 'America/New_York', 'America/Chicago',
+  'America/Denver', 'America/Los_Angeles', 'America/Sao_Paulo',
+  'Australia/Sydney', 'Pacific/Auckland'
+];
+
+const getDeviceTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'Asia/Manila';
+  }
+};
+
 export default function ProfileScreen() {
   const { user, logout, updateUser } = useAuth();
   const router = useRouter();
@@ -19,7 +35,8 @@ export default function ProfileScreen() {
     age: '',
     activityLevel: 'sedentary',
     dietPreference: '',
-    gender: 'male'
+    gender: 'male',
+    timezone: ''
   });
 
   useEffect(() => {
@@ -32,7 +49,8 @@ export default function ProfileScreen() {
         age: user.age?.toString() || '',
         activityLevel: user.activityLevel || 'sedentary',
         dietPreference: user.dietPreference || '',
-        gender: user.gender || 'male'
+        gender: user.gender || 'male',
+        timezone: user.timezone || getDeviceTimezone()
       });
     }
   }, [user]);
@@ -53,7 +71,8 @@ export default function ProfileScreen() {
         age: parseInt(form.age),
         activityLevel: form.activityLevel,
         dietPreference: form.dietPreference,
-        gender: form.gender
+        gender: form.gender,
+        timezone: form.timezone || getDeviceTimezone()
       });
       updateUser(res.data);
       setEditing(false);
@@ -85,9 +104,7 @@ export default function ProfileScreen() {
           <Text style={styles.cardLabel}>Weight Loss Plan</Text>
           <View style={styles.deficitRow}>
             <View style={styles.deficitItem}>
-              <Text style={styles.deficitValue}>
-                {Math.max(user.dailyCalorieGoal - 500, 1200)} kcal
-              </Text>
+              <Text style={styles.deficitValue}>{Math.max(user.dailyCalorieGoal - 500, 1200)} kcal</Text>
               <Text style={styles.deficitLabel}>Daily Target</Text>
             </View>
             <View style={styles.deficitItem}>
@@ -95,15 +112,11 @@ export default function ProfileScreen() {
               <Text style={styles.deficitLabel}>Daily Deficit</Text>
             </View>
             <View style={styles.deficitItem}>
-              <Text style={styles.deficitValue}>
-                {Math.ceil((user.currentWeight - user.goalWeight) / 0.5)} wks
-              </Text>
+              <Text style={styles.deficitValue}>{Math.ceil((user.currentWeight - user.goalWeight) / 0.5)} wks</Text>
               <Text style={styles.deficitLabel}>Est. to Goal</Text>
             </View>
           </View>
-          <Text style={styles.deficitNote}>
-            Based on 500 kcal/day deficit · 0.5 kg/week loss
-          </Text>
+          <Text style={styles.deficitNote}>Based on 500 kcal/day deficit · 0.5 kg/week loss</Text>
         </View>
       )}
 
@@ -142,24 +155,24 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>Age</Text>
             </View>
           </View>
-
           <View style={styles.activityCard}>
             <Text style={styles.cardLabel}>Gender</Text>
             <Text style={styles.activityValue}>{user?.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Not set'}</Text>
           </View>
-
           <View style={styles.activityCard}>
             <Text style={styles.cardLabel}>Activity Level</Text>
             <Text style={styles.activityValue}>{user?.activityLevel}</Text>
           </View>
-
+          <View style={styles.activityCard}>
+            <Text style={styles.cardLabel}>Timezone</Text>
+            <Text style={styles.activityValue}>{user?.timezone || getDeviceTimezone()}</Text>
+          </View>
           {user?.dietPreference ? (
             <View style={styles.activityCard}>
               <Text style={styles.cardLabel}>Diet Preference</Text>
               <Text style={styles.activityValue}>{user?.dietPreference}</Text>
             </View>
           ) : null}
-
           <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
             <Text style={styles.editBtnText}>Edit Profile</Text>
           </TouchableOpacity>
@@ -187,7 +200,6 @@ export default function ProfileScreen() {
               />
             </View>
           ))}
-
           <Text style={styles.fieldLabel}>Gender</Text>
           <View style={styles.pills}>
             {['male', 'female'].map(g => (
@@ -202,7 +214,18 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             ))}
           </View>
-
+          <Text style={styles.fieldLabel}>Timezone</Text>
+          <View style={styles.pills}>
+            {COMMON_TIMEZONES.map(tz => (
+              <TouchableOpacity
+                key={tz}
+                style={[styles.pill, form.timezone === tz && styles.pillActive]}
+                onPress={() => setForm({ ...form, timezone: tz })}
+              >
+                <Text style={[styles.pillText, form.timezone === tz && styles.pillTextActive]}>{tz}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <Text style={styles.fieldLabel}>Activity Level</Text>
           <View style={styles.pills}>
             {ACTIVITY_LEVELS.map(level => (
@@ -215,7 +238,6 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             ))}
           </View>
-
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={loading}>
             <Text style={styles.saveBtnText}>{loading ? 'Saving...' : 'Save Changes'}</Text>
           </TouchableOpacity>

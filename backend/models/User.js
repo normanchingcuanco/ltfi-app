@@ -23,7 +23,8 @@ const userSchema = new mongoose.Schema({
   },
   avatarInitials: { type: String },
   resetToken: { type: String },
-  resetTokenExpiry: { type: Date }
+  resetTokenExpiry: { type: Date },
+  timezone: { type: String, default: '' }
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {
