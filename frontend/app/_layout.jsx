@@ -1,4 +1,4 @@
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
@@ -25,7 +25,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <WarmUpBackend />
       <AuthProvider>
-        <Slot />
+        <Stack screenOptions={{ headerShown: false }} />
       </AuthProvider>
     </SafeAreaProvider>
   );

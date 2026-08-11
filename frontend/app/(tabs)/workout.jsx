@@ -38,6 +38,7 @@ export default function WorkoutScreen() {
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [newSet, setNewSet] = useState({ weight: '', reps: '' });
   const [exerciseNotes, setExerciseNotes] = useState({});
+  const [notesEditing, setNotesEditing] = useState({});
   const notesTimers = useRef({});
   const router = useRouter();
 
@@ -89,26 +90,53 @@ export default function WorkoutScreen() {
     }
   };
 
-  const saveNotes = (exercise, value) => {
+  const persistNotes = async (exercise, value) => {
+    const logs = exerciseLogs[exercise] || [];
+    const todayLog = logs.find(l => l.date === localDate());
+    try {
+      await api.post('/exercises', {
+        exercise,
+        date: localDate(),
+        week: getCurrentWeek(),
+        sets: todayLog?.sets || [],
+        notes: value
+      });
+      fetchExerciseLogs(exercise);
+      fetchExercises();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const scheduleNotesSave = (exercise, value) => {
     setExerciseNotes(prev => ({ ...prev, [exercise]: value }));
     if (notesTimers.current[exercise]) clearTimeout(notesTimers.current[exercise]);
-    notesTimers.current[exercise] = setTimeout(async () => {
-      const logs = exerciseLogs[exercise] || [];
-      const todayLog = logs.find(l => l.date === localDate());
-      try {
-        await api.post('/exercises', {
-          exercise,
-          date: localDate(),
-          week: getCurrentWeek(),
-          sets: todayLog?.sets || [],
-          notes: value
-        });
-        fetchExerciseLogs(exercise);
-        fetchExercises();
-      } catch (err) {
-        console.error(err);
-      }
+    notesTimers.current[exercise] = setTimeout(() => {
+      persistNotes(exercise, value);
     }, 800);
+  };
+
+  const flushNotesSave = (exercise) => {
+    if (notesTimers.current[exercise]) {
+      clearTimeout(notesTimers.current[exercise]);
+      notesTimers.current[exercise] = null;
+    }
+    const value = exerciseNotes[exercise];
+    if (value !== undefined) persistNotes(exercise, value);
+    setNotesEditing(prev => ({ ...prev, [exercise]: false }));
+  };
+
+  const renderNotesWithLinks = (text) => {
+    const parts = text.split(/(https?:\/\/[^\s]+)/g);
+    return parts.map((part, i) =>
+      /^https?:\/\//.test(part) ? (
+        <Text key={i} style={styles.linkText} onPress={() => Linking.openURL(part)}>
+          {part}
+        </Text>
+      ) : (
+        <Text key={i}>{part}</Text>
+      )
+    );
   };
 
   const addSet = async (exercise) => {
@@ -324,25 +352,37 @@ export default function WorkoutScreen() {
                           <Text style={styles.addSetBtnText}>+ Add</Text>
                         </TouchableOpacity>
                       </View>
-                      <TextInput
-                        style={styles.notesInput}
-                        placeholder="Notes, links, video URLs..."
-                        placeholderTextColor="#999"
-                        multiline
-                        value={exerciseNotes[ex.exercise] !== undefined ? exerciseNotes[ex.exercise] : (todayLog?.notes || '')}
-                        onChangeText={v => saveNotes(ex.exercise, v)}
-                      />
-                      {(exerciseNotes[ex.exercise] || todayLog?.notes || '').match(/https?:\/\/[^\s]+/) && (
-                        <TouchableOpacity
-                          style={styles.linkBtn}
-                          onPress={() => {
-                            const url = (exerciseNotes[ex.exercise] || todayLog?.notes || '').match(/https?:\/\/[^\s]+/)[0];
-                            Linking.openURL(url);
-                          }}
-                        >
-                          <Text style={styles.linkBtnText}>🔗 Open Link</Text>
-                        </TouchableOpacity>
-                      )}
+                      {(() => {
+                        const currentNote = exerciseNotes[ex.exercise] !== undefined
+                          ? exerciseNotes[ex.exercise]
+                          : (todayLog?.notes || '');
+                        const isEditing = notesEditing[ex.exercise] ?? currentNote === '';
+
+                        if (isEditing) {
+                          return (
+                            <TextInput
+                              style={styles.notesInput}
+                              placeholder="Notes, links, video URLs..."
+                              placeholderTextColor="#999"
+                              multiline
+                              autoFocus
+                              value={currentNote}
+                              onChangeText={v => scheduleNotesSave(ex.exercise, v)}
+                              onBlur={() => flushNotesSave(ex.exercise)}
+                            />
+                          );
+                        }
+                        return (
+                          <TouchableOpacity
+                            style={styles.notesDisplay}
+                            onPress={() => setNotesEditing(prev => ({ ...prev, [ex.exercise]: true }))}
+                          >
+                            <Text style={styles.notesDisplayText}>
+                              {renderNotesWithLinks(currentNote)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })()}
                       <TouchableOpacity style={styles.historyBtn} onPress={() => router.push({ pathname: '/exercise-history', params: { exercise: ex.exercise } })}>
                         <Text style={styles.historyBtnText}>View History</Text>
                       </TouchableOpacity>
@@ -410,6 +450,7 @@ const styles = StyleSheet.create({
   historyBtn: { marginTop: 10, borderWidth: 1, borderColor: '#F77E2D', borderRadius: 8, padding: 10, alignItems: 'center' },
   historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 },
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 60, textAlignVertical: 'top' },
-  linkBtn: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, alignItems: 'center', marginTop: 6 },
-  linkBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 }
+  notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, marginTop: 10, minHeight: 60 },
+  notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
+  linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' }
 });
