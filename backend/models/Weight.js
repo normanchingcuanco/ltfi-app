@@ -5,6 +5,7 @@ const weightSchema = new mongoose.Schema({
   weight: { type: Number, required: true },
   notes: { type: String },
   photoUrl: { type: String },
+  photoPublicId: { type: String },
   loggedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 

@@ -1,14 +1,16 @@
 const Weight = require('../models/Weight');
+const { deleteCloudinaryImage } = require('../utils/cloudinary');
 
 const logWeight = async (req, res) => {
   try {
-    const { weight, notes, loggedAt, photoUrl } = req.body;
+    const { weight, notes, loggedAt, photoUrl, photoPublicId } = req.body;
 
     const entry = await Weight.create({
       user: req.user._id,
       weight,
       notes,
       photoUrl,
+      photoPublicId,
       loggedAt: loggedAt || Date.now()
     });
 
@@ -34,6 +36,10 @@ const deleteWeightEntry = async (req, res) => {
   try {
     const entry = await Weight.findOne({ _id: req.params.id, user: req.user._id });
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
+
+    if (entry.photoPublicId) {
+      await deleteCloudinaryImage(entry.photoPublicId);
+    }
 
     await entry.deleteOne();
     res.json({ message: 'Entry deleted' });
