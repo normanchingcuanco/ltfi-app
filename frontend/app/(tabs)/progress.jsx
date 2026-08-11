@@ -201,8 +201,11 @@ export default function ProgressScreen() {
   const latest = history[history.length - 1];
   const first = history[0];
   const change = latest && first ? (latest.weight - first.weight).toFixed(1) : null;
-  const maxWeight = history.length ? Math.max(...history.map(e => e.weight)) : 0;
-  const minWeight = history.length ? Math.min(...history.map(e => e.weight)) : 0;
+  const fourWeeksAgo = new Date();
+  fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+  const chartHistory = history.filter(e => new Date(e.loggedAt) >= fourWeeksAgo);
+  const maxWeight = chartHistory.length ? Math.max(...chartHistory.map(e => e.weight)) : 0;
+  const minWeight = chartHistory.length ? Math.min(...chartHistory.map(e => e.weight)) : 0;
   const range = maxWeight - minWeight || 1;
   const chartHeight = 160;
   const dotRadius = 5;
@@ -287,21 +290,21 @@ export default function ProgressScreen() {
           </View>
 
           <View style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Weight Trend</Text>
+            <Text style={styles.chartTitle}>Weight Trend (Last 4 Weeks)</Text>
             <View style={[styles.chart, { overflow: 'hidden' }]}>
-              {history.length > 1 && history.map((entry, idx) => {
+              {chartHistory.length > 1 && chartHistory.map((entry, idx) => {
                 if (idx === 0) return null;
-                const prev = history[idx - 1];
-                const x1 = ((idx - 1) / Math.max(history.length - 1, 1)) * screenWidth;
+                const prev = chartHistory[idx - 1];
+                const x1 = ((idx - 1) / Math.max(chartHistory.length - 1, 1)) * screenWidth;
                 const y1 = chartHeight - ((prev.weight - minWeight) / range) * (chartHeight - dotRadius * 2) - dotRadius;
-                const x2 = (idx / Math.max(history.length - 1, 1)) * screenWidth;
+                const x2 = (idx / Math.max(chartHistory.length - 1, 1)) * screenWidth;
                 const y2 = chartHeight - ((entry.weight - minWeight) / range) * (chartHeight - dotRadius * 2) - dotRadius;
                 const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
                 const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
                 return <View key={`line-${idx}`} style={[styles.line, { left: x1, top: y1, width: length, transform: [{ rotate: `${angle}deg` }] }]} />;
               })}
-              {history.map((entry, idx) => {
-                const x = (idx / Math.max(history.length - 1, 1)) * screenWidth;
+              {chartHistory.map((entry, idx) => {
+                const x = (idx / Math.max(chartHistory.length - 1, 1)) * screenWidth;
                 const y = chartHeight - ((entry.weight - minWeight) / range) * (chartHeight - dotRadius * 2) - dotRadius;
                 return <View key={idx} style={[styles.dot, { left: x - dotRadius, top: y - dotRadius }]} />;
               })}
