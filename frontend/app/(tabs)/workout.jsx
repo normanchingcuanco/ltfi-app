@@ -36,7 +36,7 @@ export default function WorkoutScreen() {
   const [showNewExercise, setShowNewExercise] = useState(false);
   const [expandedExercise, setExpandedExercise] = useState(null);
   const [exerciseLogs, setExerciseLogs] = useState({});
-  const [newSet, setNewSet] = useState({ sets: '1', weight: '', reps: '' });
+  const [pendingSets, setPendingSets] = useState({});
   const [exerciseNotes, setExerciseNotes] = useState({});
   const [notesEditing, setNotesEditing] = useState({});
   const notesTimers = useRef({});
@@ -139,17 +139,37 @@ export default function WorkoutScreen() {
     );
   };
 
-  const addSet = async (exercise) => {
+  const addRow = (exercise) => {
+    setPendingSets(prev => ({
+      ...prev,
+      [exercise]: [...(prev[exercise] || []), { weight: '', reps: '' }]
+    }));
+  };
+
+  const updateRow = (exercise, idx, field, value) => {
+    setPendingSets(prev => ({
+      ...prev,
+      [exercise]: prev[exercise].map((row, i) => i === idx ? { ...row, [field]: value } : row)
+    }));
+  };
+
+  const removeRow = (exercise, idx) => {
+    setPendingSets(prev => ({
+      ...prev,
+      [exercise]: prev[exercise].filter((_, i) => i !== idx)
+    }));
+  };
+
+  const saveSets = async (exercise) => {
+    const rows = pendingSets[exercise] || [];
+    if (rows.length === 0) return;
     const logs = exerciseLogs[exercise] || [];
     const todayLog = logs.find(l => l.date === localDate());
     const existingSets = todayLog?.sets || [];
-    const count = parseInt(newSet.sets) || 1;
-    const weight = parseFloat(newSet.weight) || 0;
-    const reps = parseInt(newSet.reps) || 0;
-    const addedSets = Array.from({ length: count }, (_, i) => ({
+    const addedSets = rows.map((row, i) => ({
       setNumber: existingSets.length + i + 1,
-      weight,
-      reps
+      weight: parseFloat(row.weight) || 0,
+      reps: parseInt(row.reps) || 0
     }));
     const newSets = [...existingSets, ...addedSets];
     try {
@@ -160,7 +180,7 @@ export default function WorkoutScreen() {
         sets: newSets,
         notes: exerciseNotes[exercise] || ''
       });
-      setNewSet({ sets: '1', weight: '', reps: '' });
+      setPendingSets(prev => ({ ...prev, [exercise]: [] }));
       fetchExerciseLogs(exercise);
       fetchExercises();
     } catch (err) {
@@ -335,34 +355,38 @@ export default function WorkoutScreen() {
                           ))}
                         </>
                       )}
-                      <View style={styles.addSetRow}>
-                        <TextInput
-                          style={styles.setInput}
-                          placeholder="sets"
-                          placeholderTextColor="#999"
-                          keyboardType="numeric"
-                          value={newSet.sets}
-                          onChangeText={v => setNewSet(prev => ({ ...prev, sets: v }))}
-                        />
-                        <TextInput
-                          style={styles.setInput}
-                          placeholder="kg"
-                          placeholderTextColor="#999"
-                          keyboardType="numeric"
-                          value={newSet.weight}
-                          onChangeText={v => setNewSet(prev => ({ ...prev, weight: v }))}
-                        />
-                        <TextInput
-                          style={styles.setInput}
-                          placeholder="reps"
-                          placeholderTextColor="#999"
-                          keyboardType="numeric"
-                          value={newSet.reps}
-                          onChangeText={v => setNewSet(prev => ({ ...prev, reps: v }))}
-                        />
-                        <TouchableOpacity style={styles.addSetBtn} onPress={() => addSet(ex.exercise)}>
-                          <Text style={styles.addSetBtnText}>+ Add</Text>
+                      {(pendingSets[ex.exercise] || []).map((row, ridx) => (
+                        <View key={ridx} style={styles.addSetRow}>
+                          <TextInput
+                            style={styles.setInput}
+                            placeholder="kg"
+                            placeholderTextColor="#999"
+                            keyboardType="numeric"
+                            value={row.weight}
+                            onChangeText={v => updateRow(ex.exercise, ridx, 'weight', v)}
+                          />
+                          <TextInput
+                            style={styles.setInput}
+                            placeholder="reps"
+                            placeholderTextColor="#999"
+                            keyboardType="numeric"
+                            value={row.reps}
+                            onChangeText={v => updateRow(ex.exercise, ridx, 'reps', v)}
+                          />
+                          <TouchableOpacity onPress={() => removeRow(ex.exercise, ridx)}>
+                            <Text style={styles.removeRowText}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      <View style={styles.rowActions}>
+                        <TouchableOpacity style={styles.addRowBtn} onPress={() => addRow(ex.exercise)}>
+                          <Text style={styles.addRowBtnText}>+ Add Row</Text>
                         </TouchableOpacity>
+                        {(pendingSets[ex.exercise] || []).length > 0 && (
+                          <TouchableOpacity style={styles.saveSetsBtn} onPress={() => saveSets(ex.exercise)}>
+                            <Text style={styles.saveSetsBtnText}>Save Sets</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                       {(() => {
                         const currentNote = exerciseNotes[ex.exercise] !== undefined
@@ -457,8 +481,12 @@ const styles = StyleSheet.create({
   setVal: { flex: 1, fontSize: 13, color: '#1A1A1A', fontWeight: '600' },
   addSetRow: { flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' },
   setInput: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 14, color: '#1A1A1A', textAlign: 'center' },
-  addSetBtn: { backgroundColor: '#F77E2D', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 10 },
-  addSetBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  removeRowText: { color: '#888', fontSize: 16, paddingHorizontal: 6 },
+  rowActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  addRowBtn: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  addRowBtnText: { color: '#1A1A1A', fontWeight: '700', fontSize: 13 },
+  saveSetsBtn: { flex: 1, backgroundColor: '#F77E2D', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  saveSetsBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   historyBtn: { marginTop: 10, borderWidth: 1, borderColor: '#F77E2D', borderRadius: 8, padding: 10, alignItems: 'center' },
   historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 },
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 60, textAlignVertical: 'top' },
