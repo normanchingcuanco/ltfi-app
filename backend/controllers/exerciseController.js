@@ -64,4 +64,14 @@ const deleteExerciseLog = async (req, res) => {
   }
 };
 
-module.exports = { getExercises, getExerciseLogs, logExercise, deleteExerciseLog };
+const deleteExerciseByName = async (req, res) => {
+  try {
+    const { exercise } = req.params;
+    await ExerciseLog.deleteMany({ user: req.user._id, exercise });
+    res.json({ message: 'Exercise deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports = { getExercises, getExerciseLogs, logExercise, deleteExerciseLog, deleteExerciseByName };
