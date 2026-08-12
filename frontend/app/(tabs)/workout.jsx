@@ -188,7 +188,29 @@ export default function WorkoutScreen() {
     }
   };
 
-  const createExercise = async () => {
+  const deleteExercise = (exercise) => {
+      confirmDelete(async () => {
+        try {
+          await api.delete(`/exercises/by-name/${encodeURIComponent(exercise)}`);
+          setExercises(prev => prev.filter(e => e.exercise !== exercise));
+        } catch (err) {
+          console.error(err);
+        }
+      });
+    };
+
+    const deleteExercise = (exercise) => {
+        confirmDelete(async () => {
+          try {
+            await api.delete(`/exercises/by-name/${encodeURIComponent(exercise)}`);
+            setExercises(prev => prev.filter(e => e.exercise !== exercise));
+          } catch (err) {
+            console.error(err);
+          }
+        });
+      };
+
+      const createExercise = async () => {
     if (!newExerciseName.trim()) return;
     try {
       await api.post('/exercises', {
@@ -323,7 +345,12 @@ export default function WorkoutScreen() {
                   <TouchableOpacity onPress={() => toggleExercise(ex.exercise)}>
                     <View style={styles.exerciseHeader}>
                       <Text style={styles.exerciseName}>{ex.exercise}</Text>
-                      <Text style={styles.exerciseDate}>Week {ex.week || getCurrentWeek()}</Text>
+                      <View style={styles.exerciseHeaderRight}>
+                        <Text style={styles.exerciseDate}>Week {ex.week || getCurrentWeek()}</Text>
+                        <TouchableOpacity onPress={() => deleteExercise(ex.exercise)}>
+                          <Text style={styles.deleteExerciseText}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <View style={styles.exerciseBadges}>
                       <View style={styles.badge}>
@@ -468,7 +495,10 @@ const styles = StyleSheet.create({
   exerciseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   exerciseName: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
   exerciseDate: { fontSize: 12, color: '#888' },
-  exerciseBadges: { flexDirection: 'row', gap: 8 },
+  exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  deleteExerciseText: { color: '#888', fontSize: 14, fontWeight: '700' },
+  exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  deleteExerciseText: { color: '#888', fontSize: 14, fontWeight: '700' },  exerciseBadges: { flexDirection: 'row', gap: 8 },
   badge: { backgroundColor: '#EDE8DF', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, color: '#888', fontWeight: '600' },
   badgeGreen: { backgroundColor: '#E8F5E9' },

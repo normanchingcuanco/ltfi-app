@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { getExercises, getExerciseLogs, logExercise, deleteExerciseLog } = require('../controllers/exerciseController');
+const { getExercises, getExerciseLogs, logExercise, deleteExerciseLog, deleteExerciseByName } = require('../controllers/exerciseController');
 const { protect } = require('../middleware/auth');
 router.use(protect);
 router.get('/', getExercises);
 router.get('/:exercise', getExerciseLogs);
 router.post('/', logExercise);
+router.delete('/by-name/:exercise', deleteExerciseByName);
 router.delete('/:id', deleteExerciseLog);
 module.exports = router;
