@@ -192,9 +192,10 @@ Estimate values per 100g serving. If multiple foods are visible, return the prim
     });
 
     const text = response.choices[0].message.content.trim();
-    const clean = text.replace(/```json|```/g, '').trim();
+    const withoutThink = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const clean = withoutThink.replace(/```json|```/g, '').trim();
     const aiFood = JSON.parse(clean);
-
+    
     // Search all sources using the AI-identified food name
     const allResults = await searchAllSources(aiFood.name);
     const deduplicated = deduplicateResults(allResults);
