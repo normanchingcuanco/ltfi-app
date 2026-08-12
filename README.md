@@ -46,7 +46,7 @@ Current free services in use:
 - USDA FoodData Central — completely free, no key required
 - Calorie API — free tier, 1,000 calls/month, no credit card
 - API Ninjas Nutrition API — free tier, no credit card
-- Groq API — free tier with generous limits for LLaMA vision
+- Groq API — free tier with generous limits for vision models
 - Cloudinary — free tier (25GB storage, 25GB bandwidth/month, includes Admin API for deletes)
 - Gmail SMTP — free via app password
 - Expo — free for development and EAS free tier builds
@@ -75,7 +75,7 @@ This app solves that.
 An Expo-based mobile and web app that:
 - Tracks food intake via barcode scanning and AI food photo recognition
 - Lets users build custom foods and recipes with no paywall
-- Tracks daily calories, macros, and micronutrients
+- Tracks daily calories, macros, and micronutrients, with daily and weekly dashboard views
 - Logs workouts and runs HIIT / Tabata / circuit interval timers with warmup, cooldown, and repeat
 - Tracks strength training with sets, reps, weight, and progressive overload
 - Logs body weight with optional progress photos, stored on Cloudinary
@@ -102,7 +102,7 @@ An Expo-based mobile and web app that:
 | Frontend (Web) | https://ltfi-app.vercel.app |
 | Backend | https://ltfi-backend.onrender.com |
 | Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/00d76ff8-779a-4837-92d0-6bacdad57ffe |
-| iOS Native Build | Deferred — requires Apple Developer account ($99/yr) |
+| iOS Native Build | On hold — requires Apple Developer account ($99/yr) |
 
 ---
 
@@ -115,7 +115,7 @@ An Expo-based mobile and web app that:
 | Database | MongoDB Atlas (free tier) | Free |
 | Auth | JWT + Email/Password | Free |
 | Food Data | USDA + Open Food Facts + Calorie API + API Ninjas | Free |
-| AI Food Scanning | Groq API — LLaMA Vision (free tier) | Free |
+| AI Food Scanning | Groq API — Qwen 3.6 27B vision model (free tier) | Free |
 | Image Hosting | Cloudinary (free tier, unsigned upload preset + Admin API delete) | Free |
 | Email | Gmail SMTP via Nodemailer | Free |
 | Health Data | Apple HealthKit (deferred) | Free |
@@ -161,7 +161,8 @@ ltfi/
 │   │   ├── weight.js
 │   │   └── workouts.js
 │   ├── scripts/
-│   │   └── seedPhilippineFoods.js
+│   │   ├── seedPhilippineFoods.js
+│   │   └── backfillMyFoods.js
 │   ├── utils/
 │   │   ├── calorieCalculator.js
 │   │   ├── cloudinary.js
@@ -279,7 +280,7 @@ ltfi/
 | sugar | Number | |
 | servingSize | Number | Default 100 |
 | servingUnit | String | g / oz / ml / cup / tbsp / tsp / pc / serving |
-| source | String | usda / open_food_facts / calorie_api / api_ninjas / ai_scan / custom / local |
+| source | String | open_food_facts / ai_scan / custom |
 | createdBy | ObjectId | Ref: User — null if from public DB |
 
 ### Recipe
@@ -352,7 +353,7 @@ ltfi/
 | Backend Server Setup | Express app with helmet, morgan, rate limiting | ✅ Done |
 | MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ✅ Done |
 | Environment Config | .env for DB URI, JWT secret, Groq API key, Cloudinary keys, email, frontend URL | ✅ Done |
-| Rate Limit Tuning | Raised global limit from 100 to 500 req/15min, health checks excluded | ✅ Done |
+| Rate Limit Tuning | Raised global limit from 100 to 500 req/15min, health checks excluded — fixes false "data lost" symptoms caused by 429s on multi-request screens | ✅ Done |
 
 #### 2. Authentication
 
@@ -382,13 +383,17 @@ ltfi/
 | Date Navigation | Navigate to any past or future date in the diary | ✅ Done |
 | Timezone Fix | Diary uses local date formatting to prevent UTC date shift | ✅ Done |
 | Copy Previous Day | Copy all meals from previous day to current date | ✅ Done |
-| Barcode Scanner | Camera-based barcode scan via Open Food Facts API | ✅ Done |
+| Barcode Scanner | Camera-based barcode scan via Open Food Facts API — creates a Food doc automatically, appears in My Foods | ✅ Done |
 | Web Barcode Scanner | Browser-based barcode scanning via ZXing library | ✅ Done |
 | Manual Barcode Entry | Type barcode number manually with keyboard submit support | ✅ Done |
 | Barcode Fallback | When OFF fails, falls through to all 4 search sources | ✅ Done |
 | Global Barcode Types | Supports EAN13, EAN8, UPC, Code128, Code39, QR, ITF14, Codabar | ✅ Done |
-| AI Food Photo Scan | Camera photo → Groq LLaMA Vision → searches all food DBs for best match | ✅ Done |
-| AI Scan Image Compression | Compress image to stay under Groq 4MB base64 limit | ✅ Done |
+| AI Food Photo Scan | Camera photo → Groq Qwen 3.6 27B vision model → searches all food DBs for best match | ✅ Done |
+| AI Scan Vision Model | Switched from deprecated `meta-llama/llama-4-scout-17b-16e-instruct` to `qwen/qwen3.6-27b`, Groq's current vision model | ✅ Done |
+| AI Scan Thinking-Tag Strip | Qwen returns `<think>` reasoning blocks before the JSON payload — stripped before parsing to prevent scan failures | ✅ Done |
+| AI Scan Image Compression | Compress image to stay under Groq's base64 payload limit | ✅ Done |
+| AI Scan Saves to My Foods | AI-scanned results now create a Food doc automatically, matching barcode behavior | ✅ Done |
+| My Foods Backfill Script | One-time script (`backend/scripts/backfillMyFoods.js`) that scans historical meal logs and creates missing Food docs for any food that was logged before the AI Scan → My Foods fix existed | ✅ Done |
 | Custom Food Entry | Manual entry form with unit picker (g, oz, ml, cup, tbsp, tsp, pc, serving) | ✅ Done |
 | Edit Custom Food | Edit name, macros, serving size and unit of saved custom foods | ✅ Done |
 | Add to My Foods | Add food to library without logging to a meal | ✅ Done |
@@ -399,7 +404,7 @@ ltfi/
 | Quantity Picker | Select serving size and auto-scale macros before adding food to diary | ✅ Done |
 | Serving/PC Unit Fix | 1 serving or 1 pc correctly maps to 100% of calories without 100g lock | ✅ Done |
 | Recipe Builder | Build a recipe from multiple ingredients with unit picker and macro scaling | ✅ Done |
-| Edit Recipe | Edit existing recipes with full ingredient unit picker and macro scaling | ✅ Done |
+| Edit Recipe | Full edit screen (`edit-recipe.jsx`) — loads existing recipe, converts logged macros back to per-100g base values for correct unit/quantity rescaling, saves via `PUT /recipes/:id` | ✅ Done |
 | Recipes Screen | View, edit, delete, and add recipes to diary | ✅ Done |
 | Multi-day Food Logging | Log same food across multiple days | ✅ Done |
 | Food Search | USDA + Open Food Facts + Calorie API + API Ninjas + custom entries | ✅ Done |
@@ -412,7 +417,9 @@ ltfi/
 |---------|-------------|--------|
 | Daily Calorie Counter | Shows calories eaten vs remaining vs goal with progress bar | ✅ Done |
 | Dashboard UTC Fix | Dashboard uses local date formatting to prevent showing yesterday's data | ✅ Done |
-| Macros Tracking | Protein, carbs, fat progress bars vs goals | ✅ Done |
+| Dashboard Daily/Weekly Toggle | Segmented toggle switches the calorie/macro card between today's numbers and a 7-day daily average | ✅ Done |
+| Dashboard Date Navigation | Prev/next arrows step through past days in Daily mode or past weeks in Weekly mode — capped at today / current week | ✅ Done |
+| Macros Tracking | Protein, carbs, fat progress bars vs goals, both daily and weekly-average views | ✅ Done |
 | Micronutrients | Sodium, sugar, fiber breakdown per day in diary | ✅ Done |
 | Nutrition Summary | Per meal and per day breakdown | ✅ Done |
 | Progress Dashboard | Visual overview of daily and weekly nutrition | ✅ Done |
@@ -427,7 +434,7 @@ ltfi/
 | Show/Hide Photos Toggle | Photos hidden by default behind a lock icon, toggle to reveal | ✅ Done |
 | Progress Photo Cleanup | Deleting a weight entry also deletes its photo from Cloudinary via Admin API | ✅ Done — applies to entries logged after this fix; earlier entries lack the stored public_id |
 | Workout Calories Deducted | Calories burned from workouts added to remaining on dashboard | ✅ Done |
-| Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it | ✅ Done |
+| Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it, and on day/week offset change | ✅ Done |
 | Diary Focus Refresh | Diary re-fetches data every time user navigates to it | ✅ Done |
 
 #### 5. Profile
@@ -483,9 +490,10 @@ ltfi/
 | Exercise Notes Auto-Save | Notes save automatically 800ms after typing stops, independent of logging a set | ✅ Done |
 | Exercise Notes Inline Links | Saved notes render as plain text with URLs shown as tappable, underlined hyperlinks; tap the note to re-enter edit mode | ✅ Done |
 | Exercise History Screen | View progressive overload history per exercise — all-time best weight, per-session volume, PR badge, delete individual logs | ✅ Done |
+| Delete Exercise | ✕ button on each exercise card deletes the exercise and all its logged history via `DELETE /exercises/by-name/:exercise` | ✅ Done |
 | Back Navigation Fix | Root layout switched from Slot to Stack so pushed screens (e.g. exercise history) correctly pop back to the previous tab instead of resetting to Home | ✅ Done |
-| Background Timer | Timer continues running when app is backgrounded | ⬜ Deferred — requires native build |
-| iOS Sound Effects | Timer sound effects on iPhone | ⬜ Deferred — requires Apple Developer account |
+| Background Timer | Timer continues running when app is backgrounded | ⬜ On hold — requires native build |
+| iOS Sound Effects | Timer sound effects on iPhone | ⬜ On hold — requires Apple Developer account |
 
 ---
 
@@ -493,19 +501,19 @@ ltfi/
 
 #### iOS — Apple HealthKit
 
-> ⚠️ Deferred — requires EAS native iOS build. Will resume once Apple Developer account is set up.
+> ⚠️ On hold — requires EAS native iOS build. Will resume once Apple Developer account is set up.
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Apple HealthKit Setup | Request HealthKit permissions on first launch | ⏸ Deferred — requires native build |
-| Steps Tracking | Read daily step count from HealthKit | ⏸ Deferred |
-| Active Calories | Read active calories burned from HealthKit | ⏸ Deferred |
-| Heart Rate | Read heart rate data from HealthKit | ⏸ Deferred |
-| Blood Oxygen | Read SpO2 data from HealthKit | ⏸ Deferred |
-| Sleep Tracking | Read sleep duration from HealthKit | ⏸ Deferred |
-| Distance | Read daily distance from HealthKit | ⏸ Deferred |
-| Multi-sport Workout Sync | Sync completed workouts from HealthKit | ⏸ Deferred |
-| Colmi Ring Integration | Colmi ring data flows via QRing app into HealthKit — no direct integration needed | ⏸ Deferred |
+| Apple HealthKit Setup | Request HealthKit permissions on first launch | ⏸ On hold — requires native build |
+| Steps Tracking | Read daily step count from HealthKit | ⏸ On hold |
+| Active Calories | Read active calories burned from HealthKit | ⏸ On hold |
+| Heart Rate | Read heart rate data from HealthKit | ⏸ On hold |
+| Blood Oxygen | Read SpO2 data from HealthKit | ⏸ On hold |
+| Sleep Tracking | Read sleep duration from HealthKit | ⏸ On hold |
+| Distance | Read daily distance from HealthKit | ⏸ On hold |
+| Multi-sport Workout Sync | Sync completed workouts from HealthKit | ⏸ On hold |
+| Colmi Ring Integration | Colmi ring data flows via QRing app into HealthKit — no direct integration needed | ⏸ On hold |
 | Health Screen UI | Dashboard showing steps, heart rate, calories, sleep, distance | ✅ Built — pending native build |
 | HealthKit Utility Layer | Platform-aware data fetching from HealthKit | ✅ Built — pending native build |
 
@@ -540,8 +548,8 @@ ltfi/
 | Lazy Tab Loading | Tabs load on demand with lazy: true | ✅ Done |
 | Session Persistence Fix | Token only cleared on 401, not on network timeout | ✅ Done |
 | Timezone Date Fix | All date formatting uses local time to prevent UTC date shift | ✅ Done |
-| Rate Limit Tuning | Global limiter raised to 500 req/15min with health checks excluded, preventing false "data lost" symptoms from 429s during normal multi-request screens | ✅ Done |
-| iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ Deferred |
+| Rate Limit Tuning | Global limiter raised to 500 req/15min with health checks excluded | ✅ Done |
+| iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ On hold |
 
 ---
 
@@ -551,9 +559,10 @@ ltfi/
 |------------|----------|------------|
 | Timer voice announcements interrupt background music | iOS | Requires Apple Developer account for native build |
 | Sound effects (ding, beep, chime) not available | iOS | Requires Apple Developer account for native build |
-| Timer pauses when app is backgrounded | iOS + Android | Requires native build |
-| Background timer | Both | Deferred — requires native build |
+| Timer pauses when app is backgrounded | iOS + Android | On hold — requires native build |
+| Background timer | Both | On hold — requires native build |
 | Progress photos logged before the Cloudinary cleanup fix have no stored public_id | Both | Those images will remain in Cloudinary storage even after the weight entry is deleted; negligible at current free-tier usage (25GB) |
+| Local `.env` MongoDB URI drift | Local dev only | Local `.env` is gitignored and separate from Render's environment variables — if the Atlas `admin` password is rotated, both must be updated manually or the local backend/scripts will fail with `bad auth` while the deployed app keeps working fine (or vice versa) |
 
 ---
 
@@ -608,6 +617,8 @@ CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
 
+Important: the `MONGODB_URI` here is separate from whatever is set on Render — they are two independent copies. If the Atlas database password is ever reset, **update it in both places**, or one environment will start failing with `bad auth: authentication failed` while the other keeps working. If the local network blocks SRV DNS lookups (common on restrictive/corporate networks), use the non-SRV connection string format from Atlas's "Connect" screen (toggle off "SRV Connection String") instead of `mongodb+srv://`.
+
 These same `CLOUDINARY_*` values also need to be set as environment variables on Render for the deployed backend — `.env` is gitignored and never reaches production on its own.
 
 The frontend's Cloudinary cloud name and unsigned upload preset are set directly in `frontend/app/(tabs)/progress.jsx` as `CLOUDINARY_CLOUD_NAME` and `CLOUDINARY_UPLOAD_PRESET` constants, since unsigned uploads are safe to expose client-side.
@@ -636,6 +647,19 @@ eas build -p android --profile preview
 ```
 
 Download and sideload the APK directly. No Google Play account needed.
+
+---
+
+## Maintenance Scripts
+
+`backend/scripts/backfillMyFoods.js` — one-time recovery script. Scans every historical `Meal` document, finds unique food names per user, and creates a matching `Food` doc (with `createdBy` set) for anything missing from that user's My Foods library. Safe to re-run; it skips anything that already exists. Run with:
+
+```
+cd backend
+node scripts/backfillMyFoods.js
+```
+
+`backend/scripts/seedPhilippineFoods.js` — seeds common Philippine fast-food items (Jollibee, McDonald's PH, Chowking, Starbucks PH) directly into the public Food collection.
 
 ---
 
