@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
@@ -11,12 +11,12 @@ const localDate = (date) => {
   return `${y}-${m}-${d}`;
 };
 
-const getWeekDays = () => {
+const getWeekDays = (weekOffset = 0) => {
   const now = new Date();
   const dayOfWeek = now.getDay();
   const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
   const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMonday);
+  monday.setDate(now.getDate() + diffToMonday + weekOffset * 7);
   const days = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
@@ -30,32 +30,42 @@ export default function DashboardScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [viewMode, setViewMode] = useState('daily');
+  const [dayOffset, setDayOffset] = useState(0);
+  const [weekOffset, setWeekOffset] = useState(0);
   const [summary, setSummary] = useState(null);
   const [caloriesBurned, setCaloriesBurned] = useState(0);
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [weeklyAvg, setWeeklyAvg] = useState(null);
-  const now = new Date();
-  const today = localDate(now);
+
+  const viewedDate = new Date();
+  viewedDate.setDate(viewedDate.getDate() + dayOffset);
+  const viewedDateStr = localDate(viewedDate);
+  const isToday = dayOffset === 0;
 
   useFocusEffect(
     useCallback(() => {
       fetchData();
+    }, [dayOffset])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
       fetchWeeklyAverage();
-    }, [])
+    }, [weekOffset])
   );
 
   const fetchData = async () => {
     try {
       const [mealRes, workoutRes] = await Promise.all([
-        api.get(`/meals/summary?date=${today}`),
+        api.get(`/meals/summary?date=${viewedDateStr}`),
         api.get('/workouts')
       ]);
       setSummary(mealRes.data);
-      const todayWorkouts = workoutRes.data.filter(w => {
+      const dayWorkouts = workoutRes.data.filter(w => {
         if (!w.completedAt) return false;
-        return w.completedAt.split('T')[0] === today;
+        return w.completedAt.split('T')[0] === viewedDateStr;
       });
-      const burned = todayWorkouts.reduce((sum, w) => sum + (w.caloriesBurned || 0), 0);
+      const burned = dayWorkouts.reduce((sum, w) => sum + (w.caloriesBurned || 0), 0);
       setCaloriesBurned(burned);
     } catch (err) {
       console.error(err);
@@ -65,7 +75,7 @@ export default function DashboardScreen() {
   const fetchWeeklyAverage = async () => {
     setWeeklyLoading(true);
     try {
-      const days = getWeekDays();
+      const days = getWeekDays(weekOffset);
       const results = await Promise.all(
         days.map(date => api.get(`/meals/summary?date=${date}`).catch(() => ({ data: { totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 } })))
       );
@@ -103,6 +113,16 @@ export default function DashboardScreen() {
   const carbsGoal = user?.macroGoals?.carbs || 0;
   const fatGoal = user?.macroGoals?.fat || 0;
 
+  const dailyLabel = isToday ? 'Today' : viewedDate.toDateString();
+
+  const weeklyLabel = (() => {
+    const days = getWeekDays(weekOffset);
+    if (weekOffset === 0) return 'This Week';
+    const start = new Date(days[0] + 'T12:00:00');
+    const end = new Date(days[6] + 'T12:00:00');
+    return `${start.toLocaleDateString('en', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en', { month: 'short', day: 'numeric' })}`;
+  })();
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -121,6 +141,23 @@ export default function DashboardScreen() {
         </TouchableOpacity>
         <TouchableOpacity style={[styles.toggleBtn, isWeekly && styles.toggleBtnActive]} onPress={() => setViewMode('weekly')}>
           <Text style={[styles.toggleText, isWeekly && styles.toggleTextActive]}>Weekly</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.dateNav}>
+        <TouchableOpacity
+          onPress={() => isWeekly ? setWeekOffset(p => p - 1) : setDayOffset(p => p - 1)}
+          style={styles.dateNavBtn}
+        >
+          <Text style={styles.dateNavText}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.dateNavLabel}>{isWeekly ? weeklyLabel : dailyLabel}</Text>
+        <TouchableOpacity
+          onPress={() => isWeekly ? setWeekOffset(p => Math.min(p + 1, 0)) : setDayOffset(p => Math.min(p + 1, 0))}
+          style={[styles.dateNavBtn, (isWeekly ? weekOffset === 0 : isToday) && styles.dateNavBtnDisabled]}
+          disabled={isWeekly ? weekOffset === 0 : isToday}
+        >
+          <Text style={[styles.dateNavText, (isWeekly ? weekOffset === 0 : isToday) && { color: '#ccc' }]}>›</Text>
         </TouchableOpacity>
       </View>
 
@@ -146,7 +183,7 @@ export default function DashboardScreen() {
           <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: progress >= 1 ? '#E05A2B' : '#F77E2D' }]} />
         </View>
         {!isWeekly && caloriesBurned > 0 && (
-          <Text style={styles.burnedText}>🔥 {caloriesBurned} kcal burned from workouts today</Text>
+          <Text style={styles.burnedText}>🔥 {caloriesBurned} kcal burned from workouts {isToday ? 'today' : 'that day'}</Text>
         )}
       </View>
 
@@ -190,6 +227,11 @@ const styles = StyleSheet.create({
   toggleBtnActive: { backgroundColor: '#F77E2D' },
   toggleText: { fontSize: 13, fontWeight: '600', color: '#888' },
   toggleTextActive: { color: '#fff' },
+  dateNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  dateNavBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
+  dateNavBtnDisabled: { opacity: 0.3 },
+  dateNavText: { fontSize: 24, color: '#F77E2D', fontWeight: '700' },
+  dateNavLabel: { fontSize: 14, fontWeight: '700', color: '#1A1A1A' },
   calorieCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16 },
   weeklyLabel: { fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center', marginBottom: 12 },
   calorieRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
