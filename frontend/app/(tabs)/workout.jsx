@@ -199,18 +199,7 @@ export default function WorkoutScreen() {
       });
     };
 
-    const deleteExercise = (exercise) => {
-        confirmDelete(async () => {
-          try {
-            await api.delete(`/exercises/by-name/${encodeURIComponent(exercise)}`);
-            setExercises(prev => prev.filter(e => e.exercise !== exercise));
-          } catch (err) {
-            console.error(err);
-          }
-        });
-      };
-
-      const createExercise = async () => {
+    const createExercise = async () => {
     if (!newExerciseName.trim()) return;
     try {
       await api.post('/exercises', {
@@ -497,8 +486,7 @@ const styles = StyleSheet.create({
   exerciseDate: { fontSize: 12, color: '#888' },
   exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   deleteExerciseText: { color: '#888', fontSize: 14, fontWeight: '700' },
-  exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  deleteExerciseText: { color: '#888', fontSize: 14, fontWeight: '700' },  exerciseBadges: { flexDirection: 'row', gap: 8 },
+  exerciseBadges: { flexDirection: 'row', gap: 8 },
   badge: { backgroundColor: '#EDE8DF', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, color: '#888', fontWeight: '600' },
   badgeGreen: { backgroundColor: '#E8F5E9' },
