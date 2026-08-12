@@ -68,6 +68,19 @@ export default function AIFoodScanScreen() {
   const addFood = async () => {
     setAdding(true);
     try {
+      await api.post('/food', {
+        name: result.name,
+        calories: result.calories,
+        protein: result.protein,
+        carbs: result.carbs,
+        fat: result.fat,
+        fiber: result.fiber,
+        sodium: result.sodium,
+        sugar: result.sugar,
+        servingSize: result.servingSize || 100,
+        servingUnit: result.servingUnit || 'g'
+      }).catch(err => console.error('Failed to save to My Foods:', err));
+
       await api.post('/meals', {
         date,
         mealType,
