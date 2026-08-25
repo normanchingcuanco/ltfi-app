@@ -476,7 +476,7 @@ export default function WorkoutScreen() {
                           )}
                         </View>
                         <ExerciseNotesEditor
-                          key={`${ex.exercise}-notes-${todayLog?._id || 'new'}`}
+                          key={`${ex.exercise}-notes`}
                           initialValue={todayLog?.notes || ''}
                           onSave={(v) => saveNotes(ex.exercise, v)}
                         />
