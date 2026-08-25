@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import api from '../src/utils/api';
 
+const LOGS_PER_PAGE = 10;
+
 const confirmDelete = (onConfirm) => {
   if (Platform.OS === 'web') {
     if (window.confirm('Delete this log entry?')) onConfirm();
@@ -25,6 +27,7 @@ export default function ExerciseHistoryScreen() {
   const router = useRouter();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
 
   const fetchLogs = async () => {
     try {
@@ -40,6 +43,7 @@ export default function ExerciseHistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchLogs();
+      setPage(0);
     }, [exercise])
   );
 
@@ -58,6 +62,8 @@ export default function ExerciseHistoryScreen() {
   const bestWeightOf = (sets) => (sets || []).reduce((max, s) => Math.max(max, s.weight || 0), 0);
 
   const overallBest = logs.reduce((max, l) => Math.max(max, bestWeightOf(l.sets)), 0);
+  const pagedLogs = logs.slice(page * LOGS_PER_PAGE, page * LOGS_PER_PAGE + LOGS_PER_PAGE);
+  const totalPages = Math.ceil(logs.length / LOGS_PER_PAGE);
 
   if (loading) return (
     <View style={styles.center}>
@@ -84,51 +90,73 @@ export default function ExerciseHistoryScreen() {
           <Text style={styles.emptyText}>No history yet for this exercise.</Text>
         </View>
       ) : (
-        logs.map((log, idx) => {
-          const volume = volumeOf(log.sets);
-          const bestWeight = bestWeightOf(log.sets);
-          const isPR = bestWeight === overallBest && bestWeight > 0;
+        <>
+          {pagedLogs.map((log) => {
+            const volume = volumeOf(log.sets);
+            const bestWeight = bestWeightOf(log.sets);
+            const isPR = bestWeight === overallBest && bestWeight > 0;
 
-          return (
-            <View key={log._id} style={styles.logCard}>
-              <View style={styles.logHeader}>
-                <Text style={styles.logDate}>{formatDate(log.date)}</Text>
-                <View style={styles.logHeaderRight}>
-                  {isPR && (
-                    <View style={styles.prBadge}>
-                      <Text style={styles.prBadgeText}>PR</Text>
-                    </View>
-                  )}
-                  <TouchableOpacity onPress={() => deleteLog(log._id)}>
-                    <Text style={styles.deleteText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {log.sets?.length > 0 ? (
-                <>
-                  <View style={styles.setsHeader}>
-                    <Text style={styles.setsHeaderText}>Set</Text>
-                    <Text style={styles.setsHeaderText}>Weight</Text>
-                    <Text style={styles.setsHeaderText}>Reps</Text>
+            return (
+              <View key={log._id} style={styles.logCard}>
+                <View style={styles.logHeader}>
+                  <Text style={styles.logDate}>{formatDate(log.date)}</Text>
+                  <View style={styles.logHeaderRight}>
+                    {isPR && (
+                      <View style={styles.prBadge}>
+                        <Text style={styles.prBadgeText}>PR</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity onPress={() => deleteLog(log._id)}>
+                      <Text style={styles.deleteText}>✕</Text>
+                    </TouchableOpacity>
                   </View>
-                  {log.sets.map((set, sidx) => (
-                    <View key={sidx} style={styles.setRow}>
-                      <Text style={styles.setNum}>{set.setNumber}</Text>
-                      <Text style={styles.setVal}>{set.weight}kg</Text>
-                      <Text style={styles.setVal}>{set.reps}</Text>
-                    </View>
-                  ))}
-                  <Text style={styles.volumeText}>Volume: {volume}kg</Text>
-                </>
-              ) : (
-                <Text style={styles.noSets}>No sets logged</Text>
-              )}
+                </View>
 
-              {log.notes ? <Text style={styles.notes}>{log.notes}</Text> : null}
+                {log.sets?.length > 0 ? (
+                  <>
+                    <View style={styles.setsHeader}>
+                      <Text style={styles.setsHeaderText}>Set</Text>
+                      <Text style={styles.setsHeaderText}>Weight</Text>
+                      <Text style={styles.setsHeaderText}>Reps</Text>
+                    </View>
+                    {log.sets.map((set, sidx) => (
+                      <View key={sidx} style={styles.setRow}>
+                        <Text style={styles.setNum}>{set.setNumber}</Text>
+                        <Text style={styles.setVal}>{set.weight}kg</Text>
+                        <Text style={styles.setVal}>{set.reps}</Text>
+                      </View>
+                    ))}
+                    <Text style={styles.volumeText}>Volume: {volume}kg</Text>
+                  </>
+                ) : (
+                  <Text style={styles.noSets}>No sets logged</Text>
+                )}
+
+                {log.notes ? <Text style={styles.notes}>{log.notes}</Text> : null}
+              </View>
+            );
+          })}
+
+          {totalPages > 1 && (
+            <View style={styles.paginationRow}>
+              <TouchableOpacity
+                style={[styles.pageBtn, page === 0 && styles.pageBtnDisabled]}
+                disabled={page === 0}
+                onPress={() => setPage(p => p - 1)}
+              >
+                <Text style={[styles.pageBtnText, page === 0 && styles.pageBtnTextDisabled]}>‹ Prev</Text>
+              </TouchableOpacity>
+              <Text style={styles.pageIndicator}>Page {page + 1} of {totalPages}</Text>
+              <TouchableOpacity
+                style={[styles.pageBtn, page + 1 >= totalPages && styles.pageBtnDisabled]}
+                disabled={page + 1 >= totalPages}
+                onPress={() => setPage(p => p + 1)}
+              >
+                <Text style={[styles.pageBtnText, page + 1 >= totalPages && styles.pageBtnTextDisabled]}>Next ›</Text>
+              </TouchableOpacity>
             </View>
-          );
-        })
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -159,5 +187,11 @@ const styles = StyleSheet.create({
   setVal: { flex: 1, fontSize: 13, color: '#1A1A1A', fontWeight: '600' },
   volumeText: { fontSize: 12, color: '#888', marginTop: 4, fontWeight: '600' },
   noSets: { fontSize: 13, color: '#888', fontStyle: 'italic' },
-  notes: { fontSize: 13, color: '#1A1A1A', marginTop: 10, borderTopWidth: 1, borderTopColor: '#C5BFB4', paddingTop: 10 }
+  notes: { fontSize: 13, color: '#1A1A1A', marginTop: 10, borderTopWidth: 1, borderTopColor: '#C5BFB4', paddingTop: 10 },
+  paginationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 20 },
+  pageBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#D9D3C8', borderRadius: 8 },
+  pageBtnDisabled: { opacity: 0.4 },
+  pageBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 13 },
+  pageBtnTextDisabled: { color: '#888' },
+  pageIndicator: { fontSize: 12, color: '#888' }
 });

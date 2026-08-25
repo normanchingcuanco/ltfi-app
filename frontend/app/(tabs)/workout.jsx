@@ -19,12 +19,95 @@ const localDate = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
-const getCurrentWeek = () => {
-  const start = new Date('2025-01-01');
-  const now = new Date();
-  const diff = Math.floor((now - start) / (7 * 24 * 60 * 60 * 1000));
-  return diff + 1;
+const renderNotesWithLinks = (text) => {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <Text key={i} style={styles.linkText} onPress={() => Linking.openURL(part)}>
+        {part}
+      </Text>
+    ) : (
+      <Text key={i}>{part}</Text>
+    )
+  );
 };
+
+function ExerciseNotesEditor({ initialValue, onSave }) {
+  const [value, setValue] = useState(initialValue || '');
+  const [isEditing, setIsEditing] = useState(!initialValue);
+  const timerRef = useRef(null);
+
+  const handleChange = (v) => {
+    setValue(v);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onSave(v);
+    }, 800);
+  };
+
+  const handleBlur = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    onSave(value);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <TextInput
+        style={styles.notesInput}
+        placeholder="Notes, links, video URLs..."
+        placeholderTextColor="#999"
+        multiline
+        autoFocus
+        value={value}
+        onChangeText={handleChange}
+        onBlur={handleBlur}
+      />
+    );
+  }
+
+  return (
+    <TouchableOpacity style={styles.notesDisplay} onPress={() => setIsEditing(true)}>
+      <Text style={styles.notesDisplayText}>{renderNotesWithLinks(value)}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function WeekEditor({ week, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(week ?? ''));
+
+  const confirm = () => {
+    const parsed = parseInt(value, 10);
+    if (!isNaN(parsed)) onSave(parsed);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <View style={styles.weekEditRow}>
+        <TextInput
+          style={styles.weekInput}
+          keyboardType="numeric"
+          value={value}
+          onChangeText={setValue}
+          onBlur={confirm}
+          onSubmitEditing={confirm}
+          autoFocus
+        />
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity onPress={() => { setValue(String(week ?? '')); setEditing(true); }}>
+      <Text style={styles.exerciseDate}>Week {week ?? '-'}</Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function WorkoutScreen() {
   const [tab, setTab] = useState('timer');
@@ -37,9 +120,8 @@ export default function WorkoutScreen() {
   const [expandedExercise, setExpandedExercise] = useState(null);
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [pendingSets, setPendingSets] = useState({});
-  const [exerciseNotes, setExerciseNotes] = useState({});
-  const [notesEditing, setNotesEditing] = useState({});
-  const notesTimers = useRef({});
+  const [exercisesPage, setExercisesPage] = useState(0);
+  const EXERCISES_PER_PAGE = 10;
   const router = useRouter();
 
   useFocusEffect(
@@ -90,14 +172,13 @@ export default function WorkoutScreen() {
     }
   };
 
-  const persistNotes = async (exercise, value) => {
+  const saveNotes = async (exercise, value) => {
     const logs = exerciseLogs[exercise] || [];
     const todayLog = logs.find(l => l.date === localDate());
     try {
       await api.post('/exercises', {
         exercise,
         date: localDate(),
-        week: getCurrentWeek(),
         sets: todayLog?.sets || [],
         notes: value
       });
@@ -108,35 +189,22 @@ export default function WorkoutScreen() {
     }
   };
 
-  const scheduleNotesSave = (exercise, value) => {
-    setExerciseNotes(prev => ({ ...prev, [exercise]: value }));
-    if (notesTimers.current[exercise]) clearTimeout(notesTimers.current[exercise]);
-    notesTimers.current[exercise] = setTimeout(() => {
-      persistNotes(exercise, value);
-    }, 800);
-  };
-
-  const flushNotesSave = (exercise) => {
-    if (notesTimers.current[exercise]) {
-      clearTimeout(notesTimers.current[exercise]);
-      notesTimers.current[exercise] = null;
+  const saveWeek = async (exercise, newWeek) => {
+    const logs = exerciseLogs[exercise] || [];
+    const todayLog = logs.find(l => l.date === localDate());
+    try {
+      await api.post('/exercises', {
+        exercise,
+        date: localDate(),
+        sets: todayLog?.sets || [],
+        notes: todayLog?.notes || '',
+        weekOverride: newWeek
+      });
+      fetchExerciseLogs(exercise);
+      fetchExercises();
+    } catch (err) {
+      console.error(err);
     }
-    const value = exerciseNotes[exercise];
-    if (value !== undefined) persistNotes(exercise, value);
-    setNotesEditing(prev => ({ ...prev, [exercise]: false }));
-  };
-
-  const renderNotesWithLinks = (text) => {
-    const parts = text.split(/(https?:\/\/[^\s]+)/g);
-    return parts.map((part, i) =>
-      /^https?:\/\//.test(part) ? (
-        <Text key={i} style={styles.linkText} onPress={() => Linking.openURL(part)}>
-          {part}
-        </Text>
-      ) : (
-        <Text key={i}>{part}</Text>
-      )
-    );
   };
 
   const addRow = (exercise) => {
@@ -176,9 +244,8 @@ export default function WorkoutScreen() {
       await api.post('/exercises', {
         exercise,
         date: localDate(),
-        week: getCurrentWeek(),
         sets: newSets,
-        notes: exerciseNotes[exercise] || ''
+        notes: todayLog?.notes || ''
       });
       setPendingSets(prev => ({ ...prev, [exercise]: [] }));
       fetchExerciseLogs(exercise);
@@ -189,23 +256,22 @@ export default function WorkoutScreen() {
   };
 
   const deleteExercise = (exercise) => {
-      confirmDelete(async () => {
-        try {
-          await api.delete(`/exercises/by-name/${encodeURIComponent(exercise)}`);
-          setExercises(prev => prev.filter(e => e.exercise !== exercise));
-        } catch (err) {
-          console.error(err);
-        }
-      });
-    };
+    confirmDelete(async () => {
+      try {
+        await api.delete(`/exercises/by-name/${encodeURIComponent(exercise)}`);
+        setExercises(prev => prev.filter(e => e.exercise !== exercise));
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  };
 
-    const createExercise = async () => {
+  const createExercise = async () => {
     if (!newExerciseName.trim()) return;
     try {
       await api.post('/exercises', {
         exercise: newExerciseName.trim(),
         date: localDate(),
-        week: getCurrentWeek(),
         sets: []
       });
       setNewExerciseName('');
@@ -232,6 +298,8 @@ export default function WorkoutScreen() {
       <ActivityIndicator size="large" color="#F77E2D" />
     </View>
   );
+
+  const pagedExercises = exercises.slice(exercisesPage * EXERCISES_PER_PAGE, exercisesPage * EXERCISES_PER_PAGE + EXERCISES_PER_PAGE);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -322,127 +390,127 @@ export default function WorkoutScreen() {
               <Text style={styles.emptyText}>No exercises yet. Add one to start tracking.</Text>
             </View>
           ) : (
-            exercises.map((ex, idx) => {
-              const logs = exerciseLogs[ex.exercise] || [];
-              const todayLog = logs.find(l => l.date === localDate());
-              const allSets = logs.flatMap(l => l.sets || []);
-              const bestWeight = allSets.length > 0 ? Math.max(...allSets.map(s => s.weight || 0)) : 0;
-              const isExpanded = expandedExercise === ex.exercise;
+            <>
+              {pagedExercises.map((ex, idx) => {
+                const logs = exerciseLogs[ex.exercise] || [];
+                const todayLog = logs.find(l => l.date === localDate());
+                const allSets = logs.flatMap(l => l.sets || []);
+                const bestWeight = allSets.length > 0 ? Math.max(...allSets.map(s => s.weight || 0)) : 0;
+                const isExpanded = expandedExercise === ex.exercise;
 
-              return (
-                <View key={idx} style={styles.exerciseCard}>
-                  <TouchableOpacity onPress={() => toggleExercise(ex.exercise)}>
+                return (
+                  <View key={ex.exercise} style={styles.exerciseCard}>
                     <View style={styles.exerciseHeader}>
-                      <Text style={styles.exerciseName}>{ex.exercise}</Text>
+                      <TouchableOpacity style={{ flex: 1 }} onPress={() => toggleExercise(ex.exercise)}>
+                        <Text style={styles.exerciseName}>{ex.exercise}</Text>
+                      </TouchableOpacity>
                       <View style={styles.exerciseHeaderRight}>
-                        <Text style={styles.exerciseDate}>Week {ex.week || getCurrentWeek()}</Text>
+                        <WeekEditor week={ex.week} onSave={(w) => saveWeek(ex.exercise, w)} />
                         <TouchableOpacity onPress={() => deleteExercise(ex.exercise)}>
                           <Text style={styles.deleteExerciseText}>✕</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
-                    <View style={styles.exerciseBadges}>
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{todayLog?.sets?.length || 0} sets today</Text>
-                      </View>
-                      {bestWeight > 0 && (
-                        <View style={[styles.badge, styles.badgeGreen]}>
-                          <Text style={[styles.badgeText, styles.badgeTextGreen]}>{bestWeight}kg best</Text>
+                    <TouchableOpacity onPress={() => toggleExercise(ex.exercise)}>
+                      <View style={styles.exerciseBadges}>
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>{todayLog?.sets?.length || 0} sets today</Text>
                         </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-
-                  {isExpanded && (
-                    <View style={styles.setsSection}>
-                      {todayLog?.sets?.length > 0 && (
-                        <>
-                          <View style={styles.setsHeader}>
-                            <Text style={styles.setsHeaderText}>Set</Text>
-                            <Text style={styles.setsHeaderText}>Weight</Text>
-                            <Text style={styles.setsHeaderText}>Reps</Text>
+                        {bestWeight > 0 && (
+                          <View style={[styles.badge, styles.badgeGreen]}>
+                            <Text style={[styles.badgeText, styles.badgeTextGreen]}>{bestWeight}kg best</Text>
                           </View>
-                          {todayLog.sets.map((set, sidx) => (
-                            <View key={sidx} style={styles.setRow}>
-                              <Text style={styles.setNum}>{set.setNumber}</Text>
-                              <Text style={styles.setVal}>{set.weight}kg</Text>
-                              <Text style={styles.setVal}>{set.reps}</Text>
-                            </View>
-                          ))}
-                        </>
-                      )}
-                      {(pendingSets[ex.exercise] || []).map((row, ridx) => (
-                        <View key={ridx} style={styles.addSetRow}>
-                          <TextInput
-                            style={styles.setInput}
-                            placeholder="kg"
-                            placeholderTextColor="#999"
-                            keyboardType="numeric"
-                            value={row.weight}
-                            onChangeText={v => updateRow(ex.exercise, ridx, 'weight', v)}
-                          />
-                          <TextInput
-                            style={styles.setInput}
-                            placeholder="reps"
-                            placeholderTextColor="#999"
-                            keyboardType="numeric"
-                            value={row.reps}
-                            onChangeText={v => updateRow(ex.exercise, ridx, 'reps', v)}
-                          />
-                          <TouchableOpacity onPress={() => removeRow(ex.exercise, ridx)}>
-                            <Text style={styles.removeRowText}>✕</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                      <View style={styles.rowActions}>
-                        <TouchableOpacity style={styles.addRowBtn} onPress={() => addRow(ex.exercise)}>
-                          <Text style={styles.addRowBtnText}>+ Add Row</Text>
-                        </TouchableOpacity>
-                        {(pendingSets[ex.exercise] || []).length > 0 && (
-                          <TouchableOpacity style={styles.saveSetsBtn} onPress={() => saveSets(ex.exercise)}>
-                            <Text style={styles.saveSetsBtnText}>Save Sets</Text>
-                          </TouchableOpacity>
                         )}
                       </View>
-                      {(() => {
-                        const currentNote = exerciseNotes[ex.exercise] !== undefined
-                          ? exerciseNotes[ex.exercise]
-                          : (todayLog?.notes || '');
-                        const isEditing = notesEditing[ex.exercise] ?? currentNote === '';
+                    </TouchableOpacity>
 
-                        if (isEditing) {
-                          return (
+                    {isExpanded && (
+                      <View style={styles.setsSection}>
+                        {todayLog?.sets?.length > 0 && (
+                          <>
+                            <View style={styles.setsHeader}>
+                              <Text style={styles.setsHeaderText}>Set</Text>
+                              <Text style={styles.setsHeaderText}>Weight</Text>
+                              <Text style={styles.setsHeaderText}>Reps</Text>
+                            </View>
+                            {todayLog.sets.map((set, sidx) => (
+                              <View key={sidx} style={styles.setRow}>
+                                <Text style={styles.setNum}>{set.setNumber}</Text>
+                                <Text style={styles.setVal}>{set.weight}kg</Text>
+                                <Text style={styles.setVal}>{set.reps}</Text>
+                              </View>
+                            ))}
+                          </>
+                        )}
+                        {(pendingSets[ex.exercise] || []).map((row, ridx) => (
+                          <View key={ridx} style={styles.addSetRow}>
                             <TextInput
-                              style={styles.notesInput}
-                              placeholder="Notes, links, video URLs..."
+                              style={styles.setInput}
+                              placeholder="kg"
                               placeholderTextColor="#999"
-                              multiline
-                              autoFocus
-                              value={currentNote}
-                              onChangeText={v => scheduleNotesSave(ex.exercise, v)}
-                              onBlur={() => flushNotesSave(ex.exercise)}
+                              keyboardType="numeric"
+                              value={row.weight}
+                              onChangeText={v => updateRow(ex.exercise, ridx, 'weight', v)}
                             />
-                          );
-                        }
-                        return (
-                          <TouchableOpacity
-                            style={styles.notesDisplay}
-                            onPress={() => setNotesEditing(prev => ({ ...prev, [ex.exercise]: true }))}
-                          >
-                            <Text style={styles.notesDisplayText}>
-                              {renderNotesWithLinks(currentNote)}
-                            </Text>
+                            <TextInput
+                              style={styles.setInput}
+                              placeholder="reps"
+                              placeholderTextColor="#999"
+                              keyboardType="numeric"
+                              value={row.reps}
+                              onChangeText={v => updateRow(ex.exercise, ridx, 'reps', v)}
+                            />
+                            <TouchableOpacity onPress={() => removeRow(ex.exercise, ridx)}>
+                              <Text style={styles.removeRowText}>✕</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                        <View style={styles.rowActions}>
+                          <TouchableOpacity style={styles.addRowBtn} onPress={() => addRow(ex.exercise)}>
+                            <Text style={styles.addRowBtnText}>+ Add Row</Text>
                           </TouchableOpacity>
-                        );
-                      })()}
-                      <TouchableOpacity style={styles.historyBtn} onPress={() => router.push({ pathname: '/exercise-history', params: { exercise: ex.exercise } })}>
-                        <Text style={styles.historyBtnText}>View History</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                          {(pendingSets[ex.exercise] || []).length > 0 && (
+                            <TouchableOpacity style={styles.saveSetsBtn} onPress={() => saveSets(ex.exercise)}>
+                              <Text style={styles.saveSetsBtnText}>Save Sets</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        <ExerciseNotesEditor
+                          key={`${ex.exercise}-notes-${todayLog?._id || 'new'}`}
+                          initialValue={todayLog?.notes || ''}
+                          onSave={(v) => saveNotes(ex.exercise, v)}
+                        />
+                        <TouchableOpacity style={styles.historyBtn} onPress={() => router.push({ pathname: '/exercise-history', params: { exercise: ex.exercise } })}>
+                          <Text style={styles.historyBtnText}>View History</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+
+              {exercises.length > EXERCISES_PER_PAGE && (
+                <View style={styles.paginationRow}>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, exercisesPage === 0 && styles.pageBtnDisabled]}
+                    disabled={exercisesPage === 0}
+                    onPress={() => setExercisesPage(p => p - 1)}
+                  >
+                    <Text style={[styles.pageBtnText, exercisesPage === 0 && styles.pageBtnTextDisabled]}>‹ Prev</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.pageIndicator}>
+                    Page {exercisesPage + 1} of {Math.ceil(exercises.length / EXERCISES_PER_PAGE)}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, (exercisesPage + 1) * EXERCISES_PER_PAGE >= exercises.length && styles.pageBtnDisabled]}
+                    disabled={(exercisesPage + 1) * EXERCISES_PER_PAGE >= exercises.length}
+                    onPress={() => setExercisesPage(p => p + 1)}
+                  >
+                    <Text style={[styles.pageBtnText, (exercisesPage + 1) * EXERCISES_PER_PAGE >= exercises.length && styles.pageBtnTextDisabled]}>Next ›</Text>
+                  </TouchableOpacity>
                 </View>
-              );
-            })
+              )}
+            </>
           )}
         </>
       )}
@@ -486,6 +554,8 @@ const styles = StyleSheet.create({
   exerciseDate: { fontSize: 12, color: '#888' },
   exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   deleteExerciseText: { color: '#888', fontSize: 14, fontWeight: '700' },
+  weekEditRow: { flexDirection: 'row', alignItems: 'center' },
+  weekInput: { backgroundColor: '#EDE8DF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 12, color: '#1A1A1A', width: 50, textAlign: 'center' },
   exerciseBadges: { flexDirection: 'row', gap: 8 },
   badge: { backgroundColor: '#EDE8DF', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
   badgeText: { fontSize: 11, color: '#888', fontWeight: '600' },
@@ -510,5 +580,11 @@ const styles = StyleSheet.create({
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 60, textAlignVertical: 'top' },
   notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, marginTop: 10, minHeight: 60 },
   notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
-  linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' }
+  linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' },
+  paginationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 },
+  pageBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#D9D3C8', borderRadius: 8 },
+  pageBtnDisabled: { opacity: 0.4 },
+  pageBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 13 },
+  pageBtnTextDisabled: { color: '#888' },
+  pageIndicator: { fontSize: 12, color: '#888' }
 });

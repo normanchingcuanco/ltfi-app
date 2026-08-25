@@ -21,26 +21,69 @@ const getExerciseLogs = async (req, res) => {
     const { exercise } = req.params;
     const logs = await ExerciseLog.find({ user: req.user._id, exercise })
       .sort({ date: -1 })
-      .limit(20);
+      .limit(200);
     res.json(logs);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
+const EPOCH = new Date('2025-01-01');
+
+const calendarWeek = (dateStr) => {
+  const d = new Date(dateStr);
+  const diffDays = Math.floor((d - EPOCH) / (24 * 60 * 60 * 1000));
+  return Math.floor(diffDays / 7) + 1;
+};
+
+const mondayOf = (dateStr) => {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  d.setDate(d.getDate() + diff);
+  return d;
+};
+
+const weeksBetween = (dateStr1, dateStr2) => {
+  const m1 = mondayOf(dateStr1);
+  const m2 = mondayOf(dateStr2);
+  return Math.round((m2 - m1) / (7 * 24 * 60 * 60 * 1000));
+};
+
 const logExercise = async (req, res) => {
   try {
-    const { exercise, date, week, sets, notes } = req.body;
+    const { exercise, date, sets, notes, weekOverride } = req.body;
+
     const existing = await ExerciseLog.findOne({
       user: req.user._id, exercise, date
     });
+
     if (existing) {
       existing.sets = sets;
       existing.notes = notes;
-      existing.week = week;
+      if (weekOverride !== undefined && weekOverride !== null) {
+        existing.week = weekOverride;
+      }
       await existing.save();
       return res.json(existing);
     }
+
+    let week;
+    if (weekOverride !== undefined && weekOverride !== null) {
+      week = weekOverride;
+    } else {
+      const previous = await ExerciseLog.findOne({
+        user: req.user._id, exercise
+      }).sort({ date: -1 });
+
+      if (previous) {
+        const elapsed = weeksBetween(previous.date, date);
+        week = previous.week + Math.max(elapsed, 0);
+      } else {
+        week = calendarWeek(date);
+      }
+    }
+
     const log = await ExerciseLog.create({
       user: req.user._id, exercise, date, week, sets, notes
     });
