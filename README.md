@@ -25,6 +25,8 @@ To ensure efficient collaboration during the build process, the following rules 
 5. **Code in Chat, Not Artifacts** — Always provide code here in the chat unless an artifact is explicitly requested.
 6. **Build Fast** — Always recommend the fastest build path, whether that is running commands from the root terminal or providing full file contents directly.
 7. **Always State the File Path** — Every code block must be preceded by the full file path so it is always clear which file to create or update.
+8. **One File, One Edit at a Time** — Even within a single file, deliver one focused change per message and wait for confirmation before the next, unless the changes are so interdependent that fragmenting them would leave the file in a broken intermediate state — in which case say so and deliver the full file once.
+9. **Verify Against the Real File, Not Assumptions** — If there's any doubt the local sandbox copy of a file matches what's actually deployed or on the user's machine, ask for the current file content before editing it rather than editing a stale or guessed version.
 
 ---
 
@@ -77,7 +79,7 @@ An Expo-based mobile and web app that:
 - Lets users build custom foods and recipes with no paywall
 - Tracks daily calories, macros, and micronutrients, with daily and weekly dashboard views
 - Logs workouts and runs HIIT / Tabata / circuit interval timers with warmup, cooldown, and repeat
-- Tracks strength training with sets, reps, weight, and progressive overload
+- Tracks strength training with sets, reps, weight, and progressive overload, including a manually-settable week counter that auto-increments week over week
 - Logs body weight with optional progress photos, stored on Cloudinary
 - Syncs health data from Apple HealthKit and Colmi smart ring via QRing
 
@@ -335,9 +337,9 @@ ltfi/
 | user | ObjectId | Ref: User |
 | exercise | String | Exercise name |
 | date | String | YYYY-MM-DD |
-| week | Number | Week number for progressive overload tracking |
-| sets | Array | [{ setNumber, weight, reps }] |
-| notes | String | Session notes, supports inline clickable URLs |
+| week | Number | Manually settable — auto-increments by 1 each new calendar week relative to the last logged week for that exercise, unless explicitly overridden |
+| sets | Array | [{ setNumber, weight, reps }] — editable after the fact from the Exercise History screen |
+| notes | String | Session notes, supports inline clickable URLs, also editable from the Exercise History screen |
 
 ---
 
@@ -489,7 +491,14 @@ ltfi/
 | Dynamic Per-Set Rows | Add multiple set rows at once, each with its own weight and reps, saved together | ✅ Done |
 | Exercise Notes Auto-Save | Notes save automatically 800ms after typing stops, independent of logging a set | ✅ Done |
 | Exercise Notes Inline Links | Saved notes render as plain text with URLs shown as tappable, underlined hyperlinks; tap the note to re-enter edit mode | ✅ Done |
+| Exercise Notes Flicker Fix | Notes input was refocusing and reflowing on every autosave because the save handler refetched the entire exercise list; now the input focuses exactly once on entering edit mode, and notes saves update local state directly from the API response instead of triggering a full refetch | ✅ Done |
+| Editable / Auto-Incrementing Week | Tap the "Week X" label on any exercise card to manually set a starting week number; going forward, new logs for that exercise auto-increment the week by however many calendar weeks (Mon-based) have elapsed since the last log, rather than resetting to the actual calendar week-of-year | ✅ Done |
+| Tracker List Pagination | Exercise list in the Tracker tab paginated 10 per page with Prev/Next | ✅ Done |
+| Auto-Collapse on Navigate Away | Expanded exercise card automatically collapses when leaving the Workout tab or coming back to it | ✅ Done |
+| Minimize Button | Explicit ⌃ collapse button appears on an expanded exercise card, next to the week label | ✅ Done |
 | Exercise History Screen | View progressive overload history per exercise — all-time best weight, per-session volume, PR badge, delete individual logs | ✅ Done |
+| Exercise History Pagination | History log list paginated 10 per page with Prev/Next; backend log limit raised from 20 to 200 to give pagination real room | ✅ Done |
+| Edit Exercise History Entry | Pencil icon on any past log opens inline editing for its sets (weight/reps, add/remove rows) and notes, saved via `PUT /exercises/:id` | ✅ Done |
 | Delete Exercise | ✕ button on each exercise card deletes the exercise and all its logged history via `DELETE /exercises/by-name/:exercise` | ✅ Done |
 | Back Navigation Fix | Root layout switched from Slot to Stack so pushed screens (e.g. exercise history) correctly pop back to the previous tab instead of resetting to Home | ✅ Done |
 | Background Timer | Timer continues running when app is backgrounded | ⬜ On hold — requires native build |
@@ -563,6 +572,7 @@ ltfi/
 | Background timer | Both | On hold — requires native build |
 | Progress photos logged before the Cloudinary cleanup fix have no stored public_id | Both | Those images will remain in Cloudinary storage even after the weight entry is deleted; negligible at current free-tier usage (25GB) |
 | Local `.env` MongoDB URI drift | Local dev only | Local `.env` is gitignored and separate from Render's environment variables — if the Atlas `admin` password is rotated, both must be updated manually or the local backend/scripts will fail with `bad auth` while the deployed app keeps working fine (or vice versa) |
+| Assistant sandbox state can go stale between sessions | Development process only | The AI assistant's working copy of the codebase can silently reset between sessions; when in doubt whether a file matches what's actually deployed, paste the real current file content before requesting further edits to it, rather than trusting the assistant's memory of a prior state |
 
 ---
 
