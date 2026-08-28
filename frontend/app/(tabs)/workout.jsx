@@ -134,6 +134,7 @@ export default function WorkoutScreen() {
     useCallback(() => {
       fetchWorkouts();
       fetchExercises();
+      return () => setExpandedExercise(null);
     }, [])
   );
 
@@ -418,6 +419,11 @@ export default function WorkoutScreen() {
                       </TouchableOpacity>
                       <View style={styles.exerciseHeaderRight}>
                         <WeekEditor week={ex.week} onSave={(w) => saveWeek(ex.exercise, w)} />
+                        {isExpanded && (
+                          <TouchableOpacity onPress={() => setExpandedExercise(null)}>
+                            <Text style={styles.minimizeText}>⌃</Text>
+                          </TouchableOpacity>
+                        )}
                         <TouchableOpacity onPress={() => deleteExercise(ex.exercise)}>
                           <Text style={styles.deleteExerciseText}>✕</Text>
                         </TouchableOpacity>
@@ -566,6 +572,7 @@ const styles = StyleSheet.create({
   exerciseDate: { fontSize: 12, color: '#888' },
   exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   deleteExerciseText: { color: '#888', fontSize: 14, fontWeight: '700' },
+  minimizeText: { color: '#F77E2D', fontSize: 16, fontWeight: '900' },
   weekEditRow: { flexDirection: 'row', alignItems: 'center' },
   weekInput: { backgroundColor: '#EDE8DF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 12, color: '#1A1A1A', width: 50, textAlign: 'center' },
   exerciseBadges: { flexDirection: 'row', gap: 8 },
