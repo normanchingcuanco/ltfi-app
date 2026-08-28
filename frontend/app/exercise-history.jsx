@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import api from '../src/utils/api';
 
@@ -28,6 +28,9 @@ export default function ExerciseHistoryScreen() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
+  const [editingLogId, setEditingLogId] = useState(null);
+  const [editSets, setEditSets] = useState([]);
+  const [saving, setSaving] = useState(false);
 
   const fetchLogs = async () => {
     try {
@@ -44,6 +47,7 @@ export default function ExerciseHistoryScreen() {
     useCallback(() => {
       fetchLogs();
       setPage(0);
+      setEditingLogId(null);
     }, [exercise])
   );
 
@@ -56,6 +60,47 @@ export default function ExerciseHistoryScreen() {
         console.error(err);
       }
     });
+  };
+
+  const startEdit = (log) => {
+    setEditingLogId(log._id);
+    setEditSets((log.sets || []).map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
+  };
+
+  const cancelEdit = () => {
+    setEditingLogId(null);
+    setEditSets([]);
+  };
+
+  const updateEditSet = (idx, field, value) => {
+    setEditSets(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  };
+
+  const addEditSet = () => {
+    setEditSets(prev => [...prev, { weight: '', reps: '' }]);
+  };
+
+  const removeEditSet = (idx) => {
+    setEditSets(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const saveEdit = async (logId) => {
+    setSaving(true);
+    try {
+      const sets = editSets.map((s, i) => ({
+        setNumber: i + 1,
+        weight: parseFloat(s.weight) || 0,
+        reps: parseInt(s.reps) || 0
+      }));
+      const res = await api.put(`/exercises/${logId}`, { sets });
+      setLogs(prev => prev.map(l => l._id === logId ? res.data : l));
+      setEditingLogId(null);
+      setEditSets([]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const volumeOf = (sets) => (sets || []).reduce((sum, s) => sum + (s.weight || 0) * (s.reps || 0), 0);
@@ -95,6 +140,7 @@ export default function ExerciseHistoryScreen() {
             const volume = volumeOf(log.sets);
             const bestWeight = bestWeightOf(log.sets);
             const isPR = bestWeight === overallBest && bestWeight > 0;
+            const isEditing = editingLogId === log._id;
 
             return (
               <View key={log._id} style={styles.logCard}>
@@ -106,33 +152,79 @@ export default function ExerciseHistoryScreen() {
                         <Text style={styles.prBadgeText}>PR</Text>
                       </View>
                     )}
+                    {!isEditing && (
+                      <TouchableOpacity onPress={() => startEdit(log)}>
+                        <Text style={styles.editText}>✎</Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity onPress={() => deleteLog(log._id)}>
                       <Text style={styles.deleteText}>✕</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {log.sets?.length > 0 ? (
-                  <>
-                    <View style={styles.setsHeader}>
-                      <Text style={styles.setsHeaderText}>Set</Text>
-                      <Text style={styles.setsHeaderText}>Weight</Text>
-                      <Text style={styles.setsHeaderText}>Reps</Text>
-                    </View>
-                    {log.sets.map((set, sidx) => (
-                      <View key={sidx} style={styles.setRow}>
-                        <Text style={styles.setNum}>{set.setNumber}</Text>
-                        <Text style={styles.setVal}>{set.weight}kg</Text>
-                        <Text style={styles.setVal}>{set.reps}</Text>
+                {isEditing ? (
+                  <View>
+                    {editSets.map((s, sidx) => (
+                      <View key={sidx} style={styles.editRow}>
+                        <Text style={styles.editSetNum}>{sidx + 1}</Text>
+                        <TextInput
+                          style={styles.editInput}
+                          placeholder="kg"
+                          placeholderTextColor="#999"
+                          keyboardType="numeric"
+                          value={s.weight}
+                          onChangeText={v => updateEditSet(sidx, 'weight', v)}
+                        />
+                        <TextInput
+                          style={styles.editInput}
+                          placeholder="reps"
+                          placeholderTextColor="#999"
+                          keyboardType="numeric"
+                          value={s.reps}
+                          onChangeText={v => updateEditSet(sidx, 'reps', v)}
+                        />
+                        <TouchableOpacity onPress={() => removeEditSet(sidx)}>
+                          <Text style={styles.removeText}>✕</Text>
+                        </TouchableOpacity>
                       </View>
                     ))}
-                    <Text style={styles.volumeText}>Volume: {volume}kg</Text>
-                  </>
+                    <View style={styles.editActionsRow}>
+                      <TouchableOpacity style={styles.addSetBtn} onPress={addEditSet}>
+                        <Text style={styles.addSetBtnText}>+ Add Set</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.cancelBtn} onPress={cancelEdit}>
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.saveEditBtn} onPress={() => saveEdit(log._id)} disabled={saving}>
+                        {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveEditBtnText}>Save</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 ) : (
-                  <Text style={styles.noSets}>No sets logged</Text>
+                  <>
+                    {log.sets?.length > 0 ? (
+                      <>
+                        <View style={styles.setsHeader}>
+                          <Text style={styles.setsHeaderText}>Set</Text>
+                          <Text style={styles.setsHeaderText}>Weight</Text>
+                          <Text style={styles.setsHeaderText}>Reps</Text>
+                        </View>
+                        {log.sets.map((set, sidx) => (
+                          <View key={sidx} style={styles.setRow}>
+                            <Text style={styles.setNum}>{set.setNumber}</Text>
+                            <Text style={styles.setVal}>{set.weight}kg</Text>
+                            <Text style={styles.setVal}>{set.reps}</Text>
+                          </View>
+                        ))}
+                        <Text style={styles.volumeText}>Volume: {volume}kg</Text>
+                      </>
+                    ) : (
+                      <Text style={styles.noSets}>No sets logged</Text>
+                    )}
+                    {log.notes ? <Text style={styles.notes}>{log.notes}</Text> : null}
+                  </>
                 )}
-
-                {log.notes ? <Text style={styles.notes}>{log.notes}</Text> : null}
               </View>
             );
           })}
@@ -175,10 +267,11 @@ const styles = StyleSheet.create({
   emptyText: { color: '#888', textAlign: 'center', fontSize: 14 },
   logCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
   logHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  logHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   logDate: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
   prBadge: { backgroundColor: '#E8F5E9', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 3 },
   prBadgeText: { fontSize: 11, fontWeight: '700', color: '#388E3C' },
+  editText: { color: '#F77E2D', fontSize: 15 },
   deleteText: { color: '#888', fontSize: 14 },
   setsHeader: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   setsHeaderText: { flex: 1, fontSize: 11, color: '#888', textTransform: 'uppercase' },
@@ -188,6 +281,17 @@ const styles = StyleSheet.create({
   volumeText: { fontSize: 12, color: '#888', marginTop: 4, fontWeight: '600' },
   noSets: { fontSize: 13, color: '#888', fontStyle: 'italic' },
   notes: { fontSize: 13, color: '#1A1A1A', marginTop: 10, borderTopWidth: 1, borderTopColor: '#C5BFB4', paddingTop: 10 },
+  editRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 },
+  editSetNum: { width: 20, fontSize: 13, color: '#888' },
+  editInput: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 14, color: '#1A1A1A', textAlign: 'center' },
+  removeText: { color: '#888', fontSize: 16, paddingHorizontal: 6 },
+  editActionsRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  addSetBtn: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  addSetBtnText: { color: '#1A1A1A', fontWeight: '700', fontSize: 12 },
+  cancelBtn: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  cancelBtnText: { color: '#888', fontWeight: '700', fontSize: 12 },
+  saveEditBtn: { flex: 1, backgroundColor: '#F77E2D', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  saveEditBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   paginationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 20 },
   pageBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#D9D3C8', borderRadius: 8 },
   pageBtnDisabled: { opacity: 0.4 },
