@@ -182,14 +182,20 @@ export default function WorkoutScreen() {
     const logs = exerciseLogs[exercise] || [];
     const todayLog = logs.find(l => l.date === localDate());
     try {
-      await api.post('/exercises', {
+      const res = await api.post('/exercises', {
         exercise,
         date: localDate(),
         sets: todayLog?.sets || [],
         notes: value
       });
-      fetchExerciseLogs(exercise);
-      fetchExercises();
+      setExerciseLogs(prev => {
+        const existing = prev[exercise] || [];
+        const idx = existing.findIndex(l => l.date === localDate());
+        const updated = idx >= 0
+          ? existing.map((l, i) => i === idx ? res.data : l)
+          : [res.data, ...existing];
+        return { ...prev, [exercise]: updated };
+      });
     } catch (err) {
       console.error(err);
     }
