@@ -30,6 +30,7 @@ export default function ExerciseHistoryScreen() {
   const [page, setPage] = useState(0);
   const [editingLogId, setEditingLogId] = useState(null);
   const [editSets, setEditSets] = useState([]);
+  const [editNotes, setEditNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   const fetchLogs = async () => {
@@ -65,11 +66,13 @@ export default function ExerciseHistoryScreen() {
   const startEdit = (log) => {
     setEditingLogId(log._id);
     setEditSets((log.sets || []).map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
+    setEditNotes(log.notes || '');
   };
 
   const cancelEdit = () => {
     setEditingLogId(null);
     setEditSets([]);
+    setEditNotes('');
   };
 
   const updateEditSet = (idx, field, value) => {
@@ -92,10 +95,11 @@ export default function ExerciseHistoryScreen() {
         weight: parseFloat(s.weight) || 0,
         reps: parseInt(s.reps) || 0
       }));
-      const res = await api.put(`/exercises/${logId}`, { sets });
+      const res = await api.put(`/exercises/${logId}`, { sets, notes: editNotes });
       setLogs(prev => prev.map(l => l._id === logId ? res.data : l));
       setEditingLogId(null);
       setEditSets([]);
+      setEditNotes('');
     } catch (err) {
       console.error(err);
     } finally {
@@ -189,6 +193,14 @@ export default function ExerciseHistoryScreen() {
                         </TouchableOpacity>
                       </View>
                     ))}
+                    <TextInput
+                      style={styles.editNotesInput}
+                      placeholder="Notes, links, video URLs..."
+                      placeholderTextColor="#999"
+                      multiline
+                      value={editNotes}
+                      onChangeText={setEditNotes}
+                    />
                     <View style={styles.editActionsRow}>
                       <TouchableOpacity style={styles.addSetBtn} onPress={addEditSet}>
                         <Text style={styles.addSetBtnText}>+ Add Set</Text>
@@ -285,6 +297,7 @@ const styles = StyleSheet.create({
   editSetNum: { width: 20, fontSize: 13, color: '#888' },
   editInput: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 14, color: '#1A1A1A', textAlign: 'center' },
   removeText: { color: '#888', fontSize: 16, paddingHorizontal: 6 },
+  editNotesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 4, minHeight: 60, textAlignVertical: 'top' },
   editActionsRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   addSetBtn: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
   addSetBtnText: { color: '#1A1A1A', fontWeight: '700', fontSize: 12 },
