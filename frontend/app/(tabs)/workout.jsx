@@ -36,6 +36,7 @@ function ExerciseNotesEditor({ initialValue, onSave }) {
   const [value, setValue] = useState(initialValue || '');
   const [isEditing, setIsEditing] = useState(!initialValue);
   const timerRef = useRef(null);
+  const hasFocusedRef = useRef(false);
 
   const handleChange = (v) => {
     setValue(v);
@@ -57,11 +58,16 @@ function ExerciseNotesEditor({ initialValue, onSave }) {
   if (isEditing) {
     return (
       <TextInput
+        ref={(node) => {
+          if (node && !hasFocusedRef.current) {
+            hasFocusedRef.current = true;
+            node.focus();
+          }
+        }}
         style={styles.notesInput}
         placeholder="Notes, links, video URLs..."
         placeholderTextColor="#999"
         multiline
-        autoFocus
         value={value}
         onChangeText={handleChange}
         onBlur={handleBlur}
