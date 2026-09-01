@@ -127,8 +127,11 @@ export default function WorkoutScreen() {
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [pendingSets, setPendingSets] = useState({});
   const [exercisesPage, setExercisesPage] = useState(0);
-  const [renamingExercise, setRenamingExercise] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [editingExercise, setEditingExercise] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editSetsToday, setEditSetsToday] = useState([]);
+  const [editNotesValue, setEditNotesValue] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const EXERCISES_PER_PAGE = 10;
   const router = useRouter();
 
@@ -280,37 +283,60 @@ export default function WorkoutScreen() {
     }
   };
 
-  const startRename = (exercise) => {
-    setRenamingExercise(exercise);
-    setRenameValue(exercise);
+  const startEditExercise = async (exercise) => {
+    setEditingExercise(exercise);
+    setEditName(exercise);
+    const todayLog = await getFreshTodayLog(exercise);
+    setEditSetsToday((todayLog?.sets || []).map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
+    setEditNotesValue(todayLog?.notes || '');
   };
 
-  const cancelRename = () => {
-    setRenamingExercise(null);
-    setRenameValue('');
+  const cancelEditExercise = () => {
+    setEditingExercise(null);
+    setEditName('');
+    setEditSetsToday([]);
+    setEditNotesValue('');
   };
 
-  const confirmRename = async () => {
-    const trimmed = renameValue.trim();
-    if (!trimmed || trimmed === renamingExercise) {
-      cancelRename();
-      return;
-    }
+  const updateEditSet = (idx, field, value) => {
+    setEditSetsToday(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  };
+
+  const addEditSet = () => {
+    setEditSetsToday(prev => [...prev, { weight: '', reps: '' }]);
+  };
+
+  const removeEditSet = (idx) => {
+    setEditSetsToday(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const confirmEditExercise = async () => {
+    const trimmedName = editName.trim();
+    if (!trimmedName) return;
+    setSavingEdit(true);
     try {
-      await api.put(`/exercises/by-name/${encodeURIComponent(renamingExercise)}/rename`, { newName: trimmed });
-      setExercises(prev => prev.map(e => e.exercise === renamingExercise ? { ...e, exercise: trimmed } : e));
-      setExerciseLogs(prev => {
-        const updated = { ...prev };
-        if (updated[renamingExercise]) {
-          updated[trimmed] = updated[renamingExercise];
-          delete updated[renamingExercise];
-        }
-        return updated;
+      if (trimmedName !== editingExercise) {
+        await api.put(`/exercises/by-name/${encodeURIComponent(editingExercise)}/rename`, { newName: trimmedName });
+      }
+      const sets = editSetsToday.map((s, i) => ({
+        setNumber: i + 1,
+        weight: parseFloat(s.weight) || 0,
+        reps: parseInt(s.reps) || 0
+      }));
+      await api.post('/exercises', {
+        exercise: trimmedName,
+        date: localDate(),
+        sets,
+        notes: editNotesValue
       });
-      if (expandedExercise === renamingExercise) setExpandedExercise(trimmed);
-      cancelRename();
+      if (expandedExercise === editingExercise) setExpandedExercise(trimmedName);
+      cancelEditExercise();
+      fetchExercises();
+      fetchExerciseLogs(trimmedName);
     } catch (err) {
       console.error(err);
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -456,24 +482,62 @@ export default function WorkoutScreen() {
                 const allSets = logs.flatMap(l => l.sets || []);
                 const bestWeight = allSets.length > 0 ? Math.max(...allSets.map(s => s.weight || 0)) : 0;
                 const isExpanded = expandedExercise === ex.exercise;
-                const isRenaming = renamingExercise === ex.exercise;
+                const isEditingThis = editingExercise === ex.exercise;
 
-                if (isRenaming) {
+                if (isEditingThis) {
                   return (
                     <View key={ex.exercise} style={styles.exerciseCard}>
+                      <TextInput
+                        style={styles.renameInput}
+                        value={editName}
+                        onChangeText={setEditName}
+                        autoFocus
+                      />
+
+                      <Text style={styles.editSectionLabel}>Today's Sets</Text>
+                      {editSetsToday.map((s, sidx) => (
+                        <View key={sidx} style={styles.addSetRow}>
+                          <TextInput
+                            style={styles.setInput}
+                            placeholder="kg"
+                            placeholderTextColor="#999"
+                            keyboardType="numeric"
+                            value={s.weight}
+                            onChangeText={v => updateEditSet(sidx, 'weight', v)}
+                          />
+                          <TextInput
+                            style={styles.setInput}
+                            placeholder="reps"
+                            placeholderTextColor="#999"
+                            keyboardType="numeric"
+                            value={s.reps}
+                            onChangeText={v => updateEditSet(sidx, 'reps', v)}
+                          />
+                          <TouchableOpacity onPress={() => removeEditSet(sidx)}>
+                            <Text style={styles.removeRowText}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      <TouchableOpacity style={styles.addRowBtn} onPress={addEditSet}>
+                        <Text style={styles.addRowBtnText}>+ Add Set</Text>
+                      </TouchableOpacity>
+
+                      <Text style={styles.editSectionLabel}>Notes</Text>
+                      <TextInput
+                        style={styles.notesInput}
+                        placeholder="Notes, links, video URLs..."
+                        placeholderTextColor="#999"
+                        multiline
+                        value={editNotesValue}
+                        onChangeText={setEditNotesValue}
+                      />
+
                       <View style={styles.renameRow}>
-                        <TextInput
-                          style={styles.renameInput}
-                          value={renameValue}
-                          onChangeText={setRenameValue}
-                          onSubmitEditing={confirmRename}
-                          autoFocus
-                        />
-                        <TouchableOpacity style={styles.renameCancelBtn} onPress={cancelRename}>
+                        <TouchableOpacity style={styles.renameCancelBtn} onPress={cancelEditExercise}>
                           <Text style={styles.renameCancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.renameSaveBtn} onPress={confirmRename}>
-                          <Text style={styles.renameSaveBtnText}>Save</Text>
+                        <TouchableOpacity style={styles.renameSaveBtn} onPress={confirmEditExercise} disabled={savingEdit}>
+                          {savingEdit ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.renameSaveBtnText}>Save</Text>}
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -493,7 +557,7 @@ export default function WorkoutScreen() {
                             <Text style={styles.minimizeText}>⌃</Text>
                           </TouchableOpacity>
                         )}
-                        <TouchableOpacity onPress={() => startRename(ex.exercise)}>
+                        <TouchableOpacity onPress={() => startEditExercise(ex.exercise)}>
                           <Text style={styles.renameExerciseText}>✎</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => deleteExercise(ex.exercise)}>
@@ -651,6 +715,7 @@ const styles = StyleSheet.create({
   renameCancelBtnText: { color: '#888', fontWeight: '700', fontSize: 13 },
   renameSaveBtn: { backgroundColor: '#F77E2D', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
   renameSaveBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  editSectionLabel: { fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginTop: 14, marginBottom: 8 },
   minimizeText: { color: '#F77E2D', fontSize: 16, fontWeight: '900' },
   weekEditRow: { flexDirection: 'row', alignItems: 'center' },
   weekInput: { backgroundColor: '#EDE8DF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 12, color: '#1A1A1A', width: 50, textAlign: 'center' },
