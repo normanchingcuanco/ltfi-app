@@ -22,6 +22,18 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
+const KG_TO_LBS = 2.20462;
+
+const displayWeight = (kg, unit) => {
+  if (kg === undefined || kg === null) return '';
+  const val = unit === 'lbs' ? kg * KG_TO_LBS : kg;
+  return Math.round(val * 10) / 10;
+};
+
+const toKg = (value, unit) => {
+  const num = parseFloat(value) || 0;
+  return unit === 'lbs' ? num / KG_TO_LBS : num;
+};
 export default function ExerciseHistoryScreen() {
   const { exercise } = useLocalSearchParams();
   const router = useRouter();
@@ -35,6 +47,7 @@ export default function ExerciseHistoryScreen() {
   const [saving, setSaving] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
+  const [weightUnit, setWeightUnit] = useState('kg');
 
   useEffect(() => {
     setCurrentExercise(exercise);
@@ -77,9 +90,19 @@ export default function ExerciseHistoryScreen() {
     }
   };
 
+  const fetchWeightUnit = async () => {
+    try {
+      const res = await api.get('/auth/me');
+      setWeightUnit(res.data.weightUnit || 'kg');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchLogs();
+      fetchWeightUnit();
       setPage(0);
       setEditingLogId(null);
     }, [currentExercise])
@@ -98,7 +121,7 @@ export default function ExerciseHistoryScreen() {
 
   const startEdit = (log) => {
     setEditingLogId(log._id);
-    setEditSets((log.sets || []).map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
+    setEditSets((log.sets || []).map(s => ({ weight: String(displayWeight(s.weight, weightUnit) ?? ''), reps: String(s.reps ?? '') })));
     setEditNotes(log.notes || '');
   };
 
@@ -125,7 +148,7 @@ export default function ExerciseHistoryScreen() {
     try {
       const sets = editSets.map((s, i) => ({
         setNumber: i + 1,
-        weight: parseFloat(s.weight) || 0,
+        weight: toKg(s.weight, weightUnit),
         reps: parseInt(s.reps) || 0
       }));
       const res = await api.put(`/exercises/${logId}`, { sets, notes: editNotes });
@@ -186,7 +209,7 @@ export default function ExerciseHistoryScreen() {
       {overallBest > 0 && (
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>All-Time Best</Text>
-          <Text style={styles.summaryValue}>{overallBest}kg</Text>
+          <Text style={styles.summaryValue}>{displayWeight(overallBest, weightUnit)}{weightUnit}</Text>
         </View>
       )}
 
@@ -230,7 +253,7 @@ export default function ExerciseHistoryScreen() {
                         <Text style={styles.editSetNum}>{sidx + 1}</Text>
                         <TextInput
                           style={styles.editInput}
-                          placeholder="kg"
+                          placeholder={weightUnit}
                           placeholderTextColor="#999"
                           keyboardType="numeric"
                           value={s.weight}
@@ -281,12 +304,11 @@ export default function ExerciseHistoryScreen() {
                         {log.sets.map((set, sidx) => (
                           <View key={sidx} style={styles.setRow}>
                             <Text style={styles.setNum}>{set.setNumber}</Text>
-                            <Text style={styles.setVal}>{set.weight}kg</Text>
+                            <Text style={styles.setVal}>{displayWeight(set.weight, weightUnit)}{weightUnit}</Text>
                             <Text style={styles.setVal}>{set.reps}</Text>
                           </View>
                         ))}
-                        <Text style={styles.volumeText}>Volume: {volume}kg</Text>
-                      </>
+                        <Text style={styles.volumeText}>Volume: {displayWeight(volume, weightUnit)}{weightUnit}</Text>                      </>
                     ) : (
                       <Text style={styles.noSets}>No sets logged</Text>
                     )}
