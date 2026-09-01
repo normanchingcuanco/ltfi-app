@@ -292,8 +292,7 @@ export default function WorkoutScreen() {
   const saveSets = async (exercise) => {
     const rows = pendingSets[exercise] || [];
     if (rows.length === 0) return;
-    const logs = exerciseLogs[exercise] || [];
-    const todayLog = logs.find(l => l.date === localDate());
+    const todayLog = await getFreshTodayLog(exercise);
     const existingSets = todayLog?.sets || [];
     const addedSets = rows.map((row, i) => ({
       setNumber: existingSets.length + i + 1,
@@ -532,6 +531,8 @@ export default function WorkoutScreen() {
                 const todayLog = logs.find(l => l.date === localDate());
                 const allSets = logs.flatMap(l => l.sets || []);
                 const bestWeight = allSets.length > 0 ? Math.max(...allSets.map(s => s.weight || 0)) : 0;
+                const bestReps = allSets.length > 0 ? Math.max(...allSets.map(s => s.reps || 0)) : 0;
+                const isBodyweight = bestWeight === 0 && bestReps > 0;
                 const isExpanded = expandedExercise === ex.exercise;
                 const isEditingThis = editingExercise === ex.exercise;
 
@@ -621,11 +622,15 @@ export default function WorkoutScreen() {
                         <View style={styles.badge}>
                           <Text style={styles.badgeText}>{todayLog?.sets?.length || 0} sets today</Text>
                         </View>
-                        {bestWeight > 0 && (
+                        {bestWeight > 0 ? (
                           <View style={[styles.badge, styles.badgeGreen]}>
                             <Text style={[styles.badgeText, styles.badgeTextGreen]}>{displayWeight(bestWeight, weightUnit)}{weightUnit} best</Text>
                           </View>
-                        )}
+                        ) : isBodyweight ? (
+                          <View style={[styles.badge, styles.badgeGreen]}>
+                            <Text style={[styles.badgeText, styles.badgeTextGreen]}>{bestReps} reps best</Text>
+                          </View>
+                        ) : null}
                       </View>
                     </TouchableOpacity>
 
