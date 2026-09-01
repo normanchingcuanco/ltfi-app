@@ -190,6 +190,18 @@ export default function WorkoutScreen() {
     try {
       const res = await api.get('/exercises');
       setExercises(res.data);
+      const logResults = await Promise.all(
+        res.data.map(ex =>
+          api.get(`/exercises/${encodeURIComponent(ex.exercise)}`)
+            .then(r => ({ exercise: ex.exercise, logs: r.data }))
+            .catch(() => ({ exercise: ex.exercise, logs: [] }))
+        )
+      );
+      setExerciseLogs(prev => {
+        const updated = { ...prev };
+        logResults.forEach(({ exercise, logs }) => { updated[exercise] = logs; });
+        return updated;
+      });
     } catch (err) {
       console.error(err);
     } finally {
@@ -266,6 +278,7 @@ export default function WorkoutScreen() {
   };
 
   const saveAll = async (exercise) => {
+    const capturedNotes = notesRefs.current[exercise]?.getValue();
     setSavingExercise(exercise);
     try {
       const todayLog = await getFreshTodayLog(exercise);
@@ -279,7 +292,7 @@ export default function WorkoutScreen() {
           reps: parseInt(row.reps) || 0
         }));
       const newSets = [...existingSets, ...addedSets];
-      const notesValue = notesRefs.current[exercise]?.getValue() ?? (todayLog?.notes || '');
+      const notesValue = capturedNotes ?? (todayLog?.notes || '');
 
       await api.post('/exercises', {
         exercise,
