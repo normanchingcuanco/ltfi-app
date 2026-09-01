@@ -135,4 +135,21 @@ const deleteExerciseByName = async (req, res) => {
   }
 };
 
-module.exports = { getExercises, getExerciseLogs, logExercise, updateExerciseLog, deleteExerciseLog, deleteExerciseByName };
+const renameExercise = async (req, res) => {
+  try {
+    const { exercise } = req.params;
+    const { newName } = req.body;
+    if (!newName || !newName.trim()) {
+      return res.status(400).json({ message: 'newName is required' });
+    }
+    await ExerciseLog.updateMany(
+      { user: req.user._id, exercise },
+      { $set: { exercise: newName.trim() } }
+    );
+    res.json({ message: 'Exercise renamed', newName: newName.trim() });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports = { getExercises, getExerciseLogs, logExercise, updateExerciseLog, deleteExerciseLog, deleteExerciseByName, renameExercise };

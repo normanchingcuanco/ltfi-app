@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import api from '../src/utils/api';
@@ -25,6 +25,7 @@ const formatDate = (dateStr) => {
 export default function ExerciseHistoryScreen() {
   const { exercise } = useLocalSearchParams();
   const router = useRouter();
+  const [currentExercise, setCurrentExercise] = useState(exercise);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -32,10 +33,42 @@ export default function ExerciseHistoryScreen() {
   const [editSets, setEditSets] = useState([]);
   const [editNotes, setEditNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+
+  useEffect(() => {
+    setCurrentExercise(exercise);
+  }, [exercise]);
+
+  const startRename = () => {
+    setRenameValue(currentExercise);
+    setIsRenaming(true);
+  };
+
+  const cancelRename = () => {
+    setIsRenaming(false);
+    setRenameValue('');
+  };
+
+  const confirmRename = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === currentExercise) {
+      cancelRename();
+      return;
+    }
+    try {
+      await api.put(`/exercises/by-name/${encodeURIComponent(currentExercise)}/rename`, { newName: trimmed });
+      setCurrentExercise(trimmed);
+      setIsRenaming(false);
+      setRenameValue('');
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchLogs = async () => {
     try {
-      const res = await api.get(`/exercises/${encodeURIComponent(exercise)}`);
+      const res = await api.get(`/exercises/${encodeURIComponent(currentExercise)}`);
       setLogs(res.data);
     } catch (err) {
       console.error(err);
@@ -49,7 +82,7 @@ export default function ExerciseHistoryScreen() {
       fetchLogs();
       setPage(0);
       setEditingLogId(null);
-    }, [exercise])
+    }, [currentExercise])
   );
 
   const deleteLog = (id) => {
@@ -125,7 +158,30 @@ export default function ExerciseHistoryScreen() {
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>{exercise}</Text>
+      {isRenaming ? (
+        <View style={styles.renameRow}>
+          <TextInput
+            style={styles.renameInput}
+            value={renameValue}
+            onChangeText={setRenameValue}
+            onSubmitEditing={confirmRename}
+            autoFocus
+          />
+          <TouchableOpacity style={styles.renameCancelBtn} onPress={cancelRename}>
+            <Text style={styles.renameCancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.renameSaveBtn} onPress={confirmRename}>
+            <Text style={styles.renameSaveBtnText}>Save</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{currentExercise}</Text>
+          <TouchableOpacity onPress={startRename}>
+            <Text style={styles.renameText}>✎</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {overallBest > 0 && (
         <View style={styles.summaryCard}>
@@ -271,7 +327,15 @@ const styles = StyleSheet.create({
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
   back: { color: '#F77E2D', fontSize: 15, fontWeight: '600', marginBottom: 16 },
-  title: { fontSize: 26, fontWeight: '900', color: '#1A1A1A', marginBottom: 16 },
+  title: { fontSize: 26, fontWeight: '900', color: '#1A1A1A' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  renameText: { color: '#F77E2D', fontSize: 18 },
+  renameRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 16 },
+  renameInput: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 10, padding: 12, fontSize: 18, color: '#1A1A1A', fontWeight: '900' },
+  renameCancelBtn: { backgroundColor: '#D9D3C8', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  renameCancelBtnText: { color: '#888', fontWeight: '700', fontSize: 13 },
+  renameSaveBtn: { backgroundColor: '#F77E2D', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  renameSaveBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   summaryCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 20, alignItems: 'center' },
   summaryLabel: { fontSize: 12, color: '#888', textTransform: 'uppercase', marginBottom: 4 },
   summaryValue: { fontSize: 28, fontWeight: '900', color: '#F77E2D' },

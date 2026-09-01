@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { getExercises, getExerciseLogs, logExercise, updateExerciseLog, deleteExerciseLog, deleteExerciseByName } = require('../controllers/exerciseController');
+const { getExercises, getExerciseLogs, logExercise, updateExerciseLog, deleteExerciseLog, deleteExerciseByName, renameExercise } = require('../controllers/exerciseController');
 const { protect } = require('../middleware/auth');
 router.use(protect);
 router.get('/', getExercises);
 router.get('/:exercise', getExerciseLogs);
 router.post('/', logExercise);
+router.put('/by-name/:exercise/rename', renameExercise);
 router.put('/:id', updateExerciseLog);
 router.delete('/by-name/:exercise', deleteExerciseByName);
 router.delete('/:id', deleteExerciseLog);

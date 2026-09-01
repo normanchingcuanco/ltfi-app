@@ -127,6 +127,8 @@ export default function WorkoutScreen() {
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [pendingSets, setPendingSets] = useState({});
   const [exercisesPage, setExercisesPage] = useState(0);
+  const [renamingExercise, setRenamingExercise] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
   const EXERCISES_PER_PAGE = 10;
   const router = useRouter();
 
@@ -278,6 +280,40 @@ export default function WorkoutScreen() {
     }
   };
 
+  const startRename = (exercise) => {
+    setRenamingExercise(exercise);
+    setRenameValue(exercise);
+  };
+
+  const cancelRename = () => {
+    setRenamingExercise(null);
+    setRenameValue('');
+  };
+
+  const confirmRename = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === renamingExercise) {
+      cancelRename();
+      return;
+    }
+    try {
+      await api.put(`/exercises/by-name/${encodeURIComponent(renamingExercise)}/rename`, { newName: trimmed });
+      setExercises(prev => prev.map(e => e.exercise === renamingExercise ? { ...e, exercise: trimmed } : e));
+      setExerciseLogs(prev => {
+        const updated = { ...prev };
+        if (updated[renamingExercise]) {
+          updated[trimmed] = updated[renamingExercise];
+          delete updated[renamingExercise];
+        }
+        return updated;
+      });
+      if (expandedExercise === renamingExercise) setExpandedExercise(trimmed);
+      cancelRename();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const deleteExercise = (exercise) => {
     confirmDelete(async () => {
       try {
@@ -420,6 +456,29 @@ export default function WorkoutScreen() {
                 const allSets = logs.flatMap(l => l.sets || []);
                 const bestWeight = allSets.length > 0 ? Math.max(...allSets.map(s => s.weight || 0)) : 0;
                 const isExpanded = expandedExercise === ex.exercise;
+                const isRenaming = renamingExercise === ex.exercise;
+
+                if (isRenaming) {
+                  return (
+                    <View key={ex.exercise} style={styles.exerciseCard}>
+                      <View style={styles.renameRow}>
+                        <TextInput
+                          style={styles.renameInput}
+                          value={renameValue}
+                          onChangeText={setRenameValue}
+                          onSubmitEditing={confirmRename}
+                          autoFocus
+                        />
+                        <TouchableOpacity style={styles.renameCancelBtn} onPress={cancelRename}>
+                          <Text style={styles.renameCancelBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.renameSaveBtn} onPress={confirmRename}>
+                          <Text style={styles.renameSaveBtnText}>Save</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                }
 
                 return (
                   <View key={ex.exercise} style={styles.exerciseCard}>
@@ -434,6 +493,9 @@ export default function WorkoutScreen() {
                             <Text style={styles.minimizeText}>⌃</Text>
                           </TouchableOpacity>
                         )}
+                        <TouchableOpacity onPress={() => startRename(ex.exercise)}>
+                          <Text style={styles.renameExerciseText}>✎</Text>
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={() => deleteExercise(ex.exercise)}>
                           <Text style={styles.deleteExerciseText}>✕</Text>
                         </TouchableOpacity>
@@ -582,6 +644,13 @@ const styles = StyleSheet.create({
   exerciseDate: { fontSize: 12, color: '#888' },
   exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   deleteExerciseText: { color: '#888', fontSize: 14, fontWeight: '700' },
+  renameExerciseText: { color: '#888', fontSize: 14 },
+  renameRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  renameInput: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 10, padding: 12, fontSize: 15, color: '#1A1A1A', fontWeight: '700' },
+  renameCancelBtn: { backgroundColor: '#EDE8DF', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  renameCancelBtnText: { color: '#888', fontWeight: '700', fontSize: 13 },
+  renameSaveBtn: { backgroundColor: '#F77E2D', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  renameSaveBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   minimizeText: { color: '#F77E2D', fontSize: 16, fontWeight: '900' },
   weekEditRow: { flexDirection: 'row', alignItems: 'center' },
   weekInput: { backgroundColor: '#EDE8DF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, fontSize: 12, color: '#1A1A1A', width: 50, textAlign: 'center' },
