@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput, Linking } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
@@ -45,26 +45,22 @@ const renderNotesWithLinks = (text) => {
   );
 };
 
-function ExerciseNotesEditor({ initialValue, onSave }) {
+const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialValue }, ref) {
   const [value, setValue] = useState(initialValue || '');
   const [isEditing, setIsEditing] = useState(!initialValue);
-  const timerRef = useRef(null);
+  const valueRef = useRef(initialValue || '');
   const hasFocusedRef = useRef(false);
+
+  useImperativeHandle(ref, () => ({
+    getValue: () => valueRef.current
+  }));
 
   const handleChange = (v) => {
     setValue(v);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      onSave(v);
-    }, 800);
+    valueRef.current = v;
   };
 
   const handleBlur = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    onSave(value);
     setIsEditing(false);
   };
 
@@ -93,7 +89,7 @@ function ExerciseNotesEditor({ initialValue, onSave }) {
       <Text style={styles.notesDisplayText}>{renderNotesWithLinks(value)}</Text>
     </TouchableOpacity>
   );
-}
+});
 
 function WeekEditor({ week, onSave }) {
   const [editing, setEditing] = useState(false);
@@ -146,6 +142,8 @@ export default function WorkoutScreen() {
   const [editSetsToday, setEditSetsToday] = useState([]);
   const [editNotesValue, setEditNotesValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [savingExercise, setSavingExercise] = useState(null);
+  const notesRefs = useRef({});
   const EXERCISES_PER_PAGE = 10;
   const router = useRouter();
 
@@ -229,28 +227,6 @@ export default function WorkoutScreen() {
     }
   };
 
-  const saveNotes = async (exercise, value) => {
-    const todayLog = await getFreshTodayLog(exercise);
-    try {
-      const res = await api.post('/exercises', {
-        exercise,
-        date: localDate(),
-        sets: todayLog?.sets || [],
-        notes: value
-      });
-      setExerciseLogs(prev => {
-        const existing = prev[exercise] || [];
-        const idx = existing.findIndex(l => l.date === localDate());
-        const updated = idx >= 0
-          ? existing.map((l, i) => i === idx ? res.data : l)
-          : [res.data, ...existing];
-        return { ...prev, [exercise]: updated };
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const saveWeek = async (exercise, newWeek) => {
     const todayLog = await getFreshTodayLog(exercise);
     try {
@@ -289,29 +265,35 @@ export default function WorkoutScreen() {
     }));
   };
 
-  const saveSets = async (exercise) => {
-    const rows = pendingSets[exercise] || [];
-    if (rows.length === 0) return;
-    const todayLog = await getFreshTodayLog(exercise);
-    const existingSets = todayLog?.sets || [];
-    const addedSets = rows.map((row, i) => ({
-      setNumber: existingSets.length + i + 1,
-      weight: toKg(row.weight, weightUnit),
-      reps: parseInt(row.reps) || 0
-    }));
-    const newSets = [...existingSets, ...addedSets];
+  const saveAll = async (exercise) => {
+    setSavingExercise(exercise);
     try {
+      const todayLog = await getFreshTodayLog(exercise);
+      const existingSets = todayLog?.sets || [];
+      const rows = pendingSets[exercise] || [];
+      const addedSets = rows
+        .filter(row => row.weight !== '' || row.reps !== '')
+        .map((row, i) => ({
+          setNumber: existingSets.length + i + 1,
+          weight: toKg(row.weight, weightUnit),
+          reps: parseInt(row.reps) || 0
+        }));
+      const newSets = [...existingSets, ...addedSets];
+      const notesValue = notesRefs.current[exercise]?.getValue() ?? (todayLog?.notes || '');
+
       await api.post('/exercises', {
         exercise,
         date: localDate(),
         sets: newSets,
-        notes: todayLog?.notes || ''
+        notes: notesValue
       });
       setPendingSets(prev => ({ ...prev, [exercise]: [] }));
-      fetchExerciseLogs(exercise);
-      fetchExercises();
+      await fetchExerciseLogs(exercise);
+      await fetchExercises();
     } catch (err) {
       console.error(err);
+    } finally {
+      setSavingExercise(null);
     }
   };
 
@@ -675,21 +657,24 @@ export default function WorkoutScreen() {
                             </TouchableOpacity>
                           </View>
                         ))}
-                        <View style={styles.rowActions}>
-                          <TouchableOpacity style={styles.addRowBtn} onPress={() => addRow(ex.exercise)}>
-                            <Text style={styles.addRowBtnText}>+ Add Row</Text>
-                          </TouchableOpacity>
-                          {(pendingSets[ex.exercise] || []).length > 0 && (
-                            <TouchableOpacity style={styles.saveSetsBtn} onPress={() => saveSets(ex.exercise)}>
-                              <Text style={styles.saveSetsBtnText}>Save Sets</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
+                        <TouchableOpacity style={styles.addRowBtn} onPress={() => addRow(ex.exercise)}>
+                          <Text style={styles.addRowBtnText}>+ Add Row</Text>
+                        </TouchableOpacity>
                         <ExerciseNotesEditor
+                          ref={(el) => { notesRefs.current[ex.exercise] = el; }}
                           key={`${ex.exercise}-notes`}
                           initialValue={todayLog?.notes || ''}
-                          onSave={(v) => saveNotes(ex.exercise, v)}
                         />
+                        <TouchableOpacity
+                          style={styles.saveSetsBtn}
+                          onPress={() => saveAll(ex.exercise)}
+                          disabled={savingExercise === ex.exercise}
+                        >
+                          {savingExercise === ex.exercise
+                            ? <ActivityIndicator size="small" color="#fff" />
+                            : <Text style={styles.saveSetsBtnText}>Save</Text>
+                          }
+                        </TouchableOpacity>
                         <TouchableOpacity style={styles.historyBtn} onPress={() => router.push({ pathname: '/exercise-history', params: { exercise: ex.exercise } })}>
                           <Text style={styles.historyBtnText}>View History</Text>
                         </TouchableOpacity>
@@ -796,11 +781,10 @@ const styles = StyleSheet.create({
   addSetRow: { flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center' },
   setInput: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 14, color: '#1A1A1A', textAlign: 'center' },
   removeRowText: { color: '#888', fontSize: 16, paddingHorizontal: 6 },
-  rowActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  addRowBtn: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  addRowBtn: { backgroundColor: '#EDE8DF', borderRadius: 8, paddingVertical: 10, alignItems: 'center', marginTop: 8 },
   addRowBtnText: { color: '#1A1A1A', fontWeight: '700', fontSize: 13 },
-  saveSetsBtn: { flex: 1, backgroundColor: '#F77E2D', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
-  saveSetsBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  saveSetsBtn: { backgroundColor: '#F77E2D', borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
+  saveSetsBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   historyBtn: { marginTop: 10, borderWidth: 1, borderColor: '#F77E2D', borderRadius: 8, padding: 10, alignItems: 'center' },
   historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 },
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 60, textAlignVertical: 'top' },
