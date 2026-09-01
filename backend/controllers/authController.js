@@ -26,6 +26,7 @@ const register = async (req, res) => {
       avatarInitials: user.avatarInitials,
       dailyCalorieGoal: user.dailyCalorieGoal,
       macroGoals: user.macroGoals,
+      weightUnit: user.weightUnit,
       token: generateToken(user._id)
     });
   } catch (err) {
@@ -41,22 +42,23 @@ const login = async (req, res) => {
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
     const match = await user.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      gender: user.gender,
-      avatarInitials: user.avatarInitials,
-      dailyCalorieGoal: user.dailyCalorieGoal,
-      macroGoals: user.macroGoals,
-      token: generateToken(user._id)
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+      res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        gender: user.gender,
+        avatarInitials: user.avatarInitials,
+        dailyCalorieGoal: user.dailyCalorieGoal,
+        macroGoals: user.macroGoals,
+        weightUnit: user.weightUnit,
+        token: generateToken(user._id)
+      });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  };
 
-const getMe = async (req, res) => {
+  const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
@@ -67,7 +69,7 @@ const getMe = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, currentWeight, goalWeight, height, age, activityLevel, dietPreference, gender, timezone } = req.body;
+    const { name, currentWeight, goalWeight, height, age, activityLevel, dietPreference, gender, timezone, weightUnit } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -79,6 +81,7 @@ const updateProfile = async (req, res) => {
     if (activityLevel) user.activityLevel = activityLevel;
     if (dietPreference !== undefined) user.dietPreference = dietPreference;
     if (timezone) user.timezone = timezone;
+    if (weightUnit) user.weightUnit = weightUnit;
 
     const dailyCalorieGoal = calculateTDEE({
       age: user.age,
@@ -92,27 +95,29 @@ const updateProfile = async (req, res) => {
 
     await user.save();
 
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      gender: user.gender,
-      avatarInitials: user.avatarInitials,
-      dailyCalorieGoal: user.dailyCalorieGoal,
-      macroGoals: user.macroGoals,
-      currentWeight: user.currentWeight,
-      goalWeight: user.goalWeight,
-      height: user.height,
-      age: user.age,
-      activityLevel: user.activityLevel,
-      dietPreference: user.dietPreference
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+      res.json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        gender: user.gender,
+        avatarInitials: user.avatarInitials,
+        dailyCalorieGoal: user.dailyCalorieGoal,
+        macroGoals: user.macroGoals,
+        currentWeight: user.currentWeight,
+        goalWeight: user.goalWeight,
+        height: user.height,
+        age: user.age,
+        activityLevel: user.activityLevel,
+        dietPreference: user.dietPreference,
+        timezone: user.timezone,
+        weightUnit: user.weightUnit
+      });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  };
 
-const forgotPassword = async (req, res) => {
+  const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });

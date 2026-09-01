@@ -24,7 +24,8 @@ const userSchema = new mongoose.Schema({
   avatarInitials: { type: String },
   resetToken: { type: String },
   resetTokenExpiry: { type: Date },
-  timezone: { type: String, default: '' }
+  timezone: { type: String, default: '' },
+  weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' }
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {
