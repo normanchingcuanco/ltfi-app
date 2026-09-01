@@ -290,6 +290,7 @@ export default function WorkoutScreen() {
       setPendingSets(prev => ({ ...prev, [exercise]: [] }));
       await fetchExerciseLogs(exercise);
       await fetchExercises();
+      setExpandedExercise(null);
     } catch (err) {
       console.error(err);
     } finally {
