@@ -801,7 +801,7 @@ const styles = StyleSheet.create({
   saveSetsBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   historyBtn: { marginTop: 10, borderWidth: 1, borderColor: '#F77E2D', borderRadius: 8, padding: 10, alignItems: 'center' },
   historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 },
-  notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 60, textAlignVertical: 'top' },
+  notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 80, textAlignVertical: 'top' },
   notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, marginTop: 10, minHeight: 60 },
   notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
   linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' },
