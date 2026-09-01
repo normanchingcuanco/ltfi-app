@@ -19,6 +19,19 @@ const localDate = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+const KG_TO_LBS = 2.20462;
+
+const displayWeight = (kg, unit) => {
+  if (kg === undefined || kg === null) return '';
+  const val = unit === 'lbs' ? kg * KG_TO_LBS : kg;
+  return Math.round(val * 10) / 10;
+};
+
+const toKg = (value, unit) => {
+  const num = parseFloat(value) || 0;
+  return unit === 'lbs' ? num / KG_TO_LBS : num;
+};
+
 const renderNotesWithLinks = (text) => {
   const parts = text.split(/(https?:\/\/[^\s]+)/g);
   return parts.map((part, i) =>
@@ -127,6 +140,7 @@ export default function WorkoutScreen() {
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [pendingSets, setPendingSets] = useState({});
   const [exercisesPage, setExercisesPage] = useState(0);
+  const [weightUnit, setWeightUnit] = useState('kg');
   const [editingExercise, setEditingExercise] = useState(null);
   const [editName, setEditName] = useState('');
   const [editSetsToday, setEditSetsToday] = useState([]);
@@ -139,9 +153,28 @@ export default function WorkoutScreen() {
     useCallback(() => {
       fetchWorkouts();
       fetchExercises();
+      fetchWeightUnit();
       return () => setExpandedExercise(null);
     }, [])
   );
+
+  const fetchWeightUnit = async () => {
+    try {
+      const res = await api.get('/auth/me');
+      setWeightUnit(res.data.weightUnit || 'kg');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const changeWeightUnit = async (unit) => {
+    setWeightUnit(unit);
+    try {
+      await api.put('/auth/profile', { weightUnit: unit });
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchWorkouts = async () => {
     try {
@@ -264,7 +297,7 @@ export default function WorkoutScreen() {
     const existingSets = todayLog?.sets || [];
     const addedSets = rows.map((row, i) => ({
       setNumber: existingSets.length + i + 1,
-      weight: parseFloat(row.weight) || 0,
+      weight: toKg(row.weight, weightUnit),
       reps: parseInt(row.reps) || 0
     }));
     const newSets = [...existingSets, ...addedSets];
@@ -287,7 +320,7 @@ export default function WorkoutScreen() {
     setEditingExercise(exercise);
     setEditName(exercise);
     const todayLog = await getFreshTodayLog(exercise);
-    setEditSetsToday((todayLog?.sets || []).map(s => ({ weight: String(s.weight ?? ''), reps: String(s.reps ?? '') })));
+    setEditSetsToday((todayLog?.sets || []).map(s => ({ weight: String(displayWeight(s.weight, weightUnit) ?? ''), reps: String(s.reps ?? '') })));
     setEditNotesValue(todayLog?.notes || '');
   };
 
@@ -320,7 +353,7 @@ export default function WorkoutScreen() {
       }
       const sets = editSetsToday.map((s, i) => ({
         setNumber: i + 1,
-        weight: parseFloat(s.weight) || 0,
+        weight: toKg(s.weight, weightUnit),
         reps: parseInt(s.reps) || 0
       }));
       await api.post('/exercises', {
@@ -468,6 +501,24 @@ export default function WorkoutScreen() {
             </View>
           )}
 
+          <View style={styles.unitToggleRow}>
+            <Text style={styles.unitToggleLabel}>Weight Unit</Text>
+            <View style={styles.unitToggle}>
+              <TouchableOpacity
+                style={[styles.unitBtn, weightUnit === 'kg' && styles.unitBtnActive]}
+                onPress={() => changeWeightUnit('kg')}
+              >
+                <Text style={[styles.unitBtnText, weightUnit === 'kg' && styles.unitBtnTextActive]}>kg</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.unitBtn, weightUnit === 'lbs' && styles.unitBtnActive]}
+                onPress={() => changeWeightUnit('lbs')}
+              >
+                <Text style={[styles.unitBtnText, weightUnit === 'lbs' && styles.unitBtnTextActive]}>lbs</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {exercisesLoading ? (
             <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />
           ) : exercises.length === 0 ? (
@@ -499,7 +550,7 @@ export default function WorkoutScreen() {
                         <View key={sidx} style={styles.addSetRow}>
                           <TextInput
                             style={styles.setInput}
-                            placeholder="kg"
+                            placeholder={weightUnit}
                             placeholderTextColor="#999"
                             keyboardType="numeric"
                             value={s.weight}
@@ -572,7 +623,7 @@ export default function WorkoutScreen() {
                         </View>
                         {bestWeight > 0 && (
                           <View style={[styles.badge, styles.badgeGreen]}>
-                            <Text style={[styles.badgeText, styles.badgeTextGreen]}>{bestWeight}kg best</Text>
+                            <Text style={[styles.badgeText, styles.badgeTextGreen]}>{displayWeight(bestWeight, weightUnit)}{weightUnit} best</Text>
                           </View>
                         )}
                       </View>
@@ -590,7 +641,7 @@ export default function WorkoutScreen() {
                             {todayLog.sets.map((set, sidx) => (
                               <View key={sidx} style={styles.setRow}>
                                 <Text style={styles.setNum}>{set.setNumber}</Text>
-                                <Text style={styles.setVal}>{set.weight}kg</Text>
+                                <Text style={styles.setVal}>{displayWeight(set.weight, weightUnit)}{weightUnit}</Text>
                                 <Text style={styles.setVal}>{set.reps}</Text>
                               </View>
                             ))}
@@ -600,7 +651,7 @@ export default function WorkoutScreen() {
                           <View key={ridx} style={styles.addSetRow}>
                             <TextInput
                               style={styles.setInput}
-                              placeholder="kg"
+                              placeholder={weightUnit}
                               placeholderTextColor="#999"
                               keyboardType="numeric"
                               value={row.weight}
@@ -685,6 +736,13 @@ const styles = StyleSheet.create({
   createBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
   createBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   emptyBox: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 24, alignItems: 'center' },
+  unitToggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  unitToggleLabel: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 1 },
+  unitToggle: { flexDirection: 'row', backgroundColor: '#D9D3C8', borderRadius: 10, padding: 3, gap: 3 },
+  unitBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8 },
+  unitBtnActive: { backgroundColor: '#F77E2D' },
+  unitBtnText: { fontSize: 12, fontWeight: '700', color: '#888' },
+  unitBtnTextActive: { color: '#fff' },
   emptyText: { color: '#888', textAlign: 'center', fontSize: 14 },
   workoutCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
   workoutInfo: { flex: 1 },
