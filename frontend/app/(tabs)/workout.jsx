@@ -179,9 +179,20 @@ export default function WorkoutScreen() {
     }
   };
 
+  const getFreshTodayLog = async (exercise) => {
+    try {
+      const res = await api.get(`/exercises/${encodeURIComponent(exercise)}`);
+      setExerciseLogs(prev => ({ ...prev, [exercise]: res.data }));
+      return res.data.find(l => l.date === localDate()) || null;
+    } catch (err) {
+      console.error(err);
+      const logs = exerciseLogs[exercise] || [];
+      return logs.find(l => l.date === localDate()) || null;
+    }
+  };
+
   const saveNotes = async (exercise, value) => {
-    const logs = exerciseLogs[exercise] || [];
-    const todayLog = logs.find(l => l.date === localDate());
+    const todayLog = await getFreshTodayLog(exercise);
     try {
       const res = await api.post('/exercises', {
         exercise,
@@ -203,8 +214,7 @@ export default function WorkoutScreen() {
   };
 
   const saveWeek = async (exercise, newWeek) => {
-    const logs = exerciseLogs[exercise] || [];
-    const todayLog = logs.find(l => l.date === localDate());
+    const todayLog = await getFreshTodayLog(exercise);
     try {
       await api.post('/exercises', {
         exercise,

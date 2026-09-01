@@ -59,8 +59,8 @@ const logExercise = async (req, res) => {
     });
 
     if (existing) {
-      existing.sets = sets;
-      existing.notes = notes;
+      if (sets !== undefined) existing.sets = sets;
+      if (notes !== undefined) existing.notes = notes;
       if (weekOverride !== undefined && weekOverride !== null) {
         existing.week = weekOverride;
       }
