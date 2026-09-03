@@ -125,7 +125,8 @@ function WeekEditor({ week, onSave }) {
 }
 
 const getEffectiveNotes = (logs, todayLog) => {
-  if (todayLog) return todayLog.notes || '';
+  const todayHasContent = todayLog && ((todayLog.sets && todayLog.sets.length > 0) || todayLog.notes);
+  if (todayHasContent) return todayLog.notes || '';
   const mostRecent = logs.find(l => l.notes);
   return mostRecent ? mostRecent.notes : '';
 };
