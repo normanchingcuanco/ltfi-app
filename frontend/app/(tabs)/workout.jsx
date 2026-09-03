@@ -124,6 +124,12 @@ function WeekEditor({ week, onSave }) {
   );
 }
 
+const getEffectiveNotes = (logs, todayLog) => {
+  if (todayLog) return todayLog.notes || '';
+  const mostRecent = logs.find(l => l.notes);
+  return mostRecent ? mostRecent.notes : '';
+};
+
 const sortByOrder = (exercises, order) => {
   if (!order || order.length === 0) return exercises;
   const orderIndex = new Map(order.map((name, i) => [name, i]));
@@ -728,8 +734,8 @@ export default function WorkoutScreen() {
                         </TouchableOpacity>
                         <ExerciseNotesEditor
                           ref={(el) => { notesRefs.current[ex.exercise] = el; }}
-                          key={`${ex.exercise}-notes`}
-                          initialValue={todayLog?.notes || ''}
+                          key={`${ex.exercise}-notes-${todayLog ? 'today' : 'carried'}`}
+                          initialValue={getEffectiveNotes(logs, todayLog)}
                         />
                         <TouchableOpacity
                           style={styles.saveSetsBtn}
