@@ -32,46 +32,59 @@ const toKg = (value, unit) => {
   return unit === 'lbs' ? num / KG_TO_LBS : num;
 };
 
-const renderNotesWithLinks = (text) => {
-  const linkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
-  const parts = [];
+const LINK_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+
+const parseNotesLinks = (text) => {
+  const segments = [];
   let lastIndex = 0;
   let match;
-  let key = 0;
+  const pattern = new RegExp(LINK_PATTERN);
 
-  while ((match = linkPattern.exec(text)) !== null) {
+  while ((match = pattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(<Text key={key++}>{text.slice(lastIndex, match.index)}</Text>);
+      segments.push({ type: 'text', value: text.slice(lastIndex, match.index) });
     }
     if (match[1] && match[2]) {
-      const label = match[1];
-      const url = match[2];
-      parts.push(
-        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
-          {label}
-        </Text>
-      );
+      segments.push({ type: 'link', label: match[1], url: match[2], raw: match[0], start: match.index, end: pattern.lastIndex });
     } else if (match[3]) {
-      const url = match[3];
-      parts.push(
-        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
-          {url}
-        </Text>
-      );
+      segments.push({ type: 'link', label: match[3], url: match[3], raw: match[0], start: match.index, end: pattern.lastIndex });
     }
-    lastIndex = linkPattern.lastIndex;
+    lastIndex = pattern.lastIndex;
   }
 
   if (lastIndex < text.length) {
-    parts.push(<Text key={key++}>{text.slice(lastIndex)}</Text>);
+    segments.push({ type: 'text', value: text.slice(lastIndex) });
   }
 
-  return parts;
+  return segments;
 };
+
+function LinkEditPopover({ segment, onSave, onCancel }) {
+  const [label, setLabel] = useState(segment.label);
+  const [url, setUrl] = useState(segment.url);
+
+  return (
+    <View style={styles.linkEditCard}>
+      <Text style={styles.linkEditLabel}>Name</Text>
+      <TextInput style={styles.linkEditInput} value={label} onChangeText={setLabel} autoFocus />
+      <Text style={styles.linkEditLabel}>URL</Text>
+      <TextInput style={styles.linkEditInput} value={url} onChangeText={setUrl} autoCapitalize="none" />
+      <View style={styles.linkEditRow}>
+        <TouchableOpacity style={styles.linkEditCancelBtn} onPress={onCancel}>
+          <Text style={styles.linkEditCancelText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.linkEditSaveBtn} onPress={() => onSave(label.trim(), url.trim())}>
+          <Text style={styles.linkEditSaveText}>Save</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
 
 const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialValue }, ref) {
   const [value, setValue] = useState(initialValue || '');
   const [isEditing, setIsEditing] = useState(!initialValue);
+  const [editingLinkIdx, setEditingLinkIdx] = useState(null);
   const valueRef = useRef(initialValue || '');
   const hasFocusedRef = useRef(false);
 
@@ -88,6 +101,18 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
     setIsEditing(false);
   };
 
+  const saveLinkEdit = (segment, newLabel, newUrl) => {
+    if (!newUrl) {
+      setEditingLinkIdx(null);
+      return;
+    }
+    const replacement = newLabel && newLabel !== newUrl ? `[${newLabel}](${newUrl})` : newUrl;
+    const newValue = value.slice(0, segment.start) + replacement + value.slice(segment.end);
+    setValue(newValue);
+    valueRef.current = newValue;
+    setEditingLinkIdx(null);
+  };
+
   if (isEditing) {
     return (
       <TextInput
@@ -98,7 +123,7 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
           }
         }}
         style={styles.notesInput}
-        placeholder="Notes, links, video URLs... use [Label](https://...) for named links"
+        placeholder="Notes, links, video URLs..."
         placeholderTextColor="#999"
         multiline
         value={value}
@@ -108,17 +133,39 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
     );
   }
 
-    return (
-      <View style={styles.notesDisplayWrap}>
-        <View style={styles.notesDisplay}>
-          <Text style={styles.notesDisplayText}>{renderNotesWithLinks(value)}</Text>
-        </View>
-        <TouchableOpacity style={styles.notesEditBtn} onPress={() => setIsEditing(true)}>
-          <Text style={styles.notesEditBtnText}>✎ Edit</Text>
-        </TouchableOpacity>
+  const segments = parseNotesLinks(value);
+
+  return (
+    <View style={styles.notesDisplayWrap}>
+      <View style={styles.notesDisplay}>
+        <Text style={styles.notesDisplayText}>
+          {segments.map((seg, i) =>
+            seg.type === 'text' ? (
+              <Text key={i}>{seg.value}</Text>
+            ) : (
+              <Text key={i}>
+                <Text style={styles.linkText} onPress={() => Linking.openURL(seg.url)}>
+                  {seg.label}
+                </Text>
+                <Text style={styles.linkEditIcon} onPress={() => setEditingLinkIdx(i)}> ✎</Text>
+              </Text>
+            )
+          )}
+        </Text>
       </View>
-    );
-  });
+      {editingLinkIdx !== null && segments[editingLinkIdx] && (
+        <LinkEditPopover
+          segment={segments[editingLinkIdx]}
+          onCancel={() => setEditingLinkIdx(null)}
+          onSave={(newLabel, newUrl) => saveLinkEdit(segments[editingLinkIdx], newLabel, newUrl)}
+        />
+      )}
+      <TouchableOpacity style={styles.notesEditBtn} onPress={() => setIsEditing(true)}>
+        <Text style={styles.notesEditBtnText}>✎ Edit Notes</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
 
 function WeekEditor({ week, onSave }) {
   const [editing, setEditing] = useState(false);
@@ -895,10 +942,19 @@ const styles = StyleSheet.create({
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 80, textAlignVertical: 'top' },
   notesDisplayWrap: { marginTop: 10 },
   notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, minHeight: 60 },
+  notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
   notesEditBtn: { alignSelf: 'flex-end', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4 },
   notesEditBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 12 },
-  notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
   linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' },
+  linkEditIcon: { color: '#888', fontSize: 12 },
+  linkEditCard: { backgroundColor: '#fff', borderRadius: 10, padding: 12, marginTop: 8, borderWidth: 1, borderColor: '#F77E2D' },
+  linkEditLabel: { fontSize: 10, color: '#888', textTransform: 'uppercase', marginBottom: 4, marginTop: 6 },
+  linkEditInput: { backgroundColor: '#EDE8DF', borderRadius: 6, padding: 8, fontSize: 13, color: '#1A1A1A' },
+  linkEditRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  linkEditCancelBtn: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  linkEditCancelText: { color: '#888', fontWeight: '700', fontSize: 12 },
+  linkEditSaveBtn: { flex: 1, backgroundColor: '#F77E2D', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  linkEditSaveText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   paginationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 },
   pageBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#D9D3C8', borderRadius: 8 },
   pageBtnDisabled: { opacity: 0.4 },
