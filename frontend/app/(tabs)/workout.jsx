@@ -124,6 +124,17 @@ function WeekEditor({ week, onSave }) {
   );
 }
 
+const sortByOrder = (exercises, order) => {
+  if (!order || order.length === 0) return exercises;
+  const orderIndex = new Map(order.map((name, i) => [name, i]));
+  return [...exercises].sort((a, b) => {
+    const ai = orderIndex.has(a.exercise) ? orderIndex.get(a.exercise) : Infinity;
+    const bi = orderIndex.has(b.exercise) ? orderIndex.get(b.exercise) : Infinity;
+    if (ai !== bi) return ai - bi;
+    return 0;
+  });
+};
+
 export default function WorkoutScreen() {
   const [tab, setTab] = useState('timer');
   const [workouts, setWorkouts] = useState([]);
@@ -137,6 +148,7 @@ export default function WorkoutScreen() {
   const [pendingSets, setPendingSets] = useState({});
   const [exercisesPage, setExercisesPage] = useState(0);
   const [weightUnit, setWeightUnit] = useState('kg');
+  const [exerciseOrder, setExerciseOrder] = useState([]);
   const [editingExercise, setEditingExercise] = useState(null);
   const [editName, setEditName] = useState('');
   const [editSetsToday, setEditSetsToday] = useState([]);
@@ -151,15 +163,16 @@ export default function WorkoutScreen() {
     useCallback(() => {
       fetchWorkouts();
       fetchExercises();
-      fetchWeightUnit();
+      fetchUserPrefs();
       return () => setExpandedExercise(null);
     }, [])
   );
 
-  const fetchWeightUnit = async () => {
+  const fetchUserPrefs = async () => {
     try {
       const res = await api.get('/auth/me');
       setWeightUnit(res.data.weightUnit || 'kg');
+      setExerciseOrder(res.data.exerciseOrder || []);
     } catch (err) {
       console.error(err);
     }
@@ -169,6 +182,30 @@ export default function WorkoutScreen() {
     setWeightUnit(unit);
     try {
       await api.put('/auth/profile', { weightUnit: unit });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const moveExercise = async (exercise, direction) => {
+    const currentNames = exercises.map(e => e.exercise);
+    const baseOrder = exerciseOrder.length > 0 ? exerciseOrder : currentNames;
+    const fullOrder = [...baseOrder];
+    currentNames.forEach(name => {
+      if (!fullOrder.includes(name)) fullOrder.push(name);
+    });
+
+    const idx = fullOrder.indexOf(exercise);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= fullOrder.length) return;
+
+    const newOrder = [...fullOrder];
+    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+
+    setExerciseOrder(newOrder);
+    setExercises(prev => sortByOrder(prev, newOrder));
+    try {
+      await api.put('/auth/profile', { exerciseOrder: newOrder });
     } catch (err) {
       console.error(err);
     }
@@ -189,7 +226,7 @@ export default function WorkoutScreen() {
     setExercisesLoading(true);
     try {
       const res = await api.get('/exercises');
-      setExercises(res.data);
+      setExercises(sortByOrder(res.data, exerciseOrder));
       const logResults = await Promise.all(
         res.data.map(ex =>
           api.get(`/exercises/${encodeURIComponent(ex.exercise)}`)
@@ -345,6 +382,11 @@ export default function WorkoutScreen() {
     try {
       if (trimmedName !== editingExercise) {
         await api.put(`/exercises/by-name/${encodeURIComponent(editingExercise)}/rename`, { newName: trimmedName });
+        if (exerciseOrder.includes(editingExercise)) {
+          const newOrder = exerciseOrder.map(name => name === editingExercise ? trimmedName : name);
+          setExerciseOrder(newOrder);
+          api.put('/auth/profile', { exerciseOrder: newOrder }).catch(err => console.error(err));
+        }
       }
       const sets = editSetsToday.map((s, i) => ({
         setNumber: i + 1,
@@ -531,6 +573,8 @@ export default function WorkoutScreen() {
                 const isBodyweight = bestWeight === 0 && bestReps > 0;
                 const isExpanded = expandedExercise === ex.exercise;
                 const isEditingThis = editingExercise === ex.exercise;
+                const isFirst = exercisesPage === 0 && idx === 0;
+                const isLast = (exercisesPage + 1) * EXERCISES_PER_PAGE >= exercises.length && idx === pagedExercises.length - 1;
 
                 if (isEditingThis) {
                   return (
@@ -595,6 +639,14 @@ export default function WorkoutScreen() {
                 return (
                   <View key={ex.exercise} style={styles.exerciseCard}>
                     <View style={styles.exerciseHeader}>
+                      <View style={styles.reorderCol}>
+                        <TouchableOpacity onPress={() => moveExercise(ex.exercise, 'up')} disabled={isFirst}>
+                          <Text style={[styles.reorderArrow, isFirst && styles.reorderArrowDisabled]}>▲</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => moveExercise(ex.exercise, 'down')} disabled={isLast}>
+                          <Text style={[styles.reorderArrow, isLast && styles.reorderArrowDisabled]}>▼</Text>
+                        </TouchableOpacity>
+                      </View>
                       <TouchableOpacity style={{ flex: 1 }} onPress={() => toggleExercise(ex.exercise)}>
                         <Text style={styles.exerciseName}>{ex.exercise}</Text>
                       </TouchableOpacity>
@@ -765,7 +817,10 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 10, padding: 12, alignItems: 'center' },
   saveBtnText: { color: '#fff', fontWeight: '700' },
   exerciseCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
-  exerciseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  exerciseHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
+  reorderCol: { alignItems: 'center', gap: 2 },
+  reorderArrow: { fontSize: 10, color: '#F77E2D', paddingVertical: 2, paddingHorizontal: 4 },
+  reorderArrowDisabled: { color: '#C4BEB4' },
   exerciseName: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
   exerciseDate: { fontSize: 12, color: '#888' },
   exerciseHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
