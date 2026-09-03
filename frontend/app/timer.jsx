@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ScrollVi
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { Audio } from 'expo-av';
+import { setAudioModeAsync, createAudioPlayer } from 'expo-audio';
 import api from '../src/utils/api';
 import { useAuth } from '../src/contexts/AuthContext';
 
@@ -62,45 +62,43 @@ export default function TimerScreen() {
 
     useEffect(() => {
       const loadSounds = async () => {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-          allowsRecordingIOS: false,
-          interruptionModeIOS: 1,
-          interruptionModeAndroid: 2,
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: false,
+          interruptionMode: 'duckOthers',
+          interruptionModeAndroid: 'duckOthers',
+          allowsRecording: false,
         });
-        const { sound: ding } = await Audio.Sound.createAsync(require('../assets/ding.mp3'));
-        const { sound: beep } = await Audio.Sound.createAsync(require('../assets/beep.mp3'));
-        const { sound: chime } = await Audio.Sound.createAsync(require('../assets/chime.mp3'));
-        dingSound.current = ding;
-        beepSound.current = beep;
-        chimeSound.current = chime;
+        dingSound.current = createAudioPlayer(require('../assets/ding.mp3'));
+        beepSound.current = createAudioPlayer(require('../assets/beep.mp3'));
+        chimeSound.current = createAudioPlayer(require('../assets/chime.mp3'));
       };
       loadSounds();
       return () => {
-        dingSound.current?.unloadAsync();
-        beepSound.current?.unloadAsync();
-        chimeSound.current?.unloadAsync();
+        dingSound.current?.remove();
+        beepSound.current?.remove();
+        chimeSound.current?.remove();
       };
     }, []);
 
     const playDing = async () => {
       try {
-        await dingSound.current?.replayAsync();
+        await dingSound.current?.seekTo(0);
+        dingSound.current?.play();
       } catch (e) { console.error(e); }
     };
 
     const playBeep = async () => {
       try {
-        await beepSound.current?.replayAsync();
+        await beepSound.current?.seekTo(0);
+        beepSound.current?.play();
       } catch (e) { console.error(e); }
     };
 
     const playChime = async () => {
       try {
-        await chimeSound.current?.replayAsync();
+        await chimeSound.current?.seekTo(0);
+        chimeSound.current?.play();
       } catch (e) { console.error(e); }
     };
 
