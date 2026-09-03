@@ -28,6 +28,8 @@ To ensure efficient collaboration during the build process, the following rules 
 8. **One File, One Edit at a Time** — Even within a single file, deliver one focused change per message and wait for confirmation before the next, unless the changes are so interdependent that fragmenting them would leave the file in a broken intermediate state — in which case say so and deliver the full file once.
 9. **Verify Against the Real File, Not Assumptions** — If there's any doubt the local sandbox copy of a file matches what's actually deployed or on the user's machine, ask for the current file content before editing it rather than editing a stale or guessed version.
 10. **Rule Out Client Caching Before Assuming a Bug** — If a confirmed-pushed and confirmed-published change doesn't appear to be live, check for browser/app caching (hard refresh, disable cache in DevTools, force-close and reopen the app) before concluding the code itself is wrong.
+11. **Confirm the UX Before Building the Data Format** — Before designing how a feature stores or represents data (e.g. a text syntax for named links), confirm how the user actually wants to interact with it day to day. Building the "technically correct" version first and retrofitting a usable UI afterward costs more turns than asking upfront.
+12. **No Unrequested Shortcuts** — Never trim, collapse, or summarize content the user didn't ask to have shortened — including in deliverables like this README. If a full version was previously provided, later versions stay full unless the user explicitly asks for a condensed one.
 
 ---
 
@@ -80,7 +82,7 @@ An Expo-based mobile and web app that:
 - Lets users build custom foods and recipes with no paywall
 - Tracks daily calories, macros, and micronutrients, with daily and weekly dashboard views
 - Logs workouts and runs HIIT / Tabata / circuit interval timers with warmup, cooldown, and repeat
-- Tracks strength training with sets, reps, weight, and progressive overload — with editable/auto-incrementing week numbers, a kg/lbs unit toggle, bodyweight-friendly PR tracking, and full rename/edit control over every exercise and past log entry
+- Tracks strength training with sets, reps, weight, and progressive overload — with editable/auto-incrementing week numbers, a kg/lbs unit toggle, bodyweight-friendly PR tracking, custom exercise ordering, notes that carry forward day to day until explicitly changed, and named/relabeled hyperlinks in notes
 - Logs body weight with optional progress photos, stored on Cloudinary
 - Syncs health data from Apple HealthKit and Colmi smart ring via QRing
 
@@ -251,6 +253,7 @@ ltfi/
 | gender | String | male / female |
 | timezone | String | IANA timezone string e.g. Asia/Manila |
 | weightUnit | String | kg / lbs — display preference for workout weights, stored value always stays in kg |
+| exerciseOrder | [String] | User's custom drag/arrow-set order of exercise names on the Tracker tab; falls back to server-default order for anything not in the list |
 | dailyCalorieGoal | Number | Auto-calculated on registration |
 | macroGoals | Object | { protein, carbs, fat } in grams |
 | avatarInitials | String | Auto-generated from name |
@@ -341,7 +344,7 @@ ltfi/
 | date | String | YYYY-MM-DD |
 | week | Number | Manually settable — auto-increments by 1 each new calendar week (Mon-based) relative to the last logged week for that exercise, unless explicitly overridden |
 | sets | Array | [{ setNumber, weight, reps }] — weight always stored in kg regardless of the user's display unit; editable after the fact from the Exercise History screen |
-| notes | String | Session notes, supports inline clickable URLs, saved together with sets via one explicit Save action; also editable from the Exercise History screen |
+| notes | String | Session notes; supports plain URLs and named links in the form `[Label](https://...)`; carries forward from the most recent day with real content when today has no entry yet; editable from both the Tracker and the Exercise History screen |
 
 ---
 
@@ -375,6 +378,8 @@ ltfi/
 | Cached Auth | User data cached in AsyncStorage — no backend call on startup | ✅ Done |
 | Timezone Selector | User can set their timezone in profile — used across all date calculations | ✅ Done |
 | Weight Unit Preference | User can toggle kg/lbs directly from the Workout page — persisted to their profile via `PUT /auth/profile` and read on load via `GET /auth/me` | ✅ Done |
+| Exercise Order Preference | Custom exercise ordering persisted to the profile via the same `PUT /auth/profile` endpoint | ✅ Done |
+| updateProfile Destructuring Fix | `exerciseOrder` was referenced in `updateProfile` before being destructured from `req.body`, which would have thrown on every profile update — fixed before it shipped | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -495,16 +500,25 @@ ltfi/
 | kg/lbs Weight Unit Toggle | Toggle sits directly on the Tracker tab; all displayed and entered weights convert live while the underlying value is always stored in kg | ✅ Done |
 | Bodyweight PR Tracking | Exercises logged with 0 weight (e.g. pullups, pushups) now show a "X reps best" badge instead of no badge at all | ✅ Done |
 | Unified Save Button | Replaced flaky auto-save-on-blur notes with a single explicit Save button per exercise card that commits pending sets and notes together in one request | ✅ Done |
-| Exercise Notes Inline Links | Saved notes render as plain text with URLs shown as tappable, underlined hyperlinks; tap the note to re-enter edit mode | ✅ Done |
-| Stale-Data Save Fix | All exercise saves (notes, week, sets) now fetch the current server state immediately before saving, instead of trusting local component state that may be empty if the card was never expanded — prevents accidentally wiping existing sets or notes | ✅ Done |
+| Auto-Collapse on Save | Saving successfully auto-collapses the exercise card, same as tapping the minimize button | ✅ Done |
+| Exercise Notes Inline Links | Saved notes render URLs as tappable, underlined hyperlinks | ✅ Done |
+| Named/Editable Hyperlinks | Notes support `[Label](https://...)` syntax; each rendered link shows a small ✎ icon that opens an inline Name/URL edit popover pre-filled with the current label and URL — tapping the link itself still opens it, tapping the icon lets you relabel or change the URL with no hand-editing of text required | ✅ Done |
+| Exercise Notes Flicker Fix | Notes input was refocusing and reflowing on every autosave because the save handler refetched the entire exercise list; the input now focuses exactly once on entering edit mode | ✅ Done |
+| Notes Autosave Removed in Favor of Unified Save | Auto-save on blur was replaced entirely by the explicit Save button to eliminate a class of race-condition bugs where the save would fire mid-edit | ✅ Done |
+| Stale-Data Save Races Fixed | All exercise saves (notes, week, sets) fetch the current server state immediately before saving, instead of trusting local component state that may be empty if the card was never expanded — prevents accidentally wiping existing sets or notes | ✅ Done |
+| Notes Race Condition on Save Fixed | Notes value is now captured synchronously at the very start of the save handler, before any `await`, eliminating a race where an async server refetch could complete and cause a stale/reset value to be read from the ref instead of what was actually typed | ✅ Done |
 | Backend Overwrite Guard | `logExercise` only overwrites `sets`/`notes` on the server when those fields are actually present in the request, so an omitted field can never wipe existing data even from a future client bug | ✅ Done |
+| Notes Carry-Forward | When there is no log for today yet (or an empty auto-created placeholder log with no real sets or notes), the most recent day's notes are shown as the starting value instead of a blank box; explicitly saving — including saving it intentionally empty — becomes the new authoritative value going forward, and only an explicit save clears it | ✅ Done |
 | Editable / Auto-Incrementing Week | Tap the "Week X" label on any exercise card to manually set a starting week number; going forward, new logs for that exercise auto-increment the week by however many calendar weeks (Mon-based) have elapsed since the last log, rather than resetting to the actual calendar week-of-year | ✅ Done |
-| Exercise Rename | Rename any exercise from the Tracker card (pencil icon) or the Exercise History screen — updates the `exercise` field across all of that exercise's logged history via `PUT /exercises/by-name/:exercise/rename` | ✅ Done |
+| Exercise Rename | Rename any exercise from the Tracker card (pencil icon) or the Exercise History screen — updates the `exercise` field across all of that exercise's logged history via `PUT /exercises/by-name/:exercise/rename`, and keeps saved custom ordering (`exerciseOrder`) in sync with the new name | ✅ Done |
 | Full Exercise Edit Modal | Pencil icon on a Tracker card opens a combined view to rename the exercise and edit today's logged sets and notes together, in one Save action | ✅ Done |
+| Custom Exercise Ordering | ▲▼ arrows on the left of each Tracker card move that exercise up or down; the resulting order is persisted to the user's profile (`exerciseOrder`) via `PUT /auth/profile` and survives closing/reopening the app | ✅ Done |
 | Tracker List Pagination | Exercise list in the Tracker tab paginated 10 per page with Prev/Next | ✅ Done |
 | Auto-Collapse on Navigate Away | Expanded exercise card automatically collapses when leaving the Workout tab or coming back to it | ✅ Done |
 | Minimize Button | Explicit ⌃ collapse button appears on an expanded exercise card, next to the week label | ✅ Done |
-| Exercise History Screen | View progressive overload history per exercise — all-time best (weight or reps for bodyweight), per-session volume, PR badge, delete individual logs | ✅ Done |
+| Accurate Counts and Badges on Load | Every exercise's logs are fetched upfront when the Tracker tab loads, so "X sets today" and PR badges display correctly immediately without needing to expand each card first | ✅ Done |
+| Exercise History Screen | View progressive overload history per exercise — all-time best weight (or reps for bodyweight exercises), per-session volume, PR badge, delete individual logs | ✅ Done |
+| Exercise History Named Links | Same `[Label](url)` rendering and behavior as the Tracker, applied to the read-only notes display on past log entries | ✅ Done |
 | Exercise History Pagination | History log list paginated 10 per page with Prev/Next; backend log limit raised from 20 to 200 to give pagination real room | ✅ Done |
 | Edit Exercise History Entry | Pencil icon on any past log opens inline editing for its sets (weight/reps, add/remove rows) and notes, saved via `PUT /exercises/:id` | ✅ Done |
 | Delete Exercise | ✕ button on each exercise card deletes the exercise and all its logged history via `DELETE /exercises/by-name/:exercise` | ✅ Done |
@@ -580,6 +594,7 @@ ltfi/
 | Background timer | Both | On hold — requires native build |
 | Progress photos logged before the Cloudinary cleanup fix have no stored public_id | Both | Those images will remain in Cloudinary storage even after the weight entry is deleted; negligible at current free-tier usage (25GB) |
 | Exercise notes/sets lost before the unified Save button and stale-data fixes shipped | Both | Data wiped by the earlier auto-save race condition cannot be recovered automatically — re-enter it manually; the underlying bug is fixed going forward |
+| Notes that appeared "lost" when opening a new day | Both | Fixed via carry-forward — a genuinely empty auto-created log for today no longer blocks showing the most recent real note as the starting point; only an explicit save (including an intentionally empty one) now clears a note |
 | Local `.env` MongoDB URI drift | Local dev only | Local `.env` is gitignored and separate from Render's environment variables — if the Atlas `admin` password is rotated, both must be updated manually or the local backend/scripts will fail with `bad auth` while the deployed app keeps working fine (or vice versa) |
 | Assistant sandbox state can go stale between sessions | Development process only | The AI assistant's working copy of the codebase can silently reset between sessions; when in doubt whether a file matches what's actually deployed, paste the real current file content before requesting further edits to it |
 | Browser/app caching can mask a successfully deployed fix | Development process only | If a confirmed-published OTA update doesn't appear to change behavior, hard-refresh (or disable cache in DevTools) or force-close and reopen the app before assuming the fix itself is broken |
@@ -726,4 +741,4 @@ Requires Apple Developer account ($99/yr) for any distribution outside of Expo G
 
 ---
 
-*Last updated: August 2026*
+*Last updated: September 2026*
