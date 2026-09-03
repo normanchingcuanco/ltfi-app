@@ -108,12 +108,17 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
     );
   }
 
-  return (
-    <TouchableOpacity style={styles.notesDisplay} onPress={() => setIsEditing(true)}>
-      <Text style={styles.notesDisplayText}>{renderNotesWithLinks(value)}</Text>
-    </TouchableOpacity>
-  );
-});
+    return (
+      <View style={styles.notesDisplayWrap}>
+        <View style={styles.notesDisplay}>
+          <Text style={styles.notesDisplayText}>{renderNotesWithLinks(value)}</Text>
+        </View>
+        <TouchableOpacity style={styles.notesEditBtn} onPress={() => setIsEditing(true)}>
+          <Text style={styles.notesEditBtnText}>✎ Edit</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  });
 
 function WeekEditor({ week, onSave }) {
   const [editing, setEditing] = useState(false);
@@ -888,7 +893,10 @@ const styles = StyleSheet.create({
   historyBtn: { marginTop: 10, borderWidth: 1, borderColor: '#F77E2D', borderRadius: 8, padding: 10, alignItems: 'center' },
   historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 },
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 80, textAlignVertical: 'top' },
-  notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, marginTop: 10, minHeight: 60 },
+  notesDisplayWrap: { marginTop: 10 },
+  notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, minHeight: 60 },
+  notesEditBtn: { alignSelf: 'flex-end', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4 },
+  notesEditBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 12 },
   notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
   linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' },
   paginationRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 },
