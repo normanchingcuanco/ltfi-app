@@ -33,16 +33,40 @@ const toKg = (value, unit) => {
 };
 
 const renderNotesWithLinks = (text) => {
-  const parts = text.split(/(https?:\/\/[^\s]+)/g);
-  return parts.map((part, i) =>
-    /^https?:\/\//.test(part) ? (
-      <Text key={i} style={styles.linkText} onPress={() => Linking.openURL(part)}>
-        {part}
-      </Text>
-    ) : (
-      <Text key={i}>{part}</Text>
-    )
-  );
+  const linkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = linkPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<Text key={key++}>{text.slice(lastIndex, match.index)}</Text>);
+    }
+    if (match[1] && match[2]) {
+      const label = match[1];
+      const url = match[2];
+      parts.push(
+        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
+          {label}
+        </Text>
+      );
+    } else if (match[3]) {
+      const url = match[3];
+      parts.push(
+        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
+          {url}
+        </Text>
+      );
+    }
+    lastIndex = linkPattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(<Text key={key++}>{text.slice(lastIndex)}</Text>);
+  }
+
+  return parts;
 };
 
 const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialValue }, ref) {
@@ -74,7 +98,7 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
           }
         }}
         style={styles.notesInput}
-        placeholder="Notes, links, video URLs..."
+        placeholder="Notes, links, video URLs... use [Label](https://...) for named links"
         placeholderTextColor="#999"
         multiline
         value={value}

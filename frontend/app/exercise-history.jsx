@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import api from '../src/utils/api';
 
@@ -34,6 +34,44 @@ const toKg = (value, unit) => {
   const num = parseFloat(value) || 0;
   return unit === 'lbs' ? num / KG_TO_LBS : num;
 };
+
+const renderNotesWithLinks = (text) => {
+  const linkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = linkPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<Text key={key++}>{text.slice(lastIndex, match.index)}</Text>);
+    }
+    if (match[1] && match[2]) {
+      const label = match[1];
+      const url = match[2];
+      parts.push(
+        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
+          {label}
+        </Text>
+      );
+    } else if (match[3]) {
+      const url = match[3];
+      parts.push(
+        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
+          {url}
+        </Text>
+      );
+    }
+    lastIndex = linkPattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(<Text key={key++}>{text.slice(lastIndex)}</Text>);
+  }
+
+  return parts;
+};
+
 export default function ExerciseHistoryScreen() {
   const { exercise } = useLocalSearchParams();
   const router = useRouter();
@@ -274,7 +312,7 @@ export default function ExerciseHistoryScreen() {
                     ))}
                     <TextInput
                       style={styles.editNotesInput}
-                      placeholder="Notes, links, video URLs..."
+                      placeholder="Notes, links, video URLs... use [Label](https://...) for named links"
                       placeholderTextColor="#999"
                       multiline
                       value={editNotes}
@@ -308,11 +346,12 @@ export default function ExerciseHistoryScreen() {
                             <Text style={styles.setVal}>{set.reps}</Text>
                           </View>
                         ))}
-                        <Text style={styles.volumeText}>Volume: {displayWeight(volume, weightUnit)}{weightUnit}</Text>                      </>
+                        <Text style={styles.volumeText}>Volume: {displayWeight(volume, weightUnit)}{weightUnit}</Text>
+                      </>
                     ) : (
                       <Text style={styles.noSets}>No sets logged</Text>
                     )}
-                    {log.notes ? <Text style={styles.notes}>{log.notes}</Text> : null}
+                    {log.notes ? <Text style={styles.notes}>{renderNotesWithLinks(log.notes)}</Text> : null}
                   </>
                 )}
               </View>
@@ -379,6 +418,7 @@ const styles = StyleSheet.create({
   volumeText: { fontSize: 12, color: '#888', marginTop: 4, fontWeight: '600' },
   noSets: { fontSize: 13, color: '#888', fontStyle: 'italic' },
   notes: { fontSize: 13, color: '#1A1A1A', marginTop: 10, borderTopWidth: 1, borderTopColor: '#C5BFB4', paddingTop: 10 },
+  linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' },
   editRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 },
   editSetNum: { width: 20, fontSize: 13, color: '#888' },
   editInput: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 14, color: '#1A1A1A', textAlign: 'center' },
