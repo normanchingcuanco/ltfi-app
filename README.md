@@ -30,6 +30,8 @@ To ensure efficient collaboration during the build process, the following rules 
 10. **Rule Out Client Caching Before Assuming a Bug** — If a confirmed-pushed and confirmed-published change doesn't appear to be live, check for browser/app caching (hard refresh, disable cache in DevTools, force-close and reopen the app) before concluding the code itself is wrong.
 11. **Confirm the UX Before Building the Data Format** — Before designing how a feature stores or represents data (e.g. a text syntax for named links), confirm how the user actually wants to interact with it day to day. Building the "technically correct" version first and retrofitting a usable UI afterward costs more turns than asking upfront.
 12. **No Unrequested Shortcuts** — Never trim, collapse, or summarize content the user didn't ask to have shortened — including in deliverables like this README. If a full version was previously provided, later versions stay full unless the user explicitly asks for a condensed one.
+13. **Confirm Edits Actually Landed Before Assuming a Push Failed** — Before troubleshooting "why didn't this push," check `git status`/`git diff` for the specific file to confirm the edit was actually saved into the real file first. Several session delays were caused by chasing a phantom push problem when the underlying file edit had simply never been applied.
+14. **Get Real Logs Before Guessing at Build Failures** — For an "Unknown error" or unhelpful generic build failure message (e.g. from EAS), pull the actual raw log (`eas build:view <id> --json` → fetch the signed `logFiles` URL) before proposing a fix. Every fix that actually worked during the SDK 57 build-failure chase came directly from reading the real log; every guess made without it was wrong.
 
 ---
 
@@ -59,6 +61,8 @@ Current free services in use:
 - EAS Update — free tier (1,000 OTA updates/month)
 - Vercel — free tier for frontend hosting
 - Render — free tier for backend hosting
+
+**Note:** iOS native builds (standalone `.ipa`, App Store/TestFlight distribution) require an Apple Developer account ($99/yr), which is *not* free. Day-to-day iOS testing does **not** require this — see "Testing on iOS Without a Paid Account" below.
 
 ---
 
@@ -107,6 +111,7 @@ An Expo-based mobile and web app that:
 | Frontend (Web) | https://ltfi-app.vercel.app |
 | Backend | https://ltfi-backend.onrender.com |
 | Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/00d76ff8-779a-4837-92d0-6bacdad57ffe |
+| Latest EAS Update (preview) | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/updates/7aa96e49-5c73-4cb5-8844-19cbca0abd14 |
 | iOS Native Build | On hold — requires Apple Developer account ($99/yr) |
 
 ---
@@ -115,7 +120,7 @@ An Expo-based mobile and web app that:
 
 | Layer | Technology | Cost |
 |-------|------------|------|
-| Mobile + Web | Expo SDK 54 + React Native Web | Free |
+| Mobile + Web | Expo SDK 57 + React Native 0.86.3 + React 19.2.3 + React Native Web | Free |
 | Backend | Node.js + Express | Free |
 | Database | MongoDB Atlas (free tier) | Free |
 | Auth | JWT + Email/Password | Free |
@@ -129,6 +134,7 @@ An Expo-based mobile and web app that:
 | Hosting (Backend) | Render free tier | Free |
 | Mobile Builds | EAS Build free tier | Free |
 | OTA Updates | EAS Update free tier | Free |
+| Audio | expo-audio (migrated from deprecated expo-av in SDK 57) | Free |
 
 ---
 
@@ -356,7 +362,7 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Expo App Setup | Expo SDK 54 + React Native Web with navigation | ✅ Done |
+| Expo App Setup | Expo SDK 57 + React Native Web with navigation | ✅ Done |
 | Backend Server Setup | Express app with helmet, morgan, rate limiting | ✅ Done |
 | MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ✅ Done |
 | Environment Config | .env for DB URI, JWT secret, Groq API key, Cloudinary keys, email, frontend URL | ✅ Done |
@@ -380,6 +386,8 @@ ltfi/
 | Weight Unit Preference | User can toggle kg/lbs directly from the Workout page — persisted to their profile via `PUT /auth/profile` and read on load via `GET /auth/me` | ✅ Done |
 | Exercise Order Preference | Custom exercise ordering persisted to the profile via the same `PUT /auth/profile` endpoint | ✅ Done |
 | updateProfile Destructuring Fix | `exerciseOrder` was referenced in `updateProfile` before being destructured from `req.body`, which would have thrown on every profile update — fixed before it shipped | ✅ Done |
+| Gender Field Schema Fix | `gender` was accepted by `updateProfile` and used in the TDEE calculation, but was never declared on the `User` Mongoose schema — Mongoose silently stripped it on every save. Added `gender: { type: String, enum: ['male', 'female'] }` to the schema | ✅ Done |
+| Gender Field Assignment Fix | Separately from the schema bug, `updateProfile` destructured `gender` from the request and used it in TDEE calc and the response, but never actually contained the line assigning it to `user.gender` — so it silently never saved even after the schema fix. Added `if (gender !== undefined) user.gender = gender;` | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -394,13 +402,16 @@ ltfi/
 | Timezone Fix | Diary uses local date formatting to prevent UTC date shift | ✅ Done |
 | Copy Previous Day | Copy all meals from previous day to current date | ✅ Done |
 | Barcode Scanner | Camera-based barcode scan via Open Food Facts API — creates a Food doc automatically, appears in My Foods | ✅ Done |
+| Barcode Scanner Black Preview Fix | Camera preview rendered fully black in Expo Go on iOS after the SDK 57 upgrade, even though the underlying camera session initialized correctly (`onCameraReady` fired) and barcode scanning still functioned. Root cause: `style={StyleSheet.absoluteFillObject}` triggered a native `SurfaceView` layout race under SDK 57's mandatory New Architecture. Fixed by giving `CameraView` explicit `width`/`height` from `Dimensions.get('window')` instead of a flex-based fill | ✅ Done |
 | Web Barcode Scanner | Browser-based barcode scanning via ZXing library | ✅ Done |
 | Manual Barcode Entry | Type barcode number manually with keyboard submit support | ✅ Done |
 | Barcode Fallback | When OFF fails, falls through to all 4 search sources | ✅ Done |
 | Global Barcode Types | Supports EAN13, EAN8, UPC, Code128, Code39, QR, ITF14, Codabar | ✅ Done |
 | AI Food Photo Scan | Camera photo → Groq Qwen 3.6 27B vision model → searches all food DBs for best match | ✅ Done |
 | AI Scan Vision Model | Switched from deprecated `meta-llama/llama-4-scout-17b-16e-instruct` to `qwen/qwen3.6-27b`, Groq's current vision model | ✅ Done |
-| AI Scan Thinking-Tag Strip | Qwen returns `<think>` reasoning blocks before the JSON payload — stripped before parsing to prevent scan failures | ✅ Done |
+| AI Scan Camera Permission Fix | `ai-food-scan.jsx` called `ImagePicker.launchCameraAsync`/`launchImageLibraryAsync` without ever requesting permission first — it only appeared to work because Expo Go already had a stale permission grant from an earlier session; a fresh Expo Go install surfaced `MissingCameraPermissionException`. Added explicit `requestCameraPermissionsAsync()` / `requestMediaLibraryPermissionsAsync()` calls before launching either picker | ✅ Done |
+| AI Scan Reasoning-Mode Truncation Fix | Qwen 3.6 27B is a dual-mode reasoning model that, by default, emits a `<think>...</think>` block before its final JSON answer. With `max_tokens: 500`, longer analyses (e.g. fried chicken) exhausted the token budget entirely inside the still-open `<think>` block, producing a response with no closing tag and no JSON at all — silently failing JSON.parse with no useful error surfaced to the client. Fixed by (1) setting `reasoning_effort: 'none'` per Groq's documented API to skip the thinking block entirely for this non-reasoning task, (2) raising `max_tokens` to 800 as a safety margin, and (3) adding a fallback regex extraction of the first `{...}` block plus real error logging (`detail` field, raw model output on parse failure) so future failures are diagnosable instead of a black box | ✅ Done |
+| AI Scan Thinking-Tag Strip | Qwen returns `<think>` reasoning blocks before the JSON payload — stripped before parsing to prevent scan failures (superseded by the reasoning-mode fix above, which prevents the block from being generated at all; the strip logic remains as defense-in-depth) | ✅ Done |
 | AI Scan Image Compression | Compress image to stay under Groq's base64 payload limit | ✅ Done |
 | AI Scan Saves to My Foods | AI-scanned results now create a Food doc automatically, matching barcode behavior | ✅ Done |
 | My Foods Backfill Script | One-time script (`backend/scripts/backfillMyFoods.js`) that scans historical meal logs and creates missing Food docs for any food that was logged before the AI Scan → My Foods fix existed | ✅ Done |
@@ -455,7 +466,7 @@ ltfi/
 | Weight Loss Plan | Shows daily deficit target, 500 kcal deficit, and estimated weeks to goal | ✅ Done |
 | Macro Formula | Updated to 25% protein / 45% carbs / 30% fat industry standard split | ✅ Done |
 | TDEE Formula | Mifflin-St Jeor with activity multiplier and gender | ✅ Done |
-| Gender Field | Male/female selector on registration and profile for accurate TDEE | ✅ Done |
+| Gender Field | Male/female selector on registration and profile for accurate TDEE — see Gender Field Schema Fix and Gender Field Assignment Fix above; the selector always worked, the persistence layer did not | ✅ Done |
 | Timezone Selector | IANA timezone picker in profile — used across all date calculations | ✅ Done |
 | Context Sync | User context updates immediately after profile save | ✅ Done |
 | Logout | Moved to Profile tab only | ✅ Done |
@@ -483,7 +494,7 @@ ltfi/
 | Total Workout Time on Card | Each saved workout card shows total duration including warmup and cooldown | ✅ Done |
 | Default Rest Time Fix | New intervals default to 0s rest instead of 10s | ✅ Done |
 | Repeat Toggle | Loop the entire workout indefinitely | ✅ Done |
-| Voice Announcements | Audio cues for interval changes with countdown | ✅ Done |
+| Voice Announcements | Audio cues for interval changes with countdown — confirmed working on iOS via Expo Go | ✅ Done |
 | Voice Picker | Select from available system voices before starting workout | ✅ Done |
 | iOS Done Button | Floating done button above number-pad keyboard on iOS | ✅ Done |
 | Exercise Logging | Log workout type, duration, sets, reps | ✅ Done |
@@ -492,8 +503,9 @@ ltfi/
 | Delete Workouts | Remove saved workouts | ✅ Done |
 | Workout Page Focus Refresh | Workout list refreshes on every tab focus | ✅ Done |
 | Keep Screen Awake | Screen stays on globally while app is open via expo-keep-awake | ✅ Done |
-| Sound Effects | Ding, beep, and chime sounds on interval transitions — Android only | ✅ Done |
-| Audio Mix Mode | Timer sounds duck background audio without interrupting it — Android only | ✅ Done |
+| expo-av → expo-audio Migration | SDK 57 removed native support for the deprecated `expo-av`'s `Audio` API (`Cannot find native module 'ExponentAV'`). Migrated `timer.jsx`'s sound loading (`Audio.Sound.createAsync` → `createAudioPlayer`) and playback (`.replayAsync()` → `.seekTo(0)` + `.play()`) to `expo-audio`, and removed the unused `expo-av` package from `package.json` entirely | ✅ Done |
+| Sound Effects | Ding, beep, and chime sounds on interval transitions — confirmed working on **iOS** via Expo Go after the expo-audio migration; previously Android-only under expo-av | ✅ Done |
+| Audio Mix Mode | Timer sounds duck background audio without interrupting it, via `expo-audio`'s `setAudioModeAsync` — confirmed on iOS | ✅ Done |
 | Workout Timer/Tracker Tabs | Workout page split into Timer tab and Tracker tab | ✅ Done |
 | Exercise Tracker | Log sets, reps, weight per exercise with progressive overload tracking | ✅ Done |
 | Dynamic Per-Set Rows | Add multiple set rows at once, each with its own weight and reps | ✅ Done |
@@ -524,7 +536,7 @@ ltfi/
 | Delete Exercise | ✕ button on each exercise card deletes the exercise and all its logged history via `DELETE /exercises/by-name/:exercise` | ✅ Done |
 | Back Navigation Fix | Root layout switched from Slot to Stack so pushed screens (e.g. exercise history) correctly pop back to the previous tab instead of resetting to Home | ✅ Done |
 | Background Timer | Timer continues running when app is backgrounded | ⬜ On hold — requires native build |
-| iOS Sound Effects | Timer sound effects on iPhone | ⬜ On hold — requires Apple Developer account |
+| iOS Sound Effects | Timer sound effects on iPhone | ✅ Done — resolved by the expo-av → expo-audio migration; does **not** require a native build, works in Expo Go |
 
 ---
 
@@ -532,7 +544,7 @@ ltfi/
 
 #### iOS — Apple HealthKit
 
-> ⚠️ On hold — requires EAS native iOS build. Will resume once Apple Developer account is set up.
+> ⚠️ On hold — requires EAS native iOS build. Will resume once Apple Developer account is set up. This is distinct from day-to-day testing, which does not need it — see "Testing on iOS Without a Paid Account" below.
 
 | Feature | Description | Status |
 |---------|-------------|--------|
@@ -580,6 +592,12 @@ ltfi/
 | Session Persistence Fix | Token only cleared on 401, not on network timeout | ✅ Done |
 | Timezone Date Fix | All date formatting uses local time to prevent UTC date shift | ✅ Done |
 | Rate Limit Tuning | Global limiter raised to 500 req/15min with health checks excluded | ✅ Done |
+| SDK 54 → 57 Upgrade | Full upgrade of Expo SDK, React Native (0.81.5 → 0.86.3), React (19.1.0 → 19.2.3), and every `expo-*` dependency to their SDK 57-compatible versions | ✅ Done |
+| package-lock.json Resync | An incrementally-built lock file (from repeated `npx expo install`/`npm uninstall` calls across the SDK upgrade) had drifted out of sync with `package.json` in a way `npm install` alone didn't catch locally, but which `npm ci` on EAS's Linux build containers correctly rejected (`Missing: react-native-worklets@0.10.4 from lock file`). Fixed with a full clean reinstall (`node_modules` + `package-lock.json` deleted, reinstalled from scratch) | ✅ Done |
+| react-native-worklets / reanimated Version Conflict Fix | `expo install react-native-worklets` alone pinned an incompatible version against the `react-native-reanimated@4.6.0` already pulled in transitively via `expo-router` → `@expo/ui`, which requires `worklets@0.12.x`. Fixed by letting `npx expo install react-native-worklets react-native-reanimated` resolve both together, landing on `reanimated@4.5.1` + `worklets@0.10.1` | ✅ Done |
+| newArchEnabled Cleanup | SDK 57 removed `newArchEnabled` from the config schema entirely — New Architecture is now mandatory and the key is silently ignored. Removed the stale `"newArchEnabled": false` line from `app.json` | ✅ Done |
+| expo-camera Config Plugin | Added the `expo-camera` plugin block (with a proper `cameraPermission` description) to `app.json`'s `plugins` array — required for native/EAS builds; has no effect in Expo Go, where it was previously omitted without symptom | ✅ Done |
+| Android APK Rebuild on SDK 57 | Successfully rebuilt and installed a fresh Android internal-distribution APK on SDK 57 via `eas build -p android --profile preview`, confirming the full native build pipeline (not just Expo Go) is stable post-upgrade | ✅ Done |
 | iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ On hold |
 
 ---
@@ -588,16 +606,18 @@ ltfi/
 
 | Limitation | Platform | Resolution |
 |------------|----------|------------|
-| Timer voice announcements interrupt background music | iOS | Requires Apple Developer account for native build |
-| Sound effects (ding, beep, chime) not available | iOS | Requires Apple Developer account for native build |
 | Timer pauses when app is backgrounded | iOS + Android | On hold — requires native build |
 | Background timer | Both | On hold — requires native build |
+| `@zxing/library@0.23.0` requests Node ≥24 | Backend build only | EAS's build image currently runs Node 22.23.1; this only surfaces as an `EBADENGINE` warning during `npm ci`, not a failure — noted here as a watch item if the web barcode scanner (which uses this library) ever misbehaves |
 | Progress photos logged before the Cloudinary cleanup fix have no stored public_id | Both | Those images will remain in Cloudinary storage even after the weight entry is deleted; negligible at current free-tier usage (25GB) |
 | Exercise notes/sets lost before the unified Save button and stale-data fixes shipped | Both | Data wiped by the earlier auto-save race condition cannot be recovered automatically — re-enter it manually; the underlying bug is fixed going forward |
 | Notes that appeared "lost" when opening a new day | Both | Fixed via carry-forward — a genuinely empty auto-created log for today no longer blocks showing the most recent real note as the starting point; only an explicit save (including an intentionally empty one) now clears a note |
+| Gender never actually saved to the database prior to the schema + assignment fixes | Both | Any gender selection made before this fix was silently discarded and never reached MongoDB — it must be set again once after the fix is deployed; it will persist correctly going forward |
 | Local `.env` MongoDB URI drift | Local dev only | Local `.env` is gitignored and separate from Render's environment variables — if the Atlas `admin` password is rotated, both must be updated manually or the local backend/scripts will fail with `bad auth` while the deployed app keeps working fine (or vice versa) |
-| Assistant sandbox state can go stale between sessions | Development process only | The AI assistant's working copy of the codebase can silently reset between sessions; when in doubt whether a file matches what's actually deployed, paste the real current file content before requesting further edits to it |
+| Assistant sandbox state can go stale between sessions | Development process only | The AI assistant's working copy of the codebase can silently reset between sessions; when in doubt whether a file matches what's actually deployed, paste the real current file content before requesting further edits to it. Multiple session delays this round were caused by proceeding on a stale assumption instead of confirming first |
 | Browser/app caching can mask a successfully deployed fix | Development process only | If a confirmed-published OTA update doesn't appear to change behavior, hard-refresh (or disable cache in DevTools) or force-close and reopen the app before assuming the fix itself is broken |
+| Expo Go's "Recently Opened"/"Projects" list can serve a stale, pre-upgrade SDK snapshot | Development process only | This is *not* local device cache — deleting and reinstalling Expo Go does not clear it, because it is synced from the signed-in expo.dev account's cloud history. Two separate, unrelated fixes apply depending on what you're trying to do: (1) for **live local dev testing**, ignore "Recently Opened"/"Projects" entirely and use the auto-detected live server that appears under "Development servers" on the Expo Go Home tab whenever `npx expo start -c` is running on the same WiFi network — this always reflects current code; (2) for **testing without a PC running at all**, publish an EAS Update (`eas update --channel preview`) and open it via Expo Go's "PROJECTS" entry, which loads the last *published* bundle regardless of whether Metro is running — but this will only ever show whatever was last explicitly published, so it goes stale again the moment new local changes are made without re-publishing |
+| A build failing with only "Unknown error. See logs of the Install dependencies build phase" | EAS Build only | The EAS dashboard's build page does not reliably display expandable phase-by-phase logs in the browser. The actual raw log is always retrievable via `eas build:view <build-id> --json`, which returns a `logFiles` array containing a signed, time-limited (~15 min) Google Cloud Storage URL — open that URL directly in a browser to see the real npm/gradle error text. Guessing at the cause without pulling this log wasted significant time across this session; every fix that worked came directly from reading it |
 
 ---
 
@@ -609,7 +629,7 @@ ltfi/
 - MongoDB Atlas account (free tier)
 - Expo CLI (`npm install -g expo-cli`)
 - EAS CLI (`npm install -g eas-cli`)
-- Expo Go app on Android for local testing
+- Expo Go app on iOS and/or Android for local testing
 - Groq account (free tier) for AI food scanning — https://console.groq.com
 - Gmail account with app password enabled for password reset emails
 - Calorie API key (free) — https://calorieapi.com
@@ -629,8 +649,10 @@ cd ltfi
 
 ```
 cd backend && npm install
-cd ../frontend && npm install --legacy-peer-deps
+cd ../frontend && npm install
 ```
+
+If `npm ci` is ever used instead of `npm install` (e.g. simulating what EAS Build actually runs), make sure `package-lock.json` is freshly regenerated from a clean `node_modules` first — an incrementally-updated lock file can pass `npm install` locally while still failing `npm ci` in CI. See the `package-lock.json Resync` entry under Phase 4 above.
 
 ### 3. Configure environment variables
 
@@ -667,11 +689,11 @@ cd backend && node server.js
 
 Terminal 2 — Frontend:
 ```
-cd frontend && npx expo start
+cd frontend && npx expo start -c
 ```
 
 - Frontend (Web): http://localhost:8081
-- Frontend (Mobile): scan QR code with Expo Go on Android
+- Frontend (Mobile, iOS or Android): open Expo Go, and either scan the printed QR code, or — once Metro is running on the same WiFi network — just wait a few seconds for it to appear automatically under "Development servers" on the Expo Go Home tab and tap it. Do **not** rely on Expo Go's "Recently Opened" or "Projects" list for this — see the Known Limitations entry above.
 - Backend: http://localhost:5000
 
 ### 5. Build Android APK
@@ -682,6 +704,22 @@ eas build -p android --profile preview
 ```
 
 Download and sideload the APK directly. No Google Play account needed.
+
+---
+
+## Testing on iOS Without a Paid Account
+
+This project's iOS testing has always run entirely through **Expo Go**, which needs no Apple Developer account at all. The $99/yr Apple Developer account is only required for:
+
+- A standalone `.ipa` build (an installable app outside Expo Go)
+- App Store or TestFlight distribution
+- Native features that genuinely cannot run inside Expo Go's sandbox — currently just Apple HealthKit and the background timer
+
+Everything else — including the timer, its sounds and voice, the barcode scanner, and AI food scanning — runs correctly through Expo Go on a real iPhone with no paid account.
+
+**Day-to-day, PC-required testing:** run `npx expo start -c` in `frontend/`, then open Expo Go and tap the auto-detected server under "Development servers." This always reflects whatever code is currently on disk, saved or not yet committed.
+
+**PC-free testing:** publish the current code with `eas update --channel preview`, then open Expo Go → **PROJECTS → ltfi**. This loads the most recently published bundle with no PC or Metro server needed at all — but it will only ever reflect what was last explicitly published, so re-run the update command after making changes you want to test this way.
 
 ---
 
@@ -707,7 +745,7 @@ For any JS/UI changes that don't require new native modules, push an OTA update 
 | Change | Use |
 |--------|-----|
 | UI changes, bug fixes, new screens | OTA update |
-| New native library added | Rebuild APK |
+| New native library added | Rebuild APK (and rebuild/republish for iOS once native builds are unblocked) |
 | app.json native config changed | Rebuild APK |
 | App icon changed | Rebuild APK |
 
@@ -715,10 +753,10 @@ For any JS/UI changes that don't require new native modules, push an OTA update 
 
 ```
 cd frontend
-eas update --branch preview --message "your update description"
+eas update --channel preview --message "your update description"
 ```
 
-Users get the update silently on next app launch. No new APK download needed. If a confirmed-published update doesn't seem to have taken effect on a device already running the app, hard-refresh on web or force-close and reopen the app on mobile before assuming the deploy itself failed.
+Users get the update silently on next app launch. No new APK download needed. This is also how you make code changes available in Expo Go's **PROJECTS** tab for PC-free testing — see "Testing on iOS Without a Paid Account" above. If a confirmed-published update doesn't seem to have taken effect on a device already running the app, hard-refresh on web or force-close and reopen the app on mobile before assuming the deploy itself failed.
 
 ### Branches
 
@@ -737,7 +775,7 @@ Users get the update silently on next app launch. No new APK download needed. If
 3. Recipients enable "Install from unknown sources" on their Android and install
 
 **iOS:**
-Requires Apple Developer account ($99/yr) for any distribution outside of Expo Go.
+Requires Apple Developer account ($99/yr) for any distribution outside of Expo Go. Personal use via Expo Go (see above) does not require this.
 
 ---
 
