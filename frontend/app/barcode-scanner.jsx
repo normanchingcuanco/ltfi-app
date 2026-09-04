@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Platform, TextInput, Dimensions } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
@@ -125,7 +125,7 @@ export default function BarcodeScannerScreen() {
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
       <CameraView
-        style={StyleSheet.absoluteFillObject}
+        style={{ position: 'absolute', top: 0, left: 0, width: Dimensions.get('window').width, height: Dimensions.get('window').height }}
         facing={facing}
         onBarcodeScanned={({ data }) => handleScanned(data)}
         onCameraReady={() => console.log('Camera ready')}

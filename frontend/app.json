@@ -7,7 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
     "updates": {
       "url": "https://u.expo.dev/330777bd-74a9-4489-aaf1-07cf5583d72b"
     },
