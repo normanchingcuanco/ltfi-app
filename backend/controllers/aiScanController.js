@@ -188,9 +188,10 @@ Estimate values per 100g serving. If multiple foods are visible, return the prim
           ]
         }
       ],
-      max_tokens: 800
+      max_tokens: 800,
+      reasoning_effort: 'none'
     });
-
+    
     const text = response.choices[0].message.content.trim();
     const withoutThink = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     const clean = withoutThink.replace(/```json|```/g, '').trim();
