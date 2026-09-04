@@ -128,6 +128,8 @@ export default function BarcodeScannerScreen() {
         style={StyleSheet.absoluteFillObject}
         facing={facing}
         onBarcodeScanned={({ data }) => handleScanned(data)}
+        onCameraReady={() => console.log('Camera ready')}
+        onMountError={(e) => console.error('Camera mount error:', e.message)}
         barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'qr', 'itf14', 'codabar'] }}
       />
       <TouchableOpacity style={styles.flipBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>

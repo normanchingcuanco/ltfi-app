@@ -59,6 +59,7 @@ export default function AIFoodScanScreen() {
       });
       setResult(res.data);
     } catch (err) {
+      console.error('AI scan failed:', err?.response?.status, err?.response?.data || err?.message);
       alert('Could not analyze image. Try again.');
     } finally {
       setLoading(false);
