@@ -80,6 +80,7 @@ const updateProfile = async (req, res) => {
     if (age) user.age = age;
     if (activityLevel) user.activityLevel = activityLevel;
     if (dietPreference !== undefined) user.dietPreference = dietPreference;
+    if (gender !== undefined) user.gender = gender;
     if (timezone) user.timezone = timezone;
     if (weightUnit) user.weightUnit = weightUnit;
     if (exerciseOrder) user.exerciseOrder = exerciseOrder;
