@@ -32,6 +32,23 @@ export default function AIFoodScanScreen() {
 
   const pickImage = async (useCamera) => {
     const options = { base64: true, quality: 0.3, allowsEditing: true, aspect: [4, 3] };
+
+    if (Platform.OS !== 'web') {
+      if (useCamera) {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Camera access is required to take a photo.');
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Photo library access is required to choose an image.');
+          return;
+        }
+      }
+    }
+
     const source = useCamera
       ? await ImagePicker.launchCameraAsync(options)
       : await ImagePicker.launchImageLibraryAsync(options);
