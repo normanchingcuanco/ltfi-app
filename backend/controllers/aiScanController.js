@@ -188,14 +188,27 @@ Estimate values per 100g serving. If multiple foods are visible, return the prim
           ]
         }
       ],
-      max_tokens: 500
+      max_tokens: 800
     });
 
     const text = response.choices[0].message.content.trim();
     const withoutThink = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     const clean = withoutThink.replace(/```json|```/g, '').trim();
-    const aiFood = JSON.parse(clean);
-    
+
+    let aiFood;
+    try {
+      aiFood = JSON.parse(clean);
+    } catch (parseErr) {
+      // Model didn't return clean JSON -- try to salvage the first {...} block
+      const match = clean.match(/\{[\s\S]*\}/);
+      if (match) {
+        aiFood = JSON.parse(match[0]);
+      } else {
+        console.error('AI Scan: could not parse model output:', clean);
+        throw parseErr;
+      }
+    }
+
     // Search all sources using the AI-identified food name
     const allResults = await searchAllSources(aiFood.name);
     const deduplicated = deduplicateResults(allResults);
@@ -221,8 +234,8 @@ Estimate values per 100g serving. If multiple foods are visible, return the prim
     // No DB match -- return AI estimate as fallback
     res.json({ ...aiFood, source: 'ai_scan' });
   } catch (err) {
-    console.error('AI Scan error:', err);
-    res.status(500).json({ message: 'Failed to analyze image' });
+    console.error('AI Scan error:', err.message || err);
+    res.status(500).json({ message: 'Failed to analyze image', detail: err.message });
   }
 };
 
