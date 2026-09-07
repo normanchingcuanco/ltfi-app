@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import api from '../src/utils/api';
 import { activateKeepAwakeAsync } from 'expo-keep-awake';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 function WarmUpBackend() {
   useEffect(() => {
@@ -22,11 +23,13 @@ function WarmUpBackend() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <WarmUpBackend />
-      <AuthProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </AuthProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <WarmUpBackend />
+        <AuthProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

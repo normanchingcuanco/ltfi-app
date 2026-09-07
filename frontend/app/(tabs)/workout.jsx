@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Platform, TextInput, Linking } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import DraggableFlatList from 'react-native-draggable-flatlist';
 import api from '../../src/utils/api';
 
 const confirmDelete = (onConfirm) => {
@@ -199,6 +200,7 @@ export default function WorkoutScreen() {
   const [expandedExercise, setExpandedExercise] = useState(null);
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [pendingSets, setPendingSets] = useState({});
+  const [pendingLabels, setPendingLabels] = useState({});
   const [exercisesPage, setExercisesPage] = useState(0);
   const [reorderMode, setReorderMode] = useState(false);
   const [weightUnit, setWeightUnit] = useState('kg');
@@ -505,6 +507,41 @@ export default function WorkoutScreen() {
     </View>
   );
 
+  if (tab === 'tracker' && reorderMode) {
+    return (
+      <View style={styles.reorderScreen}>
+        <View style={styles.reorderHeader}>
+          <Text style={styles.title}>Reorder Exercises</Text>
+          <TouchableOpacity style={styles.reorderModeBtn} onPress={() => setReorderMode(false)}>
+            <Text style={styles.reorderModeBtnText}>✓ Done Reordering</Text>
+          </TouchableOpacity>
+          <Text style={styles.reorderHint}>Long-press and drag a card to reorder</Text>
+        </View>
+        <DraggableFlatList
+          data={exercises}
+          keyExtractor={(item) => item.exercise}
+          contentContainerStyle={styles.reorderListContent}
+          onDragEnd={({ data }) => {
+            const newOrder = data.map(e => e.exercise);
+            setExercises(data);
+            setExerciseOrder(newOrder);
+            exerciseOrderRef.current = newOrder;
+            api.put('/auth/profile', { exerciseOrder: newOrder }).catch(err => console.error(err));
+          }}
+          renderItem={({ item, drag, isActive }) => (
+            <TouchableOpacity
+              onLongPress={drag}
+              disabled={isActive}
+              style={[styles.reorderCard, isActive && styles.reorderCardActive]}
+            >
+              <Text style={styles.reorderCardText}>☰ {item.exercise}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    );
+  }
+
   const pagedExercises = exercises.slice(exercisesPage * EXERCISES_PER_PAGE, exercisesPage * EXERCISES_PER_PAGE + EXERCISES_PER_PAGE);
 
   return (
@@ -694,16 +731,6 @@ export default function WorkoutScreen() {
                 return (
                   <View key={ex.exercise} style={styles.exerciseCard}>
                     <View style={styles.exerciseHeader}>
-                      {reorderMode && (
-                        <View style={styles.reorderCol}>
-                          <TouchableOpacity onPress={() => moveExercise(ex.exercise, 'up')} disabled={isFirst}>
-                            <Text style={[styles.reorderArrow, isFirst && styles.reorderArrowDisabled]}>▲</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={() => moveExercise(ex.exercise, 'down')} disabled={isLast}>
-                            <Text style={[styles.reorderArrow, isLast && styles.reorderArrowDisabled]}>▼</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
                       <TouchableOpacity style={{ flex: 1 }} onPress={() => toggleExercise(ex.exercise)}>
                         <Text style={styles.exerciseName}>{ex.exercise}</Text>
                       </TouchableOpacity>
@@ -858,6 +885,13 @@ const styles = StyleSheet.create({
   unitBtnTextActive: { color: '#fff' },
   reorderModeBtn: { backgroundColor: '#D9D3C8', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginBottom: 16 },
   reorderModeBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 13 },
+  reorderScreen: { flex: 1, backgroundColor: '#EDE8DF', paddingTop: 60 },
+  reorderHeader: { paddingHorizontal: 24 },
+  reorderHint: { fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 12 },
+  reorderListContent: { paddingHorizontal: 24, paddingBottom: 40 },
+  reorderCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
+  reorderCardActive: { backgroundColor: '#F0D9C0', opacity: 0.9 },
+  reorderCardText: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
   emptyText: { color: '#888', textAlign: 'center', fontSize: 14 },
   workoutCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
   workoutInfo: { flex: 1 },
