@@ -106,15 +106,15 @@ export default function ProgressScreen() {
     setWeeklyLoading(true);
     try {
       const days = getWeekDays(weekOffset);
-      const results = await Promise.all(
-        days.map(date => api.get(`/meals/summary?date=${date}`).catch(() => ({ data: { totalCalories: 0 } })))
-      );
-      setWeeklyCalories(days.map((date, idx) => ({
+      const res = await api.get(`/meals/summary/range?startDate=${days[0]}&endDate=${days[days.length - 1]}`);
+      const byDate = res.data;
+
+      setWeeklyCalories(days.map(date => ({
         date,
-        calories: results[idx].data?.totalCalories || 0,
-        protein: results[idx].data?.totalProtein || 0,
-        carbs: results[idx].data?.totalCarbs || 0,
-        fat: results[idx].data?.totalFat || 0,
+        calories: byDate[date]?.totalCalories || 0,
+        protein: byDate[date]?.totalProtein || 0,
+        carbs: byDate[date]?.totalCarbs || 0,
+        fat: byDate[date]?.totalFat || 0,
       })));
     } catch (err) {
       console.error(err);

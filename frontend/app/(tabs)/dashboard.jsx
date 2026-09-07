@@ -76,15 +76,18 @@ export default function DashboardScreen() {
     setWeeklyLoading(true);
     try {
       const days = getWeekDays(weekOffset);
-      const results = await Promise.all(
-        days.map(date => api.get(`/meals/summary?date=${date}`).catch(() => ({ data: { totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 } })))
-      );
-      const totals = results.reduce((acc, r) => ({
-        calories: acc.calories + (r.data?.totalCalories || 0),
-        protein: acc.protein + (r.data?.totalProtein || 0),
-        carbs: acc.carbs + (r.data?.totalCarbs || 0),
-        fat: acc.fat + (r.data?.totalFat || 0),
-      }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      const res = await api.get(`/meals/summary/range?startDate=${days[0]}&endDate=${days[days.length - 1]}`);
+      const byDate = res.data;
+
+      const totals = days.reduce((acc, date) => {
+        const d = byDate[date];
+        return {
+          calories: acc.calories + (d?.totalCalories || 0),
+          protein: acc.protein + (d?.totalProtein || 0),
+          carbs: acc.carbs + (d?.totalCarbs || 0),
+          fat: acc.fat + (d?.totalFat || 0),
+        };
+      }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
       setWeeklyAvg({
         calories: Math.round(totals.calories / 7),
