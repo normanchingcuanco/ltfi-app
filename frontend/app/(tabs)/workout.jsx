@@ -83,23 +83,12 @@ function LinkEditPopover({ segment, onSave, onCancel }) {
 
 const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialValue }, ref) {
   const [value, setValue] = useState(initialValue || '');
-  const [isEditing, setIsEditing] = useState(!initialValue);
   const [editingLinkIdx, setEditingLinkIdx] = useState(null);
   const valueRef = useRef(initialValue || '');
-  const hasFocusedRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     getValue: () => valueRef.current
   }));
-
-  const handleChange = (v) => {
-    setValue(v);
-    valueRef.current = v;
-  };
-
-  const handleBlur = () => {
-    setIsEditing(false);
-  };
 
   const saveLinkEdit = (segment, newLabel, newUrl) => {
     if (!newUrl) {
@@ -113,45 +102,29 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
     setEditingLinkIdx(null);
   };
 
-  if (isEditing) {
-    return (
-      <TextInput
-        ref={(node) => {
-          if (node && !hasFocusedRef.current) {
-            hasFocusedRef.current = true;
-            node.focus();
-          }
-        }}
-        style={styles.notesInput}
-        placeholder="Notes, links, video URLs..."
-        placeholderTextColor="#999"
-        multiline
-        value={value}
-        onChangeText={handleChange}
-        onBlur={handleBlur}
-      />
-    );
-  }
-
   const segments = parseNotesLinks(value);
 
   return (
     <View style={styles.notesDisplayWrap}>
       <View style={styles.notesDisplay}>
-        <Text style={styles.notesDisplayText}>
-          {segments.map((seg, i) =>
-            seg.type === 'text' ? (
-              <Text key={i}>{seg.value}</Text>
-            ) : (
-              <Text key={i}>
-                <Text style={styles.linkText} onPress={() => Linking.openURL(seg.url)}>
-                  {seg.label}
+        {value ? (
+          <Text style={styles.notesDisplayText}>
+            {segments.map((seg, i) =>
+              seg.type === 'text' ? (
+                <Text key={i}>{seg.value}</Text>
+              ) : (
+                <Text key={i}>
+                  <Text style={styles.linkText} onPress={() => Linking.openURL(seg.url)}>
+                    {seg.label}
+                  </Text>
+                  <Text style={styles.linkEditIcon} onPress={() => setEditingLinkIdx(i)}> ✎</Text>
                 </Text>
-                <Text style={styles.linkEditIcon} onPress={() => setEditingLinkIdx(i)}> ✎</Text>
-              </Text>
-            )
-          )}
-        </Text>
+              )
+            )}
+          </Text>
+        ) : (
+          <Text style={styles.notesPlaceholderText}>No notes yet. Tap ✎ on the exercise to add some.</Text>
+        )}
       </View>
       {editingLinkIdx !== null && segments[editingLinkIdx] && (
         <LinkEditPopover
@@ -160,9 +133,6 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
           onSave={(newLabel, newUrl) => saveLinkEdit(segments[editingLinkIdx], newLabel, newUrl)}
         />
       )}
-      <TouchableOpacity style={styles.notesEditBtn} onPress={() => setIsEditing(true)}>
-        <Text style={styles.notesEditBtnText}>✎ Edit Notes</Text>
-      </TouchableOpacity>
     </View>
   );
 });
@@ -230,6 +200,7 @@ export default function WorkoutScreen() {
   const [exerciseLogs, setExerciseLogs] = useState({});
   const [pendingSets, setPendingSets] = useState({});
   const [exercisesPage, setExercisesPage] = useState(0);
+  const [reorderMode, setReorderMode] = useState(false);
   const [weightUnit, setWeightUnit] = useState('kg');
   const [exerciseOrder, setExerciseOrder] = useState([]);
   const [editingExercise, setEditingExercise] = useState(null);
@@ -631,6 +602,10 @@ export default function WorkoutScreen() {
             </View>
           </View>
 
+          <TouchableOpacity style={styles.reorderModeBtn} onPress={() => setReorderMode(r => !r)}>
+            <Text style={styles.reorderModeBtnText}>{reorderMode ? '✓ Done Reordering' : '⇅ Reorder Exercises'}</Text>
+          </TouchableOpacity>
+
           {exercisesLoading ? (
             <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />
           ) : exercises.length === 0 ? (
@@ -714,14 +689,16 @@ export default function WorkoutScreen() {
                 return (
                   <View key={ex.exercise} style={styles.exerciseCard}>
                     <View style={styles.exerciseHeader}>
-                      <View style={styles.reorderCol}>
-                        <TouchableOpacity onPress={() => moveExercise(ex.exercise, 'up')} disabled={isFirst}>
-                          <Text style={[styles.reorderArrow, isFirst && styles.reorderArrowDisabled]}>▲</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => moveExercise(ex.exercise, 'down')} disabled={isLast}>
-                          <Text style={[styles.reorderArrow, isLast && styles.reorderArrowDisabled]}>▼</Text>
-                        </TouchableOpacity>
-                      </View>
+                      {reorderMode && (
+                        <View style={styles.reorderCol}>
+                          <TouchableOpacity onPress={() => moveExercise(ex.exercise, 'up')} disabled={isFirst}>
+                            <Text style={[styles.reorderArrow, isFirst && styles.reorderArrowDisabled]}>▲</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => moveExercise(ex.exercise, 'down')} disabled={isLast}>
+                            <Text style={[styles.reorderArrow, isLast && styles.reorderArrowDisabled]}>▼</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                       <TouchableOpacity style={{ flex: 1 }} onPress={() => toggleExercise(ex.exercise)}>
                         <Text style={styles.exerciseName}>{ex.exercise}</Text>
                       </TouchableOpacity>
@@ -874,6 +851,8 @@ const styles = StyleSheet.create({
   unitBtnActive: { backgroundColor: '#F77E2D' },
   unitBtnText: { fontSize: 12, fontWeight: '700', color: '#888' },
   unitBtnTextActive: { color: '#fff' },
+  reorderModeBtn: { backgroundColor: '#D9D3C8', borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginBottom: 16 },
+  reorderModeBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 13 },
   emptyText: { color: '#888', textAlign: 'center', fontSize: 14 },
   workoutCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
   workoutInfo: { flex: 1 },
@@ -935,6 +914,7 @@ const styles = StyleSheet.create({
   notesDisplayWrap: { marginTop: 10 },
   notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, minHeight: 60 },
   notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
+  notesPlaceholderText: { fontSize: 13, color: '#999', fontStyle: 'italic', lineHeight: 18 },
   notesEditBtn: { alignSelf: 'flex-end', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4 },
   notesEditBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 12 },
   linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' },
