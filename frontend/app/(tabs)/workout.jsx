@@ -309,7 +309,8 @@ export default function WorkoutScreen() {
     setExercisesLoading(true);
     try {
       const res = await api.get('/exercises');
-      setExercises(sortByOrder(res.data, exerciseOrder));
+      const alphabetical = [...res.data].sort((a, b) => a.exercise.localeCompare(b.exercise));
+      setExercises(sortByOrder(alphabetical, exerciseOrder));
       const logResults = await Promise.all(
         res.data.map(ex =>
           api.get(`/exercises/${encodeURIComponent(ex.exercise)}`)
