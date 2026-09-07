@@ -311,18 +311,9 @@ export default function WorkoutScreen() {
       const res = await api.get('/exercises');
       const alphabetical = [...res.data].sort((a, b) => a.exercise.localeCompare(b.exercise));
       setExercises(sortByOrder(alphabetical, exerciseOrder));
-      const logResults = await Promise.all(
-        res.data.map(ex =>
-          api.get(`/exercises/${encodeURIComponent(ex.exercise)}`)
-            .then(r => ({ exercise: ex.exercise, logs: r.data }))
-            .catch(() => ({ exercise: ex.exercise, logs: [] }))
-        )
-      );
-      setExerciseLogs(prev => {
-        const updated = { ...prev };
-        logResults.forEach(({ exercise, logs }) => { updated[exercise] = logs; });
-        return updated;
-      });
+
+      const allLogsRes = await api.get('/exercises/logs/all');
+      setExerciseLogs(prev => ({ ...prev, ...allLogsRes.data }));
     } catch (err) {
       console.error(err);
     } finally {
