@@ -13,7 +13,9 @@ const exerciseLogSchema = new mongoose.Schema({
   date: { type: String, required: true },
   week: { type: Number },
   sets: [setSchema],
-  notes: { type: String, default: '' }
-}, { timestamps: true });
+    notes: { type: String, default: '' }
+  }, { timestamps: true });
+
+  exerciseLogSchema.index({ user: 1, exercise: 1, date: -1 });
 
 module.exports = mongoose.model('ExerciseLog', exerciseLogSchema);

@@ -18,7 +18,9 @@ const workoutSchema = new mongoose.Schema({
   warmUp: { type: Number, default: 0 },
   coolDown: { type: Number, default: 0 },
   caloriesBurned: { type: Number, default: 0 },
-  completedAt: { type: Date }
-}, { timestamps: true });
+    completedAt: { type: Date }
+  }, { timestamps: true });
+
+  workoutSchema.index({ user: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Workout', workoutSchema);

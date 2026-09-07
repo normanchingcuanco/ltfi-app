@@ -23,8 +23,10 @@ const mealSchema = new mongoose.Schema({
       sugar: { type: Number, default: 0 }
     }
   ],
-  totalCalories: { type: Number, default: 0 }
-}, { timestamps: true });
+    totalCalories: { type: Number, default: 0 }
+  }, { timestamps: true });
+
+  mealSchema.index({ user: 1, date: 1 });
 
 mealSchema.pre('save', async function () {
   this.totalCalories = this.foods.reduce((sum, food) => sum + food.calories, 0);

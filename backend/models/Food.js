@@ -13,7 +13,10 @@ const foodSchema = new mongoose.Schema({
   servingSize: { type: Number, default: 100 },
   servingUnit: { type: String, default: 'g' },
   source: { type: String, enum: ['open_food_facts', 'ai_scan', 'custom'], default: 'custom' },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
-}, { timestamps: true });
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
+  }, { timestamps: true });
+
+  foodSchema.index({ barcode: 1 });
+  foodSchema.index({ createdBy: 1 });
 
 module.exports = mongoose.model('Food', foodSchema);

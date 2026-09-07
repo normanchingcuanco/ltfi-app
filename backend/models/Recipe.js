@@ -30,4 +30,6 @@ recipeSchema.pre('save', async function () {
   this.totalFat = this.ingredients.reduce((sum, i) => sum + i.fat, 0);
 });
 
+recipeSchema.index({ user: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Recipe', recipeSchema);

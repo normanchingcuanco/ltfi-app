@@ -6,7 +6,9 @@ const weightSchema = new mongoose.Schema({
   notes: { type: String },
   photoUrl: { type: String },
   photoPublicId: { type: String },
-  loggedAt: { type: Date, default: Date.now }
-}, { timestamps: true });
+    loggedAt: { type: Date, default: Date.now }
+  }, { timestamps: true });
+
+  weightSchema.index({ user: 1, loggedAt: -1 });
 
 module.exports = mongoose.model('Weight', weightSchema);
