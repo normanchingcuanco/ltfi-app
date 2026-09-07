@@ -95,4 +95,40 @@ const getDailySummary = async (req, res) => {
   }
 };
 
-module.exports = { getMeals, addFoodToMeal, removeFoodFromMeal, updateFoodInMeal, getDailySummary };
+const getRangeSummary = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) return res.status(400).json({ message: 'startDate and endDate required' });
+
+    const meals = await Meal.find({
+      user: req.user._id,
+      date: { $gte: startDate, $lte: endDate }
+    });
+
+    const byDate = {};
+    meals.forEach(meal => {
+      if (!byDate[meal.date]) {
+        byDate[meal.date] = {
+          totalCalories: 0, totalProtein: 0, totalCarbs: 0,
+          totalFat: 0, totalFiber: 0, totalSodium: 0, totalSugar: 0, meals: []
+        };
+      }
+      byDate[meal.date].meals.push(meal);
+      meal.foods.forEach(food => {
+        byDate[meal.date].totalCalories += food.calories;
+        byDate[meal.date].totalProtein += food.protein;
+        byDate[meal.date].totalCarbs += food.carbs;
+        byDate[meal.date].totalFat += food.fat;
+        byDate[meal.date].totalFiber += food.fiber;
+        byDate[meal.date].totalSodium += food.sodium;
+        byDate[meal.date].totalSugar += food.sugar;
+      });
+    });
+
+    res.json(byDate);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports = { getMeals, addFoodToMeal, removeFoodFromMeal, updateFoodInMeal, getDailySummary, getRangeSummary };
