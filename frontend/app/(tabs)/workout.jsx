@@ -210,6 +210,7 @@ export default function WorkoutScreen() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [savingExercise, setSavingExercise] = useState(null);
   const notesRefs = useRef({});
+  const exerciseOrderRef = useRef([]);
   const EXERCISES_PER_PAGE = 10;
   const router = useRouter();
 
@@ -226,7 +227,9 @@ export default function WorkoutScreen() {
     try {
       const res = await api.get('/auth/me');
       setWeightUnit(res.data.weightUnit || 'kg');
-      setExerciseOrder(res.data.exerciseOrder || []);
+      const order = res.data.exerciseOrder || [];
+      setExerciseOrder(order);
+      exerciseOrderRef.current = order;
     } catch (err) {
       console.error(err);
     }
@@ -257,6 +260,7 @@ export default function WorkoutScreen() {
     [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
 
     setExerciseOrder(newOrder);
+    exerciseOrderRef.current = newOrder;
     setExercises(prev => sortByOrder(prev, newOrder));
     try {
       await api.put('/auth/profile', { exerciseOrder: newOrder });
@@ -281,7 +285,7 @@ export default function WorkoutScreen() {
     try {
       const res = await api.get('/exercises');
       const alphabetical = [...res.data].sort((a, b) => a.exercise.localeCompare(b.exercise));
-      setExercises(sortByOrder(alphabetical, exerciseOrder));
+      setExercises(sortByOrder(alphabetical, exerciseOrderRef.current));
 
       const allLogsRes = await api.get('/exercises/logs/all');
       setExerciseLogs(prev => ({ ...prev, ...allLogsRes.data }));
@@ -431,6 +435,7 @@ export default function WorkoutScreen() {
         if (exerciseOrder.includes(editingExercise)) {
           const newOrder = exerciseOrder.map(name => name === editingExercise ? trimmedName : name);
           setExerciseOrder(newOrder);
+          exerciseOrderRef.current = newOrder;
           api.put('/auth/profile', { exerciseOrder: newOrder }).catch(err => console.error(err));
         }
       }
