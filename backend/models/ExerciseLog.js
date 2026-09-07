@@ -4,7 +4,8 @@ const setSchema = new mongoose.Schema({
   setNumber: { type: Number, required: true },
   weight: { type: Number, default: 0 },
   reps: { type: Number, default: 0 },
-  notes: { type: String, default: '' }
+  notes: { type: String, default: '' },
+  label: { type: String, default: '' }
 }, { _id: false });
 
 const exerciseLogSchema = new mongoose.Schema({

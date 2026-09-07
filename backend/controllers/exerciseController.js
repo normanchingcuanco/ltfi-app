@@ -28,6 +28,20 @@ const getExerciseLogs = async (req, res) => {
   }
 };
 
+const getAllExerciseLogs = async (req, res) => {
+  try {
+    const logs = await ExerciseLog.find({ user: req.user._id }).sort({ date: -1 });
+    const byExercise = {};
+    logs.forEach(log => {
+      if (!byExercise[log.exercise]) byExercise[log.exercise] = [];
+      byExercise[log.exercise].push(log);
+    });
+    res.json(byExercise);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 const EPOCH = new Date('2025-01-01');
 
 const calendarWeek = (dateStr) => {
@@ -152,4 +166,4 @@ const renameExercise = async (req, res) => {
   }
 };
 
-module.exports = { getExercises, getExerciseLogs, logExercise, updateExerciseLog, deleteExerciseLog, deleteExerciseByName, renameExercise };
+module.exports = { getExercises, getExerciseLogs, getAllExerciseLogs, logExercise, updateExerciseLog, deleteExerciseLog, deleteExerciseByName, renameExercise };
