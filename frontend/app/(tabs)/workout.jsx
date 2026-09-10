@@ -232,6 +232,7 @@ export default function WorkoutScreen() {
       const order = res.data.exerciseOrder || [];
       setExerciseOrder(order);
       exerciseOrderRef.current = order;
+      setExercises(prev => sortByOrder(prev, order));
     } catch (err) {
       console.error(err);
     }
@@ -329,13 +330,17 @@ export default function WorkoutScreen() {
   };
 
   const saveWeek = async (exercise, newWeek) => {
-    const todayLog = await getFreshTodayLog(exercise);
+    const res = await api.get(`/exercises/${encodeURIComponent(exercise)}`).catch(() => ({ data: exerciseLogs[exercise] || [] }));
+    const logs = res.data;
+    setExerciseLogs(prev => ({ ...prev, [exercise]: logs }));
+    const todayLog = logs.find(l => l.date === localDate()) || null;
+    const effectiveNotes = getEffectiveNotes(logs, todayLog);
     try {
       await api.post('/exercises', {
         exercise,
         date: localDate(),
         sets: todayLog?.sets || [],
-        notes: todayLog?.notes || '',
+        notes: effectiveNotes,
         weekOverride: newWeek
       });
       fetchExerciseLogs(exercise);
