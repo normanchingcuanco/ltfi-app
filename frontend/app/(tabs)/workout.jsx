@@ -178,15 +178,19 @@ const getEffectiveNotes = (logs, todayLog) => {
   return mostRecent ? mostRecent.notes : '';
 };
 
-const sortByOrder = (exercises, order) => {
-  if (!order || order.length === 0) return exercises;
-  const orderIndex = new Map(order.map((name, i) => [name, i]));
-  return [...exercises].sort((a, b) => {
-    const ai = orderIndex.has(a.exercise) ? orderIndex.get(a.exercise) : Infinity;
-    const bi = orderIndex.has(b.exercise) ? orderIndex.get(b.exercise) : Infinity;
-    if (ai !== bi) return ai - bi;
-    return 0;
+const groupLogsByDate = (exerciseLogs) => {
+  const byDate = {};
+  Object.entries(exerciseLogs).forEach(([exercise, logs]) => {
+    logs.forEach(log => {
+      const hasContent = (log.sets && log.sets.length > 0) || log.notes;
+      if (!hasContent) return;
+      if (!byDate[log.date]) byDate[log.date] = [];
+      byDate[log.date].push({ ...log, exercise });
+    });
   });
+  return Object.keys(byDate)
+    .sort((a, b) => b.localeCompare(a))
+    .map(date => ({ date, entries: byDate[date] }));
 };
 
 export default function WorkoutScreen() {
@@ -203,6 +207,9 @@ export default function WorkoutScreen() {
   const [pendingLabels, setPendingLabels] = useState({});
   const [exercisesPage, setExercisesPage] = useState(0);
   const [reorderMode, setReorderMode] = useState(false);
+  const [dayView, setDayView] = useState(false);
+  const [dayViewPage, setDayViewPage] = useState(0);
+  const [expandedDate, setExpandedDate] = useState(null);
   const [weightUnit, setWeightUnit] = useState('kg');
   const [exerciseOrder, setExerciseOrder] = useState([]);
   const [editingExercise, setEditingExercise] = useState(null);
@@ -517,7 +524,77 @@ export default function WorkoutScreen() {
       <ActivityIndicator size="large" color="#F77E2D" />
     </View>
   );
-
+    if (tab === 'tracker' && dayView) {
+      const days = groupLogsByDate(exerciseLogs);
+      const DAYS_PER_PAGE = 7;
+      const pagedDays = days.slice(dayViewPage * DAYS_PER_PAGE, dayViewPage * DAYS_PER_PAGE + DAYS_PER_PAGE);
+      return (
+        <ScrollView style={styles.reorderScreen} contentContainerStyle={styles.reorderListContent}>
+          <View style={styles.reorderHeader}>
+            <Text style={styles.title}>Day View</Text>
+            <TouchableOpacity style={styles.reorderModeBtn} onPress={() => { setDayView(false); setExpandedDate(null); }}>
+              <Text style={styles.reorderModeBtnText}>✓ Back to Tracker</Text>
+            </TouchableOpacity>
+          </View>
+          {pagedDays.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>No logged workouts yet.</Text>
+            </View>
+          ) : (
+            pagedDays.map(day => {
+              const isToday = day.date === localDate();
+              const isDayExpanded = expandedDate === day.date;
+              return (
+                <View key={day.date} style={styles.dayCard}>
+                  <TouchableOpacity onPress={() => setExpandedDate(isDayExpanded ? null : day.date)}>
+                    <View style={styles.dayCardHeader}>
+                      <View>
+                        <Text style={styles.dayCardTitle}>{isToday ? 'Today' : day.date}</Text>
+                        <Text style={styles.dayCardSub}>{day.entries.length} exercise{day.entries.length !== 1 ? 's' : ''} logged</Text>
+                      </View>
+                      <Text style={styles.dayCardChevron}>{isDayExpanded ? '⌃' : '›'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                  {isDayExpanded && (
+                    <View style={styles.dayCardBody}>
+                      {day.entries.map((entry, i) => (
+                        <View key={i} style={styles.dayEntryRow}>
+                          <Text style={styles.dayEntryName}>{entry.exercise}</Text>
+                          <Text style={styles.dayEntryMeta}>
+                            {entry.sets && entry.sets.length > 0
+                              ? `${entry.sets.length} set${entry.sets.length !== 1 ? 's' : ''}`
+                              : 'Notes only'}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+          {days.length > DAYS_PER_PAGE && (
+            <View style={styles.paginationRow}>
+              <TouchableOpacity
+                style={[styles.pageBtn, dayViewPage === 0 && styles.pageBtnDisabled]}
+                disabled={dayViewPage === 0}
+                onPress={() => setDayViewPage(p => p - 1)}
+              >
+                <Text style={[styles.pageBtnText, dayViewPage === 0 && styles.pageBtnTextDisabled]}>‹ Prev</Text>
+              </TouchableOpacity>
+              <Text style={styles.pageIndicator}>Page {dayViewPage + 1}</Text>
+              <TouchableOpacity
+                style={[styles.pageBtn, (dayViewPage + 1) * DAYS_PER_PAGE >= days.length && styles.pageBtnDisabled]}
+                disabled={(dayViewPage + 1) * DAYS_PER_PAGE >= days.length}
+                onPress={() => setDayViewPage(p => p + 1)}
+              >
+                <Text style={[styles.pageBtnText, (dayViewPage + 1) * DAYS_PER_PAGE >= days.length && styles.pageBtnTextDisabled]}>Next ›</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      );
+    }
   if (tab === 'tracker' && reorderMode) {
     return (
       <View style={styles.reorderScreen}>
@@ -659,8 +736,11 @@ export default function WorkoutScreen() {
             <Text style={styles.reorderModeBtnText}>{reorderMode ? '✓ Done Reordering' : '⇅ Reorder Exercises'}</Text>
           </TouchableOpacity>
 
-          {exercisesLoading ? (
-            <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />
+          <TouchableOpacity style={styles.reorderModeBtn} onPress={() => setDayView(true)}>
+            <Text style={styles.reorderModeBtnText}>📅 Day View</Text>
+          </TouchableOpacity>
+
+          {exercisesLoading ? (            <ActivityIndicator color="#F77E2D" style={{ marginTop: 20 }} />
           ) : exercises.length === 0 ? (
             <View style={styles.emptyBox}>
               <Text style={styles.emptyText}>No exercises yet. Add one to start tracking.</Text>
@@ -911,6 +991,15 @@ const styles = StyleSheet.create({
   reorderCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
   reorderCardActive: { backgroundColor: '#F0D9C0', opacity: 0.9 },
   reorderCardText: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+  dayCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
+  dayCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dayCardTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+  dayCardSub: { fontSize: 12, color: '#888', marginTop: 2 },
+  dayCardChevron: { fontSize: 20, color: '#F77E2D' },
+  dayCardBody: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#C5BFB4', paddingTop: 12 },
+  dayEntryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
+  dayEntryName: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
+  dayEntryMeta: { fontSize: 12, color: '#888' },
   emptyText: { color: '#888', textAlign: 'center', fontSize: 14 },
   workoutCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, marginBottom: 12 },
   workoutInfo: { flex: 1 },
