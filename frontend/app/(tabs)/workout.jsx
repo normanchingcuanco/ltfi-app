@@ -178,8 +178,18 @@ const getEffectiveNotes = (logs, todayLog) => {
   return mostRecent ? mostRecent.notes : '';
 };
 
-const groupLogsByDate = (exerciseLogs) => {
-  const byDate = {};
+const sortByOrder = (exercises, order) => {
+  if (!order || order.length === 0) return exercises;
+  const orderIndex = new Map(order.map((name, i) => [name, i]));
+  return [...exercises].sort((a, b) => {
+    const ai = orderIndex.has(a.exercise) ? orderIndex.get(a.exercise) : Infinity;
+    const bi = orderIndex.has(b.exercise) ? orderIndex.get(b.exercise) : Infinity;
+    if (ai !== bi) return ai - bi;
+    return 0;
+  });
+};
+
+const groupLogsByDate = (exerciseLogs) => {  const byDate = {};
   Object.entries(exerciseLogs).forEach(([exercise, logs]) => {
     logs.forEach(log => {
       const hasContent = (log.sets && log.sets.length > 0) || log.notes;
