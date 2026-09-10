@@ -209,6 +209,7 @@ export default function WorkoutScreen() {
   const [editName, setEditName] = useState('');
   const [editSetsToday, setEditSetsToday] = useState([]);
   const [editNotesValue, setEditNotesValue] = useState('');
+  const [editWeekValue, setEditWeekValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const [savingExercise, setSavingExercise] = useState(null);
   const notesRefs = useRef({});
@@ -405,12 +406,13 @@ export default function WorkoutScreen() {
     }
   };
 
-  const startEditExercise = async (exercise) => {
+    const startEditExercise = async (exercise, currentWeek) => {
     setEditingExercise(exercise);
     setEditName(exercise);
+    setEditWeekValue(String(currentWeek ?? ''));
     const todayLog = await getFreshTodayLog(exercise);
     setEditSetsToday((todayLog?.sets || []).map(s => ({ weight: String(displayWeight(s.weight, weightUnit) ?? ''), reps: String(s.reps ?? '') })));
-    setEditNotesValue(todayLog?.notes || '');
+    setEditNotesValue(getEffectiveNotes(exerciseLogs[exercise] || [], todayLog));
   };
 
   const cancelEditExercise = () => {
@@ -451,11 +453,13 @@ export default function WorkoutScreen() {
         weight: toKg(s.weight, weightUnit),
         reps: parseInt(s.reps) || 0
       }));
+      const parsedWeek = parseInt(editWeekValue, 10);
       await api.post('/exercises', {
         exercise: trimmedName,
         date: localDate(),
         sets,
-        notes: editNotesValue
+        notes: editNotesValue,
+        weekOverride: isNaN(parsedWeek) ? undefined : parsedWeek
       });
       if (expandedExercise === editingExercise) setExpandedExercise(trimmedName);
       cancelEditExercise();
@@ -480,16 +484,18 @@ export default function WorkoutScreen() {
   };
 
   const createExercise = async () => {
-    if (!newExerciseName.trim()) return;
+    const name = newExerciseName.trim();
+    if (!name) return;
     try {
-      await api.post('/exercises', {
-        exercise: newExerciseName.trim(),
+      const res = await api.post('/exercises', {
+        exercise: name,
         date: localDate(),
         sets: []
       });
       setNewExerciseName('');
       setShowNewExercise(false);
       fetchExercises();
+      startEditExercise(name, res.data.week);
     } catch (err) {
       console.error(err);
     }
@@ -683,6 +689,14 @@ export default function WorkoutScreen() {
                         autoFocus
                       />
 
+                      <Text style={styles.editSectionLabel}>Week</Text>
+                      <TextInput
+                        style={styles.weekInput}
+                        keyboardType="numeric"
+                        value={editWeekValue}
+                        onChangeText={setEditWeekValue}
+                      />
+
                       <Text style={styles.editSectionLabel}>Today's Sets</Text>
                       {editSetsToday.map((s, sidx) => (
                         <View key={sidx} style={styles.addSetRow}>
@@ -746,7 +760,7 @@ export default function WorkoutScreen() {
                             <Text style={styles.minimizeText}>⌃</Text>
                           </TouchableOpacity>
                         )}
-                        <TouchableOpacity onPress={() => startEditExercise(ex.exercise)}>
+                        <TouchableOpacity onPress={() => startEditExercise(ex.exercise, ex.week)}>
                           <Text style={styles.renameExerciseText}>✎</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => deleteExercise(ex.exercise)}>
