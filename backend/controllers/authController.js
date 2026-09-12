@@ -84,7 +84,10 @@ const updateProfile = async (req, res) => {
     if (gender !== undefined) user.gender = gender;
     if (timezone) user.timezone = timezone;
     if (weightUnit) user.weightUnit = weightUnit;
-    if (exerciseOrder) user.exerciseOrder = exerciseOrder;
+    if (exerciseOrder) {
+      user.exerciseOrder = exerciseOrder;
+      console.log('Setting exerciseOrder on user', user._id.toString(), ':', JSON.stringify(exerciseOrder));
+    }
 
     const dailyCalorieGoal = calculateTDEE({
       age: user.age,
@@ -96,7 +99,8 @@ const updateProfile = async (req, res) => {
     user.dailyCalorieGoal = dailyCalorieGoal;
     user.macroGoals = calculateMacros(dailyCalorieGoal);
 
-    await user.save();
+    const savedUser = await user.save();
+    console.log('After save, exerciseOrder is:', JSON.stringify(savedUser.exerciseOrder));
 
     res.json({
       _id: user._id,
