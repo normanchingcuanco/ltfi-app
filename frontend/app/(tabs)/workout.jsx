@@ -301,8 +301,8 @@ export default function WorkoutScreen() {
     }
   };
 
-  const fetchExercises = async () => {
-    setExercisesLoading(true);
+  const fetchExercises = async (silent = false) => {
+    if (!silent) setExercisesLoading(true);
     try {
       const res = await api.get('/exercises');
       const alphabetical = [...res.data].sort((a, b) => a.exercise.localeCompare(b.exercise));
@@ -313,7 +313,7 @@ export default function WorkoutScreen() {
     } catch (err) {
       console.error(err);
     } finally {
-      setExercisesLoading(false);
+      if (!silent) setExercisesLoading(false);
     }
   };
 
@@ -361,14 +361,14 @@ export default function WorkoutScreen() {
         notes: effectiveNotes,
         weekOverride: newWeek
       });
-      fetchExerciseLogs(exercise);
-      fetchExercises();
-    } catch (err) {
-      console.error(err);
-    }
-  };
+        fetchExerciseLogs(exercise);
+        fetchExercises(true);
+      } catch (err) {
+        console.error(err);
+      }
+    };
 
-  const addRow = (exercise) => {
+    const addRow = (exercise) => {
     setPendingSets(prev => ({
       ...prev,
       [exercise]: [...(prev[exercise] || []), { weight: '', reps: '' }]
@@ -414,7 +414,7 @@ export default function WorkoutScreen() {
       });
       setPendingSets(prev => ({ ...prev, [exercise]: [] }));
       await fetchExerciseLogs(exercise);
-      await fetchExercises();
+      await fetchExercises(true);
       setExpandedExercise(null);
     } catch (err) {
       console.error(err);
@@ -480,7 +480,7 @@ export default function WorkoutScreen() {
       });
       if (expandedExercise === editingExercise) setExpandedExercise(trimmedName);
       cancelEditExercise();
-      fetchExercises();
+      fetchExercises(true);
       fetchExerciseLogs(trimmedName);
     } catch (err) {
       console.error(err);
@@ -511,7 +511,7 @@ export default function WorkoutScreen() {
       });
       setNewExerciseName('');
       setShowNewExercise(false);
-      fetchExercises();
+      fetchExercises(true);
       startEditExercise(name, res.data.week);
     } catch (err) {
       console.error(err);
