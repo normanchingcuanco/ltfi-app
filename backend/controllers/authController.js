@@ -61,6 +61,7 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
+    console.log('GET /auth/me exerciseOrder:', JSON.stringify(user.exerciseOrder));
     res.json(user);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -83,10 +84,7 @@ const updateProfile = async (req, res) => {
     if (gender !== undefined) user.gender = gender;
     if (timezone) user.timezone = timezone;
     if (weightUnit) user.weightUnit = weightUnit;
-    if (exerciseOrder) {
-      console.log('PUT /auth/profile exerciseOrder update:', JSON.stringify(exerciseOrder));
-      user.exerciseOrder = exerciseOrder;
-    }
+    if (exerciseOrder) user.exerciseOrder = exerciseOrder;
 
     const dailyCalorieGoal = calculateTDEE({
       age: user.age,
