@@ -83,7 +83,10 @@ const updateProfile = async (req, res) => {
     if (gender !== undefined) user.gender = gender;
     if (timezone) user.timezone = timezone;
     if (weightUnit) user.weightUnit = weightUnit;
-    if (exerciseOrder) user.exerciseOrder = exerciseOrder;
+    if (exerciseOrder) {
+      console.log('PUT /auth/profile exerciseOrder update:', JSON.stringify(exerciseOrder));
+      user.exerciseOrder = exerciseOrder;
+    }
 
     const dailyCalorieGoal = calculateTDEE({
       age: user.age,
