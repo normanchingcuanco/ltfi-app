@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema({
   },
   dietPreference: { type: String },
   gender: { type: String, enum: ['male', 'female'] },
+  exerciseOrder: { type: [String], default: [] },
   dailyCalorieGoal: { type: Number },
   macroGoals: {
     protein: { type: Number },
