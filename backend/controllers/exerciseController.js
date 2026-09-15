@@ -93,8 +93,10 @@ const logExercise = async (req, res) => {
       if (previous) {
         const elapsed = weeksBetween(previous.date, date);
         week = previous.week + Math.max(elapsed, 0);
+        console.log(`WEEK CALC [${exercise}]: today=${date} previous.date=${previous.date} previous.week=${previous.week} elapsed=${elapsed} => new week=${week}`);
       } else {
         week = calendarWeek(date);
+        console.log(`WEEK CALC [${exercise}]: no previous log, today=${date} => calendarWeek=${week}`);
       }
     }
 
