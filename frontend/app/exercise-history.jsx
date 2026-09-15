@@ -266,8 +266,7 @@ export default function ExerciseHistoryScreen() {
             return (
               <View key={log._id} style={styles.logCard}>
                 <View style={styles.logHeader}>
-                  <Text style={styles.logDate}>{formatDate(log.date)}</Text>
-                  <View style={styles.logHeaderRight}>
+                  <Text style={styles.logDate}>{formatDate(log.date)} · Week {log.week ?? '-'}</Text>                  <View style={styles.logHeaderRight}>
                     {isPR && (
                       <View style={styles.prBadge}>
                         <Text style={styles.prBadgeText}>PR</Text>
