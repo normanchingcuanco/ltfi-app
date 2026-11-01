@@ -13,10 +13,6 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#EDE8DF"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ltfi.app",
@@ -44,7 +40,14 @@
       "expo-updates",
       "expo-font",
       "expo-status-bar",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#EDE8DF"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
