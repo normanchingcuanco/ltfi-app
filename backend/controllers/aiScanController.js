@@ -157,7 +157,7 @@ const scanFoodImage = async (req, res) => {
     if (!imageBase64) return res.status(400).json({ message: 'Image required' });
 
     const response = await groq.chat.completions.create({
-      model: 'qwen/qwen3.6-27b',
+      model: 'qwen/qwen3.8-27b',
       messages: [
         {
           role: 'user',
