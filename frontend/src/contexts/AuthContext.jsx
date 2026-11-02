@@ -13,6 +13,18 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
+  // Pull the full profile (weight, height, age, etc.) from the server
+  const fetchFullUser = async (base) => {
+    try {
+      const me = await api.get('/auth/me');
+      const full = { ...base, ...me.data };
+      await AsyncStorage.setItem('user', JSON.stringify(full));
+      return full;
+    } catch (err) {
+      return base;
+    }
+  };
+
   const loadUser = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
@@ -24,7 +36,10 @@ export const AuthProvider = ({ children }) => {
         } else {
           const storedUser = await AsyncStorage.getItem('user');
           if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            const cached = JSON.parse(storedUser);
+            setUser(cached);
+            // refresh in the background so the profile is never stale
+            fetchFullUser(cached).then(setUser);
           } else {
             const res = await api.get('/auth/me');
             setUser(res.data);
@@ -46,14 +61,16 @@ export const AuthProvider = ({ children }) => {
     const res = await api.post('/auth/register', data);
     await AsyncStorage.setItem('token', res.data.token);
     await AsyncStorage.setItem('user', JSON.stringify(res.data));
-    setUser(res.data);
+    const full = await fetchFullUser(res.data);
+    setUser(full);
   };
 
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
     await AsyncStorage.setItem('token', res.data.token);
     await AsyncStorage.setItem('user', JSON.stringify(res.data));
-    setUser(res.data);
+    const full = await fetchFullUser(res.data);
+    setUser(full);
   };
 
   const logout = async () => {
