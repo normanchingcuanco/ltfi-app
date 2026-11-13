@@ -144,7 +144,7 @@ function WeekEditor({ week, onSave }) {
 
   const confirm = () => {
     const parsed = parseInt(value, 10);
-    if (!isNaN(parsed)) onSave(parsed);
+    if (!isNaN(parsed) && parsed !== week) onSave(parsed);
     setEditing(false);
   };
 
@@ -423,7 +423,7 @@ export default function WorkoutScreen() {
     }
   };
 
-    const startEditExercise = async (exercise, currentWeek) => {
+  const startEditExercise = async (exercise, currentWeek) => {
     setEditingExercise(exercise);
     setEditName(exercise);
     setEditWeekValue(String(currentWeek ?? ''));
@@ -470,13 +470,15 @@ export default function WorkoutScreen() {
         weight: toKg(s.weight, weightUnit),
         reps: parseInt(s.reps) || 0
       }));
+      const originalWeek = exercises.find(e => e.exercise === editingExercise)?.week;
       const parsedWeek = parseInt(editWeekValue, 10);
+      const weekChanged = !isNaN(parsedWeek) && parsedWeek !== originalWeek;
       await api.post('/exercises', {
         exercise: trimmedName,
         date: localDate(),
         sets,
         notes: editNotesValue,
-        weekOverride: isNaN(parsedWeek) ? undefined : parsedWeek
+        weekOverride: weekChanged ? parsedWeek : undefined
       });
       if (expandedExercise === editingExercise) setExpandedExercise(trimmedName);
       cancelEditExercise();
