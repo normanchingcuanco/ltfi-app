@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Platform, Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
 
@@ -14,6 +14,20 @@ const formatDate = (date) => {
 const displayDate = (date) => date.toDateString();
 const isToday = (date) => formatDate(date) === formatDate(new Date());
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+// Monday-first month grid: null = empty cell, number = day of month
+const buildCalendarCells = (year, month) => {
+  const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+};
+
 export default function DiaryScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [summary, setSummary] = useState(null);
@@ -22,6 +36,8 @@ export default function DiaryScreen() {
   const [editQuantity, setEditQuantity] = useState('');
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calMonth, setCalMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const router = useRouter();
 
   useFocusEffect(
@@ -59,6 +75,22 @@ export default function DiaryScreen() {
   const goToToday = () => {
     setSelectedDate(new Date());
     setSummary(null);
+    setCalendarOpen(false);
+  };
+
+  const openCalendar = () => {
+    setCalMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+    setCalendarOpen(true);
+  };
+
+  const changeMonth = (delta) => {
+    setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + delta, 1));
+  };
+
+  const pickDay = (day) => {
+    setSelectedDate(new Date(calMonth.getFullYear(), calMonth.getMonth(), day));
+    setSummary(null);
+    setCalendarOpen(false);
   };
 
   const deleteFood = async (mealId, foodId) => {
@@ -141,6 +173,7 @@ export default function DiaryScreen() {
   };
 
   const isEmpty = !summary?.meals || summary.meals.every(m => m.foods.length === 0);
+  const calCells = buildCalendarCells(calMonth.getFullYear(), calMonth.getMonth());
 
   if (loading) return (
     <View style={styles.center}>
@@ -156,11 +189,11 @@ export default function DiaryScreen() {
         <TouchableOpacity style={styles.navBtn} onPress={goToPrevDay}>
           <Text style={styles.navBtnText}>‹</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={goToToday}>
+        <TouchableOpacity onPress={openCalendar}>
           <Text style={styles.dateText}>
             {isToday(selectedDate) ? 'Today' : displayDate(selectedDate)}
           </Text>
-          {!isToday(selectedDate) && <Text style={styles.goToToday}>Tap to go to today</Text>}
+          <Text style={styles.goToToday}>Tap to pick a date</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navBtn} onPress={goToNextDay}>
           <Text style={styles.navBtnText}>›</Text>
@@ -291,6 +324,50 @@ export default function DiaryScreen() {
           </View>
         </View>
       )}
+
+      <Modal visible={calendarOpen} transparent animationType="fade" onRequestClose={() => setCalendarOpen(false)}>
+        <View style={styles.calOverlay}>
+          <View style={styles.calCard}>
+            <View style={styles.calHeader}>
+              <TouchableOpacity style={styles.navBtn} onPress={() => changeMonth(-1)}>
+                <Text style={styles.navBtnText}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.calMonthText}>{MONTH_NAMES[calMonth.getMonth()]} {calMonth.getFullYear()}</Text>
+              <TouchableOpacity style={styles.navBtn} onPress={() => changeMonth(1)}>
+                <Text style={styles.navBtnText}>›</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.calWeekRow}>
+              {WEEKDAYS.map((w, i) => (
+                <Text key={i} style={styles.calWeekday}>{w}</Text>
+              ))}
+            </View>
+            <View style={styles.calGrid}>
+              {calCells.map((day, i) => {
+                if (!day) return <View key={i} style={styles.calCell} />;
+                const cellDate = new Date(calMonth.getFullYear(), calMonth.getMonth(), day);
+                const isSelected = formatDate(cellDate) === formatDate(selectedDate);
+                const isTodayCell = isToday(cellDate);
+                return (
+                  <TouchableOpacity key={i} style={styles.calCell} onPress={() => pickDay(day)}>
+                    <View style={[styles.calDayInner, isTodayCell && styles.calDayToday, isSelected && styles.calDaySelected]}>
+                      <Text style={[styles.calDayText, isSelected && styles.calDayTextSelected]}>{day}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.calActions}>
+              <TouchableOpacity style={styles.calCloseBtn} onPress={() => setCalendarOpen(false)}>
+                <Text style={styles.calCloseBtnText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.calTodayBtn} onPress={goToToday}>
+                <Text style={styles.calTodayBtnText}>Today</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -347,5 +424,23 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 8 },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   cancelBtn: { padding: 12, alignItems: 'center' },
-  cancelBtnText: { color: '#888', fontSize: 14 }
+  cancelBtnText: { color: '#888', fontSize: 14 },
+  calOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  calCard: { backgroundColor: '#EDE8DF', borderRadius: 20, padding: 20, width: '100%', maxWidth: 360 },
+  calHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  calMonthText: { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
+  calWeekRow: { flexDirection: 'row' },
+  calWeekday: { width: '14.2857%', textAlign: 'center', fontSize: 11, color: '#888', fontWeight: '700', paddingBottom: 6 },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calCell: { width: '14.2857%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center' },
+  calDayInner: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+  calDayToday: { borderWidth: 1.5, borderColor: '#F77E2D' },
+  calDaySelected: { backgroundColor: '#F77E2D' },
+  calDayText: { fontSize: 14, color: '#1A1A1A', fontWeight: '600' },
+  calDayTextSelected: { color: '#fff' },
+  calActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  calCloseBtn: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 10, padding: 12, alignItems: 'center' },
+  calCloseBtnText: { color: '#888', fontWeight: '700', fontSize: 14 },
+  calTodayBtn: { flex: 1, backgroundColor: '#F77E2D', borderRadius: 10, padding: 12, alignItems: 'center' },
+  calTodayBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 }
 });
