@@ -85,6 +85,7 @@ function LinkEditPopover({ segment, onSave, onCancel }) {
 const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialValue }, ref) {
   const [value, setValue] = useState(initialValue || '');
   const [editingLinkIdx, setEditingLinkIdx] = useState(null);
+  const [editing, setEditing] = useState(false);
   const valueRef = useRef(initialValue || '');
 
   useImperativeHandle(ref, () => ({
@@ -103,30 +104,50 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
     setEditingLinkIdx(null);
   };
 
+  const handleChange = (text) => {
+    setValue(text);
+    valueRef.current = text;
+  };
+
   const segments = parseNotesLinks(value);
 
   return (
     <View style={styles.notesDisplayWrap}>
-      <View style={styles.notesDisplay}>
-        {value ? (
-          <Text style={styles.notesDisplayText}>
-            {segments.map((seg, i) =>
-              seg.type === 'text' ? (
-                <Text key={i}>{seg.value}</Text>
-              ) : (
-                <Text key={i}>
-                  <Text style={styles.linkText} onPress={() => Linking.openURL(seg.url)}>
-                    {seg.label}
-                  </Text>
-                  <Text style={styles.linkEditIcon} onPress={() => setEditingLinkIdx(i)}> ✎</Text>
-                </Text>
-              )
+      {editing ? (
+        <TextInput
+          style={styles.notesEditInput}
+          multiline
+          autoFocus
+          value={value}
+          onChangeText={handleChange}
+          onBlur={() => setEditing(false)}
+          placeholder="Notes, links... use [Label](https://...) for named links"
+          placeholderTextColor="#999"
+        />
+      ) : (
+        <TouchableOpacity activeOpacity={0.8} onPress={() => setEditing(true)}>
+          <View style={styles.notesDisplay}>
+            {value ? (
+              <Text style={styles.notesDisplayText}>
+                {segments.map((seg, i) =>
+                  seg.type === 'text' ? (
+                    <Text key={i}>{seg.value}</Text>
+                  ) : (
+                    <Text key={i}>
+                      <Text style={styles.linkText} onPress={() => Linking.openURL(seg.url)}>
+                        {seg.label}
+                      </Text>
+                      <Text style={styles.linkEditIcon} onPress={() => setEditingLinkIdx(i)}> ✎</Text>
+                    </Text>
+                  )
+                )}
+              </Text>
+            ) : (
+              <Text style={styles.notesPlaceholderText}>No notes yet. Tap here to add some.</Text>
             )}
-          </Text>
-        ) : (
-          <Text style={styles.notesPlaceholderText}>No notes yet. Tap ✎ on the exercise to add some.</Text>
-        )}
-      </View>
+          </View>
+        </TouchableOpacity>
+      )}
       {editingLinkIdx !== null && segments[editingLinkIdx] && (
         <LinkEditPopover
           segment={segments[editingLinkIdx]}
@@ -1072,6 +1093,7 @@ const styles = StyleSheet.create({
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 80, textAlignVertical: 'top' },
   notesDisplayWrap: { marginTop: 10 },
   notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, minHeight: 60 },
+  notesEditInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', lineHeight: 18, minHeight: 60, textAlignVertical: 'top' },
   notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
   notesPlaceholderText: { fontSize: 13, color: '#999', fontStyle: 'italic', lineHeight: 18 },
   notesEditBtn: { alignSelf: 'flex-end', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4 },
