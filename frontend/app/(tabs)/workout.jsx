@@ -925,6 +925,15 @@ export default function WorkoutScreen() {
                         <TouchableOpacity style={styles.historyBtn} onPress={() => router.push({ pathname: '/exercise-history', params: { exercise: ex.exercise } })}>
                           <Text style={styles.historyBtnText}>View History</Text>
                         </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.backBtn}
+                          onPress={() => {
+                            setPendingSets(prev => ({ ...prev, [ex.exercise]: [] }));
+                            setExpandedExercise(null);
+                          }}
+                        >
+                          <Text style={styles.backBtnText}>← Back</Text>
+                        </TouchableOpacity>
                       </View>
                     )}
                   </View>
@@ -1054,6 +1063,8 @@ const styles = StyleSheet.create({
   saveSetsBtn: { backgroundColor: '#F77E2D', borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
   saveSetsBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   historyBtn: { marginTop: 10, borderWidth: 1, borderColor: '#F77E2D', borderRadius: 8, padding: 10, alignItems: 'center' },
+  backBtn: { marginTop: 8, borderRadius: 8, padding: 10, alignItems: 'center', backgroundColor: '#EDE8DF' },
+  backBtnText: { color: '#888', fontWeight: '700', fontSize: 13 },
   historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 },
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 80, textAlignVertical: 'top' },
   notesDisplayWrap: { marginTop: 10 },
