@@ -1,8 +1,10 @@
-import { View, Text, Linking, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
 
-// Simple note formatting. Users type markers, the display renders them.
+// Note formatting. The toolbar inserts these markers around your selection,
+// and the display renders them. You can also type them by hand.
 //   **bold**   *italic*   - bullet   # heading   {orange}text{/orange}
-//   [Label](https://...) and bare https:// links
+//   >c  center line   >r  right line   [Label](https://...)  and bare links
 // Colors: orange, green, red, gray
 
 export const NOTE_COLORS = {
@@ -60,18 +62,25 @@ export const parseNotes = (text) => {
   const lines = [];
   let offset = 0;
   (text || '').split('\n').forEach((line) => {
-    let kind = 'p';
+    let align = 'l';
     let prefixLen = 0;
-    const h = /^#\s+/.exec(line);
-    const b = /^-\s+/.exec(line);
+    const a = /^>([cr]) /.exec(line);
+    if (a) {
+      align = a[1];
+      prefixLen = a[0].length;
+    }
+    const rest = line.slice(prefixLen);
+    let kind = 'p';
+    const h = /^#\s+/.exec(rest);
+    const b = /^-\s+/.exec(rest);
     if (h) {
       kind = 'h';
-      prefixLen = h[0].length;
+      prefixLen += h[0].length;
     } else if (b) {
       kind = 'b';
-      prefixLen = b[0].length;
+      prefixLen += b[0].length;
     }
-    lines.push({ kind, nodes: parseInline(line.slice(prefixLen), offset + prefixLen) });
+    lines.push({ kind, align, nodes: parseInline(line.slice(prefixLen), offset + prefixLen) });
     offset += line.length + 1;
   });
   return lines;
@@ -80,7 +89,113 @@ export const parseNotes = (text) => {
 const nodesHaveFormat = (nodes) => nodes.some(n => n.type === 'bold' || n.type === 'italic' || n.type === 'color');
 
 export const hasFormatting = (text) =>
-  !!text && parseNotes(text).some(l => l.kind !== 'p' || nodesHaveFormat(l.nodes));
+  !!text && parseNotes(text).some(l => l.kind !== 'p' || l.align !== 'l' || nodesHaveFormat(l.nodes));
+
+// ---------- formatting actions used by the toolbar ----------
+
+// Wrap the selection in open/close markers. Tapping again on the same
+// selection removes them. With no selection, markers go in with the cursor between.
+const wrapSelection = (text, sel, open, close) => {
+  const { start, end } = sel;
+  const before = text.slice(0, start);
+  const mid = text.slice(start, end);
+  const after = text.slice(end);
+  const isItalic = open === '*';
+  const surrounded = start !== end && before.endsWith(open) && after.startsWith(close)
+    && !(isItalic && (before.endsWith('**') || after.startsWith('**')));
+  if (surrounded) {
+    return {
+      text: before.slice(0, before.length - open.length) + mid + after.slice(close.length),
+      selection: { start: start - open.length, end: end - open.length }
+    };
+  }
+  const selfWrapped = start !== end && mid.length >= open.length + close.length
+    && mid.startsWith(open) && mid.endsWith(close)
+    && !(isItalic && (mid.startsWith('**') || mid.endsWith('**')));
+  if (selfWrapped) {
+    const inner = mid.slice(open.length, mid.length - close.length);
+    return { text: before + inner + after, selection: { start, end: start + inner.length } };
+  }
+  return {
+    text: before + open + mid + close + after,
+    selection: { start: start + open.length, end: end + open.length }
+  };
+};
+
+// Change the line prefixes (align marker and heading/bullet marker)
+// on every line the selection touches.
+const changeLines = (text, sel, edit) => {
+  const s = text.lastIndexOf('\n', sel.start - 1) + 1;
+  let e = text.indexOf('\n', sel.end);
+  if (e === -1) e = text.length;
+  const lines = text.slice(s, e).split('\n');
+  let firstDelta = 0;
+  let totalDelta = 0;
+  const out = lines.map((line, i) => {
+    const m = /^(>[cr] )?(# |- )?/.exec(line);
+    const next = edit({ align: m[1] || '', block: m[2] || '' });
+    const rebuilt = next.align + next.block + line.slice(m[0].length);
+    const delta = rebuilt.length - line.length;
+    if (i === 0) firstDelta = delta;
+    totalDelta += delta;
+    return rebuilt;
+  });
+  return {
+    text: text.slice(0, s) + out.join('\n') + text.slice(e),
+    selection: {
+      start: Math.max(s, sel.start + firstDelta),
+      end: Math.max(s, sel.end + totalDelta)
+    }
+  };
+};
+
+export const applyFormat = (text, sel, kind, arg) => {
+  if (kind === 'bold') return wrapSelection(text, sel, '**', '**');
+  if (kind === 'italic') return wrapSelection(text, sel, '*', '*');
+  if (kind === 'color') return wrapSelection(text, sel, `{${arg}}`, `{/${arg}}`);
+  if (kind === 'heading') return changeLines(text, sel, ({ align, block }) => ({ align, block: block === '# ' ? '' : '# ' }));
+  if (kind === 'bullet') return changeLines(text, sel, ({ align, block }) => ({ align, block: block === '- ' ? '' : '- ' }));
+  if (kind === 'align') {
+    return changeLines(text, sel, ({ align, block }) => {
+      const want = arg === 'center' ? '>c ' : arg === 'right' ? '>r ' : '';
+      return { align: want === align ? '' : want, block };
+    });
+  }
+  return { text, selection: sel };
+};
+
+// Hook for a notes TextInput. Spread inputProps on the TextInput and pass
+// apply to <FormatToolbar />.
+export function useFormattedInput(value, setValue) {
+  const [sel, setSel] = useState({ start: 0, end: 0 });
+  const [forced, setForced] = useState(undefined);
+
+  const inputProps = {
+    value,
+    onChangeText: setValue,
+    selection: forced,
+    onSelectionChange: (e) => {
+      setSel(e.nativeEvent.selection);
+      if (forced) setForced(undefined);
+    }
+  };
+
+  const apply = (kind, arg) => {
+    const current = value || '';
+    const safe = {
+      start: Math.min(sel.start, current.length),
+      end: Math.min(sel.end, current.length)
+    };
+    const result = applyFormat(current, safe, kind, arg);
+    setValue(result.text);
+    setSel(result.selection);
+    setForced(result.selection);
+  };
+
+  return { inputProps, apply };
+}
+
+// ---------- display ----------
 
 const renderNodes = (nodes, keyPrefix, onLinkEdit) => nodes.map((n, i) => {
   const key = `${keyPrefix}-${i}`;
@@ -96,22 +211,31 @@ const renderNodes = (nodes, keyPrefix, onLinkEdit) => nodes.map((n, i) => {
   );
 });
 
-// Renders formatted notes. Pass the text style you want as `style`.
+const ALIGN = { l: 'left', c: 'center', r: 'right' };
+
+// Renders formatted notes. `style` is the outer box, `textStyle` the text.
 // Pass onLinkEdit to show a small pencil next to each link.
-export function RichNotes({ text, style, onLinkEdit }) {
+export function RichNotes({ text, style, textStyle, onLinkEdit }) {
   const lines = parseNotes(text);
+  const base = textStyle || styles.baseText;
   return (
-    <Text style={style}>
-      {lines.map((line, i) => (
-        <Text key={i}>
-          {i > 0 ? '\n' : ''}
-          {line.kind === 'b' ? '•  ' : ''}
-          {line.kind === 'h'
-            ? <Text style={styles.heading}>{renderNodes(line.nodes, `l${i}`, onLinkEdit)}</Text>
-            : renderNodes(line.nodes, `l${i}`, onLinkEdit)}
-        </Text>
-      ))}
-    </Text>
+    <View style={style}>
+      {lines.map((line, i) => {
+        const alignStyle = { textAlign: ALIGN[line.align] };
+        const body = line.kind === 'h'
+          ? <Text style={styles.heading}>{renderNodes(line.nodes, `l${i}`, onLinkEdit)}</Text>
+          : renderNodes(line.nodes, `l${i}`, onLinkEdit);
+        if (line.kind === 'b') {
+          return (
+            <View key={i} style={styles.bulletRow}>
+              <Text style={[base, styles.bulletDot]}>•</Text>
+              <Text style={[base, styles.bulletText, alignStyle]}>{body}</Text>
+            </View>
+          );
+        }
+        return <Text key={i} style={[base, alignStyle]}>{line.nodes.length ? body : ' '}</Text>;
+      })}
+    </View>
   );
 }
 
@@ -121,25 +245,70 @@ export function NotesPreview({ text }) {
   return (
     <View style={styles.previewBox}>
       <Text style={styles.previewLabel}>Preview</Text>
-      <RichNotes text={text} style={styles.previewText} />
+      <RichNotes text={text} />
     </View>
   );
 }
 
-const HINT = 'Format: **bold**  *italic*  - bullet  # heading  {orange}text{/orange}  (orange, green, red, gray)';
+// ---------- toolbar ----------
 
-export function FormatHint() {
-  return <Text style={styles.hint}>{HINT}</Text>;
+const COLOR_KEYS = ['orange', 'green', 'red', 'gray'];
+
+export function FormatToolbar({ apply, onDone }) {
+  return (
+    <View style={styles.toolbar}>
+      <TouchableOpacity style={styles.tbBtn} onPress={() => apply('bold')}>
+        <Text style={[styles.tbText, { fontWeight: '900' }]}>B</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tbBtn} onPress={() => apply('italic')}>
+        <Text style={[styles.tbText, { fontStyle: 'italic', fontWeight: '700' }]}>I</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tbBtn} onPress={() => apply('bullet')}>
+        <Text style={styles.tbText}>•</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tbBtn} onPress={() => apply('heading')}>
+        <Text style={styles.tbText}>H</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tbPill} onPress={() => apply('align', 'left')}>
+        <Text style={styles.tbPillText}>Left</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tbPill} onPress={() => apply('align', 'center')}>
+        <Text style={styles.tbPillText}>Center</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tbPill} onPress={() => apply('align', 'right')}>
+        <Text style={styles.tbPillText}>Right</Text>
+      </TouchableOpacity>
+      {COLOR_KEYS.map(c => (
+        <TouchableOpacity key={c} style={styles.tbBtn} onPress={() => apply('color', c)}>
+          <View style={[styles.tbDot, { backgroundColor: NOTE_COLORS[c] }]} />
+        </TouchableOpacity>
+      ))}
+      {onDone ? (
+        <TouchableOpacity style={[styles.tbPill, styles.tbDone]} onPress={onDone}>
+          <Text style={[styles.tbPillText, { color: '#fff' }]}>Done</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  baseText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
   bold: { fontWeight: '700' },
   italic: { fontStyle: 'italic' },
   heading: { fontWeight: '800', fontSize: 15 },
   link: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' },
   linkEditIcon: { color: '#888', fontSize: 12 },
+  bulletRow: { flexDirection: 'row' },
+  bulletDot: { width: 16 },
+  bulletText: { flex: 1 },
   previewBox: { marginTop: 6, borderWidth: 1, borderColor: '#C5BFB4', borderRadius: 8, padding: 10 },
   previewLabel: { fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
-  previewText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
-  hint: { fontSize: 11, color: '#888', marginTop: 6, lineHeight: 15 }
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8, alignItems: 'center' },
+  tbBtn: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#EDE8DF', justifyContent: 'center', alignItems: 'center' },
+  tbText: { fontSize: 16, color: '#1A1A1A' },
+  tbPill: { height: 34, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#EDE8DF', justifyContent: 'center', alignItems: 'center' },
+  tbPillText: { fontSize: 12, fontWeight: '700', color: '#1A1A1A' },
+  tbDot: { width: 18, height: 18, borderRadius: 9 },
+  tbDone: { backgroundColor: '#F77E2D' }
 });

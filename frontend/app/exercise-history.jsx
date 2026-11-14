@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import api from '../src/utils/api';
-import { RichNotes, NotesPreview, FormatHint } from '../src/utils/richNotes';
+import { RichNotes, NotesPreview, FormatToolbar, useFormattedInput } from '../src/utils/richNotes';
 
 const LOGS_PER_PAGE = 10;
 
@@ -51,6 +51,7 @@ export default function ExerciseHistoryScreen() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [weightUnit, setWeightUnit] = useState('kg');
+  const notesFmt = useFormattedInput(editNotes, setEditNotes);
 
   useEffect(() => {
     setCurrentExercise(exercise);
@@ -186,7 +187,7 @@ export default function ExerciseHistoryScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
       </TouchableOpacity>
@@ -294,10 +295,9 @@ export default function ExerciseHistoryScreen() {
                       placeholder="Notes, links, video URLs... use [Label](https://...) for named links"
                       placeholderTextColor="#999"
                       multiline
-                      value={editNotes}
-                      onChangeText={setEditNotes}
+                      {...notesFmt.inputProps}
                     />
-                    <FormatHint />
+                    <FormatToolbar apply={notesFmt.apply} />
                     <NotesPreview text={editNotes} />
                     <View style={styles.editActionsRow}>
                       <TouchableOpacity style={styles.addSetBtn} onPress={addEditSet}>

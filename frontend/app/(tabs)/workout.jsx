@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useRouter, useFocusEffect } from 'expo-router';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import api from '../../src/utils/api';
-import { RichNotes, NotesPreview, FormatHint } from '../../src/utils/richNotes';
+import { RichNotes, NotesPreview, FormatToolbar, useFormattedInput } from '../../src/utils/richNotes';
 
 const confirmDelete = (onConfirm) => {
   if (Platform.OS === 'web') {
@@ -83,6 +83,8 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
     valueRef.current = text;
   };
 
+  const fmt = useFormattedInput(value, handleChange);
+
   return (
     <View style={styles.notesDisplayWrap}>
       {editing ? (
@@ -91,20 +93,18 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
             style={styles.notesEditInput}
             multiline
             autoFocus
-            value={value}
-            onChangeText={handleChange}
-            onBlur={() => setEditing(false)}
+            {...fmt.inputProps}
             placeholder="Notes, links... use [Label](https://...) for named links"
             placeholderTextColor="#999"
           />
-          <FormatHint />
+          <FormatToolbar apply={fmt.apply} onDone={() => setEditing(false)} />
           <NotesPreview text={value} />
         </View>
       ) : (
         <TouchableOpacity activeOpacity={0.8} onPress={() => setEditing(true)}>
           <View style={styles.notesDisplay}>
             {value ? (
-              <RichNotes text={value} style={styles.notesDisplayText} onLinkEdit={setEditingLink} />
+              <RichNotes text={value} textStyle={styles.notesDisplayText} onLinkEdit={setEditingLink} />
             ) : (
               <Text style={styles.notesPlaceholderText}>No notes yet. Tap here to add some.</Text>
             )}
@@ -210,6 +210,7 @@ export default function WorkoutScreen() {
   const [editName, setEditName] = useState('');
   const [editSetsToday, setEditSetsToday] = useState([]);
   const [editNotesValue, setEditNotesValue] = useState('');
+  const notesFmt = useFormattedInput(editNotesValue, setEditNotesValue);
   const [editWeekValue, setEditWeekValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const [savingExercise, setSavingExercise] = useState(null);
@@ -629,7 +630,7 @@ export default function WorkoutScreen() {
   const pagedExercises = exercises.slice(exercisesPage * EXERCISES_PER_PAGE, exercisesPage * EXERCISES_PER_PAGE + EXERCISES_PER_PAGE);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Workout</Text>
 
       <View style={styles.tabs}>
@@ -807,10 +808,9 @@ export default function WorkoutScreen() {
                         placeholder="Notes, links, video URLs..."
                         placeholderTextColor="#999"
                         multiline
-                        value={editNotesValue}
-                        onChangeText={setEditNotesValue}
+                        {...notesFmt.inputProps}
                       />
-                      <FormatHint />
+                      <FormatToolbar apply={notesFmt.apply} />
                       <NotesPreview text={editNotesValue} />
 
                       <View style={styles.renameRow}>
