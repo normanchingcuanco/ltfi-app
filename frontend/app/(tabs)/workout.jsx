@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useRouter, useFocusEffect } from 'expo-router';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import api from '../../src/utils/api';
+import { RichNotes, NotesPreview, FormatHint } from '../../src/utils/richNotes';
 
 const confirmDelete = (onConfirm) => {
   if (Platform.OS === 'web') {
@@ -33,33 +34,6 @@ const toKg = (value, unit) => {
   return unit === 'lbs' ? num / KG_TO_LBS : num;
 };
 
-const LINK_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
-
-const parseNotesLinks = (text) => {
-  const segments = [];
-  let lastIndex = 0;
-  let match;
-  const pattern = new RegExp(LINK_PATTERN);
-
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({ type: 'text', value: text.slice(lastIndex, match.index) });
-    }
-    if (match[1] && match[2]) {
-      segments.push({ type: 'link', label: match[1], url: match[2], raw: match[0], start: match.index, end: pattern.lastIndex });
-    } else if (match[3]) {
-      segments.push({ type: 'link', label: match[3], url: match[3], raw: match[0], start: match.index, end: pattern.lastIndex });
-    }
-    lastIndex = pattern.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    segments.push({ type: 'text', value: text.slice(lastIndex) });
-  }
-
-  return segments;
-};
-
 function LinkEditPopover({ segment, onSave, onCancel }) {
   const [label, setLabel] = useState(segment.label);
   const [url, setUrl] = useState(segment.url);
@@ -84,7 +58,7 @@ function LinkEditPopover({ segment, onSave, onCancel }) {
 
 const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialValue }, ref) {
   const [value, setValue] = useState(initialValue || '');
-  const [editingLinkIdx, setEditingLinkIdx] = useState(null);
+  const [editingLink, setEditingLink] = useState(null);
   const [editing, setEditing] = useState(false);
   const valueRef = useRef(initialValue || '');
 
@@ -94,14 +68,14 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
 
   const saveLinkEdit = (segment, newLabel, newUrl) => {
     if (!newUrl) {
-      setEditingLinkIdx(null);
+      setEditingLink(null);
       return;
     }
     const replacement = newLabel && newLabel !== newUrl ? `[${newLabel}](${newUrl})` : newUrl;
     const newValue = value.slice(0, segment.start) + replacement + value.slice(segment.end);
     setValue(newValue);
     valueRef.current = newValue;
-    setEditingLinkIdx(null);
+    setEditingLink(null);
   };
 
   const handleChange = (text) => {
@@ -109,50 +83,39 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
     valueRef.current = text;
   };
 
-  const segments = parseNotesLinks(value);
-
   return (
     <View style={styles.notesDisplayWrap}>
       {editing ? (
-        <TextInput
-          style={styles.notesEditInput}
-          multiline
-          autoFocus
-          value={value}
-          onChangeText={handleChange}
-          onBlur={() => setEditing(false)}
-          placeholder="Notes, links... use [Label](https://...) for named links"
-          placeholderTextColor="#999"
-        />
+        <View>
+          <TextInput
+            style={styles.notesEditInput}
+            multiline
+            autoFocus
+            value={value}
+            onChangeText={handleChange}
+            onBlur={() => setEditing(false)}
+            placeholder="Notes, links... use [Label](https://...) for named links"
+            placeholderTextColor="#999"
+          />
+          <FormatHint />
+          <NotesPreview text={value} />
+        </View>
       ) : (
         <TouchableOpacity activeOpacity={0.8} onPress={() => setEditing(true)}>
           <View style={styles.notesDisplay}>
             {value ? (
-              <Text style={styles.notesDisplayText}>
-                {segments.map((seg, i) =>
-                  seg.type === 'text' ? (
-                    <Text key={i}>{seg.value}</Text>
-                  ) : (
-                    <Text key={i}>
-                      <Text style={styles.linkText} onPress={() => Linking.openURL(seg.url)}>
-                        {seg.label}
-                      </Text>
-                      <Text style={styles.linkEditIcon} onPress={() => setEditingLinkIdx(i)}> ✎</Text>
-                    </Text>
-                  )
-                )}
-              </Text>
+              <RichNotes text={value} style={styles.notesDisplayText} onLinkEdit={setEditingLink} />
             ) : (
               <Text style={styles.notesPlaceholderText}>No notes yet. Tap here to add some.</Text>
             )}
           </View>
         </TouchableOpacity>
       )}
-      {editingLinkIdx !== null && segments[editingLinkIdx] && (
+      {editingLink !== null && (
         <LinkEditPopover
-          segment={segments[editingLinkIdx]}
-          onCancel={() => setEditingLinkIdx(null)}
-          onSave={(newLabel, newUrl) => saveLinkEdit(segments[editingLinkIdx], newLabel, newUrl)}
+          segment={editingLink}
+          onCancel={() => setEditingLink(null)}
+          onSave={(newLabel, newUrl) => saveLinkEdit(editingLink, newLabel, newUrl)}
         />
       )}
     </View>
@@ -847,6 +810,8 @@ export default function WorkoutScreen() {
                         value={editNotesValue}
                         onChangeText={setEditNotesValue}
                       />
+                      <FormatHint />
+                      <NotesPreview text={editNotesValue} />
 
                       <View style={styles.renameRow}>
                         <TouchableOpacity style={styles.renameCancelBtn} onPress={cancelEditExercise}>

@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import api from '../src/utils/api';
+import { RichNotes, NotesPreview, FormatHint } from '../src/utils/richNotes';
 
 const LOGS_PER_PAGE = 10;
 
@@ -33,43 +34,6 @@ const displayWeight = (kg, unit) => {
 const toKg = (value, unit) => {
   const num = parseFloat(value) || 0;
   return unit === 'lbs' ? num / KG_TO_LBS : num;
-};
-
-const renderNotesWithLinks = (text) => {
-  const linkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
-  const parts = [];
-  let lastIndex = 0;
-  let match;
-  let key = 0;
-
-  while ((match = linkPattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(<Text key={key++}>{text.slice(lastIndex, match.index)}</Text>);
-    }
-    if (match[1] && match[2]) {
-      const label = match[1];
-      const url = match[2];
-      parts.push(
-        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
-          {label}
-        </Text>
-      );
-    } else if (match[3]) {
-      const url = match[3];
-      parts.push(
-        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
-          {url}
-        </Text>
-      );
-    }
-    lastIndex = linkPattern.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(<Text key={key++}>{text.slice(lastIndex)}</Text>);
-  }
-
-  return parts;
 };
 
 export default function ExerciseHistoryScreen() {
@@ -333,6 +297,8 @@ export default function ExerciseHistoryScreen() {
                       value={editNotes}
                       onChangeText={setEditNotes}
                     />
+                    <FormatHint />
+                    <NotesPreview text={editNotes} />
                     <View style={styles.editActionsRow}>
                       <TouchableOpacity style={styles.addSetBtn} onPress={addEditSet}>
                         <Text style={styles.addSetBtnText}>+ Add Set</Text>
@@ -366,7 +332,7 @@ export default function ExerciseHistoryScreen() {
                     ) : (
                       <Text style={styles.noSets}>No sets logged</Text>
                     )}
-                    {log.notes ? <Text style={styles.notes}>{renderNotesWithLinks(log.notes)}</Text> : null}
+                    {log.notes ? <RichNotes text={log.notes} style={styles.notes} /> : null}
                   </>
                 )}
               </View>
