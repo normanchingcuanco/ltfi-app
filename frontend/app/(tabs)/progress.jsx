@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../../src/utils/api';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { NotesPreview, FormatToolbar, useFormattedInput } from '../../src/utils/richNotes';
 
 const CLOUDINARY_CLOUD_NAME = 'de6cwgvio';
 const CLOUDINARY_UPLOAD_PRESET = 'ltfi_progress';
@@ -66,6 +67,7 @@ export default function ProgressScreen() {
   const [loading, setLoading] = useState(true);
   const [weight, setWeight] = useState('');
   const [notes, setNotes] = useState('');
+  const notesFmt = useFormattedInput(notes, setNotes);
   const [logging, setLogging] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [photoUri, setPhotoUri] = useState(null);
@@ -217,7 +219,7 @@ export default function ProgressScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Progress</Text>
 
       <TouchableOpacity style={styles.logBtn} onPress={() => setShowForm(!showForm)}>
@@ -235,12 +237,14 @@ export default function ProgressScreen() {
             onChangeText={setWeight}
           />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { minHeight: 60, textAlignVertical: 'top' }]}
             placeholder="Notes (optional)"
             placeholderTextColor="#999"
-            value={notes}
-            onChangeText={setNotes}
+            {...notesFmt.inputProps}
+            multiline
           />
+          <FormatToolbar apply={notesFmt.apply} />
+          <NotesPreview text={notes} />
           {photoUri ? (
             <View style={styles.photoPreviewWrap}>
               <Image source={{ uri: photoUri }} style={styles.photoPreview} />

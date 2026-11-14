@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
+import { NotesPreview, FormatToolbar, useFormattedInput } from '../src/utils/richNotes';
 
 const UNITS = ['g', 'oz', 'ml', 'cup', 'tbsp', 'tsp'];
 
@@ -42,6 +43,7 @@ export default function EditRecipeScreen() {
   const [name, setName] = useState('');
   const [servings, setServings] = useState('1');
   const [notes, setNotes] = useState('');
+  const notesFmt = useFormattedInput(notes, setNotes);
   const [ingredients, setIngredients] = useState([]);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -194,7 +196,7 @@ export default function EditRecipeScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
@@ -216,7 +218,9 @@ export default function EditRecipeScreen() {
         />
 
         <Text style={styles.label}>Notes (optional)</Text>
-        <TextInput style={[styles.input, { height: 80 }]} placeholder="Cooking instructions..." placeholderTextColor="#999" value={notes} onChangeText={setNotes} multiline />
+        <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]} placeholder="Cooking instructions..." placeholderTextColor="#999" {...notesFmt.inputProps} multiline />
+        <FormatToolbar apply={notesFmt.apply} />
+        <NotesPreview text={notes} />
 
         <Text style={styles.label}>Ingredients</Text>
 
