@@ -14,27 +14,6 @@ The goal is to first complete the core nutrition tracking and user auth loop bef
 
 ---
 
-## Rules of Engagement
-
-To ensure efficient collaboration during the build process, the following rules will be followed:
-
-1. **Minimize Replies** — Responses should remain concise to reduce unnecessary back-and-forth and avoid overwhelming instructions.
-2. **No Guessing During Debugging** — Do not provide speculative solutions when debugging. Troubleshooting must be based only on the actual code, logs, or errors provided.
-3. **Step-by-Step Workflow** — Only one step should be given at a time. After each step, wait for confirmation before proceeding.
-4. **Provide Complete Code Blocks** — Whenever code is required, always provide the full file or full code block to avoid missing pieces or implementation errors.
-5. **Code in Chat, Not Artifacts** — Always provide code here in the chat unless an artifact is explicitly requested.
-6. **Build Fast** — Always recommend the fastest build path, whether that is running commands from the root terminal or providing full file contents directly.
-7. **Always State the File Path** — Every code block must be preceded by the full file path so it is always clear which file to create or update.
-8. **One File, One Edit at a Time** — Even within a single file, deliver one focused change per message and wait for confirmation before the next, unless the changes are so interdependent that fragmenting them would leave the file in a broken intermediate state — in which case say so and deliver the full file once.
-9. **Verify Against the Real File, Not Assumptions** — If there's any doubt the local sandbox copy of a file matches what's actually deployed or on the user's machine, ask for the current file content before editing it rather than editing a stale or guessed version.
-10. **Rule Out Client Caching Before Assuming a Bug** — If a confirmed-pushed and confirmed-published change doesn't appear to be live, check for browser/app caching (hard refresh, disable cache in DevTools, force-close and reopen the app) before concluding the code itself is wrong.
-11. **Confirm the UX Before Building the Data Format** — Before designing how a feature stores or represents data (e.g. a text syntax for named links), confirm how the user actually wants to interact with it day to day. Building the "technically correct" version first and retrofitting a usable UI afterward costs more turns than asking upfront.
-12. **No Unrequested Shortcuts** — Never trim, collapse, or summarize content the user didn't ask to have shortened — including in deliverables like this README. If a full version was previously provided, later versions stay full unless the user explicitly asks for a condensed one.
-13. **Confirm Edits Actually Landed Before Assuming a Push Failed** — Before troubleshooting "why didn't this push," check `git status`/`git diff` for the specific file to confirm the edit was actually saved into the real file first. Several session delays were caused by chasing a phantom push problem when the underlying file edit had simply never been applied.
-14. **Get Real Logs Before Guessing at Build Failures** — For an "Unknown error" or unhelpful generic build failure message (e.g. from EAS), pull the actual raw log (`eas build:view <id> --json` → fetch the signed `logFiles` URL) before proposing a fix. Every fix that actually worked during the SDK 57 build-failure chase came directly from reading the real log; every guess made without it was wrong.
-
----
-
 ## Free-First Requirement
 
 **Every tool, service, and API used in this project must have a free tier or be completely free.** No paid subscriptions, no trial-only services, no features locked behind a paywall — at any layer of the stack.
