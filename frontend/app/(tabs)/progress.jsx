@@ -187,7 +187,8 @@ export default function ProgressScreen() {
   const deleteEntry = (id) => {
     confirmDelete(async () => {
       try {
-        await api.delete(`/weight/${id}`);
+        const res = await api.delete(`/weight/${id}`);
+        if (res.data?.profile) updateUser(res.data.profile);
         setHistory(prev => prev.filter(e => e._id !== id));
       } catch (err) {
         console.error(err);
