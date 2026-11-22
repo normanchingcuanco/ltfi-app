@@ -43,6 +43,12 @@
       "expo-audio",
       "expo-asset",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "LTFI uses your camera to scan barcodes and food."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#EDE8DF"
