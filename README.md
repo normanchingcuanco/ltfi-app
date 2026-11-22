@@ -110,7 +110,7 @@ An Expo-based mobile and web app that:
 |-------------|-----|
 | Frontend (Web) | https://ltfi-app.vercel.app |
 | Backend | https://ltfi-backend.onrender.com |
-| Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/00d76ff8-779a-4837-92d0-6bacdad57ffe (built on SDK 57, runtime 1.0.0) |
+| Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/33bc94c3-8f13-4496-a90f-ae7c6b6ec813 (built on SDK 58, runtime 1.1.0) |
 | Latest EAS Update (preview) | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/updates/5f026ff5-934f-4dad-878a-444d3f28f021 |
 | iOS Native Build | On hold — requires Apple Developer account ($99/yr) |
 
@@ -607,7 +607,7 @@ ltfi/
 | newArchEnabled Cleanup | SDK 57 removed `newArchEnabled` from the config schema entirely — New Architecture is now mandatory and the key is silently ignored. Removed the stale `"newArchEnabled": false` line from `app.json` | ✅ Done |
 | expo-camera Config Plugin | Added the `expo-camera` plugin block (with a proper `cameraPermission` description) to `app.json`'s `plugins` array — required for native/EAS builds; has no effect in Expo Go, where it was previously omitted without symptom | ✅ Done |
 | Android APK Rebuild on SDK 57 | Successfully rebuilt and installed a fresh Android internal-distribution APK on SDK 57 via `eas build -p android --profile preview`, confirming the full native build pipeline (not just Expo Go) is stable post-upgrade | ✅ Done |
-| SDK 57 → 58 Upgrade | Upgraded Expo SDK to 58 (React Native 0.88.1, React 19.3.0). Fixes needed along the way are listed in the next four rows | ✅ Done — on `sdk-58-upgrade`, pending merge to `main` |
+| SDK 57 → 58 Upgrade | Upgraded Expo SDK to 58 (React Native 0.88.1, React 19.3.0). Fixes needed along the way are listed in the next four rows | ✅ Done, merged to `main` |
 | expo-asset Peer Dependency | `expo-asset` is a required peer of `expo-audio` in SDK 58; installed via `npx expo install expo-asset` and added to the `plugins` array in `app.json` | ✅ Done |
 | Splash Config Moved to Plugin | SDK 58 no longer allows a top-level `splash` block in `app.json`. Removed it and configured the splash through the `expo-splash-screen` plugin (`backgroundColor: "#EDE8DF"`) | ✅ Done |
 | Metro Package Exports Fix | `metro.config.js` had `config.resolver.unstable_enablePackageExports = false`, which broke SDK 58 with a red screen `Unable to resolve module @expo/log-box/LogBox`. Removed the line | ✅ Done |
@@ -640,7 +640,7 @@ ltfi/
 | Browser/app caching can mask a successfully deployed fix | Development process only | If a confirmed-published OTA update doesn't appear to change behavior, hard-refresh (or disable cache in DevTools) or force-close and reopen the app before assuming the fix itself is broken |
 | Expo Go's "Recently Opened"/"Projects" list can serve a stale, pre-upgrade SDK snapshot | Development process only | This is *not* local device cache — deleting and reinstalling Expo Go does not clear it, because it is synced from the signed-in expo.dev account's cloud history. Two separate, unrelated fixes apply depending on what you're trying to do: (1) for **live local dev testing**, ignore "Recently Opened"/"Projects" entirely and use the auto-detected live server that appears under "Development servers" on the Expo Go Home tab whenever `npx expo start -c` is running on the same WiFi network — this always reflects current code; (2) for **testing without a PC running at all**, publish an EAS Update (`eas update --channel preview`) and open it via Expo Go's "PROJECTS" entry, which loads the last *published* bundle regardless of whether Metro is running — but this will only ever show whatever was last explicitly published, so it goes stale again the moment new local changes are made without re-publishing |
 | A build failing with only "Unknown error. See logs of the Install dependencies build phase" | EAS Build only | The EAS dashboard's build page does not reliably display expandable phase-by-phase logs in the browser. The actual raw log is always retrievable via `eas build:view <build-id> --json`, which returns a `logFiles` array containing a signed, time-limited (~15 min) Google Cloud Storage URL — open that URL directly in a browser to see the real npm/gradle error text. Guessing at the cause without pulling this log wasted significant time across this session; every fix that worked came directly from reading it |
-| Android APK is on SDK 57 | Android | Built with runtime 1.0.0, so it does not receive the SDK 58 updates (runtime 1.1.0). It keeps running its existing bundle until rebuilt with `eas build -p android --profile preview` |
+| Android APK not yet tested on SDK 58 | Android | A new SDK 58 APK (runtime 1.1.0) is built on EAS but has not been installed on a device yet. The older SDK 57 APK (runtime 1.0.0) does not receive the SDK 58 updates |
 | Expo Go on iOS only runs the latest SDK | iOS | The project must be on the SDK that Expo Go currently supports (58). An older project shows Project is incompatible with this version of Expo Go, and the only fix is upgrading the project |
 | npm install can hit ERESOLVE after SDK upgrades | Development process only | `expo-router`'s optional peers can conflict with older installed versions. `npx expo install --fix -- --legacy-peer-deps` resolves it, then run `npx expo-doctor` to catch required peers that flag skipped |
 | Profile weight is only synced from logged weigh-ins | Both | A weight typed manually in Profile is not a logged weigh-in, so adding then deleting weigh-ins returns the profile to the latest logged entry, not to the manually typed value. Deleting your only entry leaves the profile weight unchanged |
@@ -671,7 +671,7 @@ ltfi/
 
 ```
 git clone https://github.com/normanchingcuanco/ltfi-app.git
-cd ltfi
+cd ltfi-app
 ```
 
 ### 2. Install dependencies
