@@ -125,7 +125,7 @@ An Expo-based mobile and web app that:
 | Database | MongoDB Atlas (free tier) | Free |
 | Auth | JWT + Email/Password | Free |
 | Food Data | USDA + Open Food Facts + Calorie API + API Ninjas | Free |
-| AI Food Scanning | Groq API — Qwen 3.6 27B vision model (free tier) | Free |
+| AI Food Scanning | Groq API — Qwen 3.8 27B vision model (free tier) | Free |
 | Image Hosting | Cloudinary (free tier, unsigned upload preset + Admin API delete) | Free |
 | Email | Gmail SMTP via Nodemailer | Free |
 | Health Data | Apple HealthKit (deferred) | Free |
@@ -229,7 +229,6 @@ ltfi/
 │   │   ├── reset-password.jsx
 │   │   └── timer.jsx
 │   ├── app.json
-│   ├── babel.config.js
 │   ├── eas.json
 │   ├── metro.config.js
 │   ├── package.json
@@ -391,6 +390,7 @@ ltfi/
 | Gender Field Schema Fix | `gender` was accepted by `updateProfile` and used in the TDEE calculation, but was never declared on the `User` Mongoose schema — Mongoose silently stripped it on every save. Added `gender: { type: String, enum: ['male', 'female'] }` to the schema | ✅ Done |
 | Gender Field Assignment Fix | Separately from the schema bug, `updateProfile` destructured `gender` from the request and used it in TDEE calc and the response, but never actually contained the line assigning it to `user.gender` — so it silently never saved even after the schema fix. Added `if (gender !== undefined) user.gender = gender;` | ✅ Done |
 | Login Returns Full Profile | `login` previously returned only name, email, gender, calorie goal, macros and weight unit, so a fresh login (new browser, or after logout) had no current weight, goal weight, height, age or deficit and the Weight Loss Plan card stayed hidden. It now returns the full profile | ✅ Done |
+| Profile Data Not Loading Fix | `/auth/login` and `/auth/register` return only a short object (id, name, email, token), and `AuthContext` only called `/auth/me` when nothing was cached in AsyncStorage — so Profile showed blank weight, goal, height, age and activity level even though the data was saved in MongoDB. `AuthContext` now calls `/auth/me` after login/register and after loading the cached user, merges the full profile into context, and re-caches it | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -410,8 +410,9 @@ ltfi/
 | Manual Barcode Entry | Type barcode number manually with keyboard submit support | ✅ Done |
 | Barcode Fallback | When OFF fails, falls through to all 4 search sources | ✅ Done |
 | Global Barcode Types | Supports EAN13, EAN8, UPC, Code128, Code39, QR, ITF14, Codabar | ✅ Done |
-| AI Food Photo Scan | Camera photo → Groq Qwen 3.6 27B vision model → searches all food DBs for best match | ✅ Done |
+| AI Food Photo Scan | Camera photo → Groq Qwen 3.8 27B vision model → searches all food DBs for best match | ✅ Done |
 | AI Scan Vision Model | Switched from deprecated `meta-llama/llama-4-scout-17b-16e-instruct` to `qwen/qwen3.6-27b`, Groq's current vision model | ✅ Done |
+| AI Scan Model Migration (Qwen 3.6 → 3.8) | Groq shut down `qwen/qwen3.6-27b` on 2026-09-14. Every AI scan after that failed with `404 model_not_found` (visible in Render logs as `AI Scan error: 404 ... model_not_found`) and the app showed "Could not analyze image." Not related to the SDK upgrade. Fixed by switching `aiScanController.js` to Groq's listed replacement `qwen/qwen3.8-27b` (image input supported, up to 3 images per request); `reasoning_effort: 'none'` is still accepted. Confirmed working with a banana scan | ✅ Done |
 | AI Scan Camera Permission Fix | `ai-food-scan.jsx` called `ImagePicker.launchCameraAsync`/`launchImageLibraryAsync` without ever requesting permission first — it only appeared to work because Expo Go already had a stale permission grant from an earlier session; a fresh Expo Go install surfaced `MissingCameraPermissionException`. Added explicit `requestCameraPermissionsAsync()` / `requestMediaLibraryPermissionsAsync()` calls before launching either picker | ✅ Done |
 | AI Scan Reasoning-Mode Truncation Fix | Qwen 3.6 27B is a dual-mode reasoning model that, by default, emits a `<think>...</think>` block before its final JSON answer. With `max_tokens: 500`, longer analyses (e.g. fried chicken) exhausted the token budget entirely inside the still-open `<think>` block, producing a response with no closing tag and no JSON at all — silently failing JSON.parse with no useful error surfaced to the client. Fixed by (1) setting `reasoning_effort: 'none'` per Groq's documented API to skip the thinking block entirely for this non-reasoning task, (2) raising `max_tokens` to 800 as a safety margin, and (3) adding a fallback regex extraction of the first `{...}` block plus real error logging (`detail` field, raw model output on parse failure) so future failures are diagnosable instead of a black box | ✅ Done |
 | AI Scan Thinking-Tag Strip | Qwen returns `<think>` reasoning blocks before the JSON payload — stripped before parsing to prevent scan failures (superseded by the reasoning-mode fix above, which prevents the block from being generated at all; the strip logic remains as defense-in-depth) | ✅ Done |
@@ -606,6 +607,12 @@ ltfi/
 | newArchEnabled Cleanup | SDK 57 removed `newArchEnabled` from the config schema entirely — New Architecture is now mandatory and the key is silently ignored. Removed the stale `"newArchEnabled": false` line from `app.json` | ✅ Done |
 | expo-camera Config Plugin | Added the `expo-camera` plugin block (with a proper `cameraPermission` description) to `app.json`'s `plugins` array — required for native/EAS builds; has no effect in Expo Go, where it was previously omitted without symptom | ✅ Done |
 | Android APK Rebuild on SDK 57 | Successfully rebuilt and installed a fresh Android internal-distribution APK on SDK 57 via `eas build -p android --profile preview`, confirming the full native build pipeline (not just Expo Go) is stable post-upgrade | ✅ Done |
+| SDK 57 → 58 Upgrade | Upgraded Expo SDK to 58 (React Native 0.88.1, React 19.3.0). Fixes needed along the way are listed in the next four rows | ✅ Done — on `sdk-58-upgrade`, pending merge to `main` |
+| expo-asset Peer Dependency | `expo-asset` is a required peer of `expo-audio` in SDK 58; installed via `npx expo install expo-asset` and added to the `plugins` array in `app.json` | ✅ Done |
+| Splash Config Moved to Plugin | SDK 58 no longer allows a top-level `splash` block in `app.json`. Removed it and configured the splash through the `expo-splash-screen` plugin (`backgroundColor: "#EDE8DF"`) | ✅ Done |
+| Metro Package Exports Fix | `metro.config.js` had `config.resolver.unstable_enablePackageExports = false`, which broke SDK 58 with a red screen `Unable to resolve module @expo/log-box/LogBox`. Removed the line | ✅ Done |
+| babel.config.js Removed | A `babel.config.js` containing only `presets: ['babel-preset-expo']` made `expo export` / `eas update` fail with "Config file contains no configuration data". That preset is already Expo's default, so the file was deleted | ✅ Done |
+| Backend Keepalive | cron-job.org pings the backend every 10 minutes, 24/7, so Render's free tier does not sleep after 15 minutes idle. A sleeping service returns 503 to the pings and does not wake from them, and cron-job.org auto-disables a job after many consecutive failures — if the job gets disabled, re-enable it in cron-job.org | ✅ Done |
 | iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ On hold |
 | SDK 57 → 58 Upgrade | Upgraded Expo SDK to 58 (React Native 0.88.1, React 19.3.0, and every `expo-*` package to its SDK 58 version) with `npm install expo@^58.0.0` then `npx expo install --fix`, on a branch off main, with a Vercel preview build verified before merging to main | ✅ Done |
 | Peer Dependency Install Fix | `expo-router` 58 declares optional peers (`@expo/ui`, `expo-symbols`) that triggered npm `ERESOLVE` against the previously installed versions. Resolved with `npx expo install --fix -- --legacy-peer-deps`; `npx expo-doctor` then flagged a required peer that flag skips (`expo-asset`), installed with `npx expo install expo-asset` | ✅ Done |
@@ -637,6 +644,9 @@ ltfi/
 | Expo Go on iOS only runs the latest SDK | iOS | The project must be on the SDK that Expo Go currently supports (58). An older project shows Project is incompatible with this version of Expo Go, and the only fix is upgrading the project |
 | npm install can hit ERESOLVE after SDK upgrades | Development process only | `expo-router`'s optional peers can conflict with older installed versions. `npx expo install --fix -- --legacy-peer-deps` resolves it, then run `npx expo-doctor` to catch required peers that flag skipped |
 | Profile weight is only synced from logged weigh-ins | Both | A weight typed manually in Profile is not a logged weigh-in, so adding then deleting weigh-ins returns the profile to the latest logged entry, not to the manually typed value. Deleting your only entry leaves the profile weight unchanged |
+| Groq models get deprecated and shut down | AI Food Scan | Check https://console.groq.com/docs/deprecations before assuming an AI scan failure is an app bug. If Render logs show `404 model_not_found`, swap the `model` value in `backend/controllers/aiScanController.js` for the replacement Groq lists, then redeploy the backend (the frontend does not need to change) |
+| Render free tier: 750 instance hours per month, shared across all services in the workspace | Backend hosting | Services sleep after 15 minutes idle. The keepalive job keeps the backend awake 24/7, which uses roughly 720 hours a month on its own — check Render Billing / Included Usage if other services share the workspace, since running out of hours takes every service in it offline |
+| Expo Go over LAN timed out ("The request timed out") even with Local Network permission granted | Development process only | Use a tunnel instead: set `$env:EXPO_TOKEN` to an Expo access token (expo.dev/settings/access-tokens) in PowerShell, then run `npx expo start --tunnel -c`. Use PowerShell rather than Git Bash, because Git Bash does not render the QR code. Delete the token when finished — never paste it into chat or commit it |
 
 ---
 
@@ -740,7 +750,7 @@ Everything else — including the timer, its sounds and voice, the barcode scann
 
 **Expo Go version note:** Expo Go on iOS always updates to the latest SDK and cannot be downgraded, so the project's SDK must match it (currently SDK 58). A mismatch shows Project is incompatible with this version of Expo Go.
 
-**Day-to-day, PC-required testing:** run `npx expo start -c` in `frontend/`, then open Expo Go and tap the auto-detected server under "Development servers." This always reflects whatever code is currently on disk, saved or not yet committed.
+**Day-to-day, PC-required testing:** run `npx expo start -c` in `frontend/`, then open Expo Go and tap the auto-detected server under "Development servers." This always reflects whatever code is currently on disk, saved or not yet committed. If Expo Go times out over WiFi, use `npx expo start --tunnel -c` instead (see Known Limitations).
 
 **PC-free testing:** publish the current code with `eas update --channel preview`, then open Expo Go → **PROJECTS → ltfi**. This loads the most recently published bundle with no PC or Metro server needed at all — but it will only ever reflect what was last explicitly published, so re-run the update command after making changes you want to test this way.
 

@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import api from '../src/utils/api';
+import { RichNotes, NotesPreview, FormatToolbar, useFormattedInput } from '../src/utils/richNotes';
 
 const LOGS_PER_PAGE = 10;
 
@@ -35,43 +36,6 @@ const toKg = (value, unit) => {
   return unit === 'lbs' ? num / KG_TO_LBS : num;
 };
 
-const renderNotesWithLinks = (text) => {
-  const linkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
-  const parts = [];
-  let lastIndex = 0;
-  let match;
-  let key = 0;
-
-  while ((match = linkPattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(<Text key={key++}>{text.slice(lastIndex, match.index)}</Text>);
-    }
-    if (match[1] && match[2]) {
-      const label = match[1];
-      const url = match[2];
-      parts.push(
-        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
-          {label}
-        </Text>
-      );
-    } else if (match[3]) {
-      const url = match[3];
-      parts.push(
-        <Text key={key++} style={styles.linkText} onPress={() => Linking.openURL(url)}>
-          {url}
-        </Text>
-      );
-    }
-    lastIndex = linkPattern.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(<Text key={key++}>{text.slice(lastIndex)}</Text>);
-  }
-
-  return parts;
-};
-
 export default function ExerciseHistoryScreen() {
   const { exercise } = useLocalSearchParams();
   const router = useRouter();
@@ -82,10 +46,12 @@ export default function ExerciseHistoryScreen() {
   const [editingLogId, setEditingLogId] = useState(null);
   const [editSets, setEditSets] = useState([]);
   const [editNotes, setEditNotes] = useState('');
+  const [editWeek, setEditWeek] = useState('');
   const [saving, setSaving] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [weightUnit, setWeightUnit] = useState('kg');
+  const notesFmt = useFormattedInput(editNotes, setEditNotes);
 
   useEffect(() => {
     setCurrentExercise(exercise);
@@ -161,12 +127,14 @@ export default function ExerciseHistoryScreen() {
     setEditingLogId(log._id);
     setEditSets((log.sets || []).map(s => ({ weight: String(displayWeight(s.weight, weightUnit) ?? ''), reps: String(s.reps ?? '') })));
     setEditNotes(log.notes || '');
+    setEditWeek(log.week != null ? String(log.week) : '');
   };
 
   const cancelEdit = () => {
     setEditingLogId(null);
     setEditSets([]);
     setEditNotes('');
+    setEditWeek('');
   };
 
   const updateEditSet = (idx, field, value) => {
@@ -189,11 +157,15 @@ export default function ExerciseHistoryScreen() {
         weight: toKg(s.weight, weightUnit),
         reps: parseInt(s.reps) || 0
       }));
-      const res = await api.put(`/exercises/${logId}`, { sets, notes: editNotes });
+      const body = { sets, notes: editNotes };
+      const parsedWeek = parseInt(editWeek, 10);
+      if (!isNaN(parsedWeek)) body.week = parsedWeek;
+      const res = await api.put(`/exercises/${logId}`, body);
       setLogs(prev => prev.map(l => l._id === logId ? res.data : l));
       setEditingLogId(null);
       setEditSets([]);
       setEditNotes('');
+      setEditWeek('');
     } catch (err) {
       console.error(err);
     } finally {
@@ -215,7 +187,7 @@ export default function ExerciseHistoryScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
       </TouchableOpacity>
@@ -285,6 +257,15 @@ export default function ExerciseHistoryScreen() {
 
                 {isEditing ? (
                   <View>
+                    <View style={styles.editWeekRow}>
+                      <Text style={styles.editWeekLabel}>Week</Text>
+                      <TextInput
+                        style={styles.editWeekInput}
+                        keyboardType="numeric"
+                        value={editWeek}
+                        onChangeText={setEditWeek}
+                      />
+                    </View>
                     {editSets.map((s, sidx) => (
                       <View key={sidx} style={styles.editRow}>
                         <Text style={styles.editSetNum}>{sidx + 1}</Text>
@@ -314,9 +295,10 @@ export default function ExerciseHistoryScreen() {
                       placeholder="Notes, links, video URLs... use [Label](https://...) for named links"
                       placeholderTextColor="#999"
                       multiline
-                      value={editNotes}
-                      onChangeText={setEditNotes}
+                      {...notesFmt.inputProps}
                     />
+                    <FormatToolbar apply={notesFmt.apply} />
+                    <NotesPreview text={editNotes} />
                     <View style={styles.editActionsRow}>
                       <TouchableOpacity style={styles.addSetBtn} onPress={addEditSet}>
                         <Text style={styles.addSetBtnText}>+ Add Set</Text>
@@ -350,7 +332,7 @@ export default function ExerciseHistoryScreen() {
                     ) : (
                       <Text style={styles.noSets}>No sets logged</Text>
                     )}
-                    {log.notes ? <Text style={styles.notes}>{renderNotesWithLinks(log.notes)}</Text> : null}
+                    {log.notes ? <RichNotes text={log.notes} style={styles.notes} /> : null}
                   </>
                 )}
               </View>
@@ -419,6 +401,9 @@ const styles = StyleSheet.create({
   notes: { fontSize: 13, color: '#1A1A1A', marginTop: 10, borderTopWidth: 1, borderTopColor: '#C5BFB4', paddingTop: 10 },
   linkText: { color: '#F77E2D', textDecorationLine: 'underline', fontWeight: '600' },
   editRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 },
+  editWeekRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  editWeekLabel: { fontSize: 13, color: '#888', fontWeight: '600' },
+  editWeekInput: { width: 60, backgroundColor: '#EDE8DF', borderRadius: 8, padding: 8, fontSize: 14, color: '#1A1A1A', textAlign: 'center' },
   editSetNum: { width: 20, fontSize: 13, color: '#888' },
   editInput: { flex: 1, backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 14, color: '#1A1A1A', textAlign: 'center' },
   removeText: { color: '#888', fontSize: 16, paddingHorizontal: 6 },

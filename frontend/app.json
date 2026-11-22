@@ -41,7 +41,13 @@
       "expo-font",
       "expo-status-bar",
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#EDE8DF"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useRouter, useFocusEffect } from 'expo-router';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 import api from '../../src/utils/api';
+import { RichNotes, NotesPreview, FormatToolbar, useFormattedInput } from '../../src/utils/richNotes';
 
 const confirmDelete = (onConfirm) => {
   if (Platform.OS === 'web') {
@@ -33,33 +34,6 @@ const toKg = (value, unit) => {
   return unit === 'lbs' ? num / KG_TO_LBS : num;
 };
 
-const LINK_PATTERN = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
-
-const parseNotesLinks = (text) => {
-  const segments = [];
-  let lastIndex = 0;
-  let match;
-  const pattern = new RegExp(LINK_PATTERN);
-
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({ type: 'text', value: text.slice(lastIndex, match.index) });
-    }
-    if (match[1] && match[2]) {
-      segments.push({ type: 'link', label: match[1], url: match[2], raw: match[0], start: match.index, end: pattern.lastIndex });
-    } else if (match[3]) {
-      segments.push({ type: 'link', label: match[3], url: match[3], raw: match[0], start: match.index, end: pattern.lastIndex });
-    }
-    lastIndex = pattern.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    segments.push({ type: 'text', value: text.slice(lastIndex) });
-  }
-
-  return segments;
-};
-
 function LinkEditPopover({ segment, onSave, onCancel }) {
   const [label, setLabel] = useState(segment.label);
   const [url, setUrl] = useState(segment.url);
@@ -84,7 +58,8 @@ function LinkEditPopover({ segment, onSave, onCancel }) {
 
 const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialValue }, ref) {
   const [value, setValue] = useState(initialValue || '');
-  const [editingLinkIdx, setEditingLinkIdx] = useState(null);
+  const [editingLink, setEditingLink] = useState(null);
+  const [editing, setEditing] = useState(false);
   const valueRef = useRef(initialValue || '');
 
   useImperativeHandle(ref, () => ({
@@ -93,45 +68,54 @@ const ExerciseNotesEditor = forwardRef(function ExerciseNotesEditor({ initialVal
 
   const saveLinkEdit = (segment, newLabel, newUrl) => {
     if (!newUrl) {
-      setEditingLinkIdx(null);
+      setEditingLink(null);
       return;
     }
     const replacement = newLabel && newLabel !== newUrl ? `[${newLabel}](${newUrl})` : newUrl;
     const newValue = value.slice(0, segment.start) + replacement + value.slice(segment.end);
     setValue(newValue);
     valueRef.current = newValue;
-    setEditingLinkIdx(null);
+    setEditingLink(null);
   };
 
-  const segments = parseNotesLinks(value);
+  const handleChange = (text) => {
+    setValue(text);
+    valueRef.current = text;
+  };
+
+  const fmt = useFormattedInput(value, handleChange);
 
   return (
     <View style={styles.notesDisplayWrap}>
-      <View style={styles.notesDisplay}>
-        {value ? (
-          <Text style={styles.notesDisplayText}>
-            {segments.map((seg, i) =>
-              seg.type === 'text' ? (
-                <Text key={i}>{seg.value}</Text>
-              ) : (
-                <Text key={i}>
-                  <Text style={styles.linkText} onPress={() => Linking.openURL(seg.url)}>
-                    {seg.label}
-                  </Text>
-                  <Text style={styles.linkEditIcon} onPress={() => setEditingLinkIdx(i)}> ✎</Text>
-                </Text>
-              )
+      {editing ? (
+        <View>
+          <TextInput
+            style={styles.notesEditInput}
+            multiline
+            autoFocus
+            {...fmt.inputProps}
+            placeholder="Notes, links... use [Label](https://...) for named links"
+            placeholderTextColor="#999"
+          />
+          <FormatToolbar apply={fmt.apply} onDone={() => setEditing(false)} />
+          <NotesPreview text={value} />
+        </View>
+      ) : (
+        <TouchableOpacity activeOpacity={0.8} onPress={() => setEditing(true)}>
+          <View style={styles.notesDisplay}>
+            {value ? (
+              <RichNotes text={value} textStyle={styles.notesDisplayText} onLinkEdit={setEditingLink} />
+            ) : (
+              <Text style={styles.notesPlaceholderText}>No notes yet. Tap here to add some.</Text>
             )}
-          </Text>
-        ) : (
-          <Text style={styles.notesPlaceholderText}>No notes yet. Tap ✎ on the exercise to add some.</Text>
-        )}
-      </View>
-      {editingLinkIdx !== null && segments[editingLinkIdx] && (
+          </View>
+        </TouchableOpacity>
+      )}
+      {editingLink !== null && (
         <LinkEditPopover
-          segment={segments[editingLinkIdx]}
-          onCancel={() => setEditingLinkIdx(null)}
-          onSave={(newLabel, newUrl) => saveLinkEdit(segments[editingLinkIdx], newLabel, newUrl)}
+          segment={editingLink}
+          onCancel={() => setEditingLink(null)}
+          onSave={(newLabel, newUrl) => saveLinkEdit(editingLink, newLabel, newUrl)}
         />
       )}
     </View>
@@ -144,7 +128,7 @@ function WeekEditor({ week, onSave }) {
 
   const confirm = () => {
     const parsed = parseInt(value, 10);
-    if (!isNaN(parsed)) onSave(parsed);
+    if (!isNaN(parsed) && parsed !== week) onSave(parsed);
     setEditing(false);
   };
 
@@ -226,6 +210,7 @@ export default function WorkoutScreen() {
   const [editName, setEditName] = useState('');
   const [editSetsToday, setEditSetsToday] = useState([]);
   const [editNotesValue, setEditNotesValue] = useState('');
+  const notesFmt = useFormattedInput(editNotesValue, setEditNotesValue);
   const [editWeekValue, setEditWeekValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const [savingExercise, setSavingExercise] = useState(null);
@@ -423,7 +408,7 @@ export default function WorkoutScreen() {
     }
   };
 
-    const startEditExercise = async (exercise, currentWeek) => {
+  const startEditExercise = async (exercise, currentWeek) => {
     setEditingExercise(exercise);
     setEditName(exercise);
     setEditWeekValue(String(currentWeek ?? ''));
@@ -470,13 +455,15 @@ export default function WorkoutScreen() {
         weight: toKg(s.weight, weightUnit),
         reps: parseInt(s.reps) || 0
       }));
+      const originalWeek = exercises.find(e => e.exercise === editingExercise)?.week;
       const parsedWeek = parseInt(editWeekValue, 10);
+      const weekChanged = !isNaN(parsedWeek) && parsedWeek !== originalWeek;
       await api.post('/exercises', {
         exercise: trimmedName,
         date: localDate(),
         sets,
         notes: editNotesValue,
-        weekOverride: isNaN(parsedWeek) ? undefined : parsedWeek
+        weekOverride: weekChanged ? parsedWeek : undefined
       });
       if (expandedExercise === editingExercise) setExpandedExercise(trimmedName);
       cancelEditExercise();
@@ -643,7 +630,7 @@ export default function WorkoutScreen() {
   const pagedExercises = exercises.slice(exercisesPage * EXERCISES_PER_PAGE, exercisesPage * EXERCISES_PER_PAGE + EXERCISES_PER_PAGE);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Workout</Text>
 
       <View style={styles.tabs}>
@@ -821,9 +808,10 @@ export default function WorkoutScreen() {
                         placeholder="Notes, links, video URLs..."
                         placeholderTextColor="#999"
                         multiline
-                        value={editNotesValue}
-                        onChangeText={setEditNotesValue}
+                        {...notesFmt.inputProps}
                       />
+                      <FormatToolbar apply={notesFmt.apply} />
+                      <NotesPreview text={editNotesValue} />
 
                       <View style={styles.renameRow}>
                         <TouchableOpacity style={styles.renameCancelBtn} onPress={cancelEditExercise}>
@@ -936,6 +924,15 @@ export default function WorkoutScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.historyBtn} onPress={() => router.push({ pathname: '/exercise-history', params: { exercise: ex.exercise } })}>
                           <Text style={styles.historyBtnText}>View History</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.backBtn}
+                          onPress={() => {
+                            setPendingSets(prev => ({ ...prev, [ex.exercise]: [] }));
+                            setExpandedExercise(null);
+                          }}
+                        >
+                          <Text style={styles.backBtnText}>← Back</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1066,10 +1063,13 @@ const styles = StyleSheet.create({
   saveSetsBtn: { backgroundColor: '#F77E2D', borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 10 },
   saveSetsBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   historyBtn: { marginTop: 10, borderWidth: 1, borderColor: '#F77E2D', borderRadius: 8, padding: 10, alignItems: 'center' },
+  backBtn: { marginTop: 8, borderRadius: 8, padding: 10, alignItems: 'center', backgroundColor: '#EDE8DF' },
+  backBtnText: { color: '#888', fontWeight: '700', fontSize: 13 },
   historyBtnText: { color: '#F77E2D', fontWeight: '600', fontSize: 13 },
   notesInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', marginTop: 10, minHeight: 80, textAlignVertical: 'top' },
   notesDisplayWrap: { marginTop: 10 },
   notesDisplay: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, minHeight: 60 },
+  notesEditInput: { backgroundColor: '#EDE8DF', borderRadius: 8, padding: 10, fontSize: 13, color: '#1A1A1A', lineHeight: 18, minHeight: 60, textAlignVertical: 'top' },
   notesDisplayText: { fontSize: 13, color: '#1A1A1A', lineHeight: 18 },
   notesPlaceholderText: { fontSize: 13, color: '#999', fontStyle: 'italic', lineHeight: 18 },
   notesEditBtn: { alignSelf: 'flex-end', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4 },

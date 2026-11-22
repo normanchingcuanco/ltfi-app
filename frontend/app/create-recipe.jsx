@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/api';
+import { NotesPreview, FormatToolbar, useFormattedInput } from '../src/utils/richNotes';
 
 const UNITS = ['g', 'oz', 'ml', 'cup', 'tbsp', 'tsp'];
 
@@ -40,6 +41,7 @@ export default function CreateRecipeScreen() {
   const [name, setName] = useState('');
   const [servings, setServings] = useState('1');
   const [notes, setNotes] = useState('');
+  const notesFmt = useFormattedInput(notes, setNotes);
   const [ingredients, setIngredients] = useState([
     { name: '', quantity: '100', unit: 'g', calories: '', protein: '', carbs: '', fat: '', base: null }
   ]);
@@ -148,7 +150,7 @@ export default function CreateRecipeScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
@@ -170,7 +172,9 @@ export default function CreateRecipeScreen() {
         />
 
         <Text style={styles.label}>Notes (optional)</Text>
-        <TextInput style={[styles.input, { height: 80 }]} placeholder="Cooking instructions..." placeholderTextColor="#999" value={notes} onChangeText={setNotes} multiline />
+        <TextInput style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]} placeholder="Cooking instructions..." placeholderTextColor="#999" {...notesFmt.inputProps} multiline />
+        <FormatToolbar apply={notesFmt.apply} />
+        <NotesPreview text={notes} />
 
         <Text style={styles.label}>Ingredients</Text>
 
