@@ -18,6 +18,8 @@ const userSchema = new mongoose.Schema({
   gender: { type: String, enum: ['male', 'female'] },
   exerciseOrder: { type: [String], default: [] },
   dailyCalorieGoal: { type: Number },
+  dailyDeficit: { type: Number, default: 500 },
+  minCalories: { type: Number, default: 1200 },
   macroGoals: {
     protein: { type: Number },
     carbs: { type: Number },

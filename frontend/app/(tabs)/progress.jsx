@@ -61,7 +61,7 @@ const getWeekDays = (weekOffset = 0) => {
 };
 
 export default function ProgressScreen() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [weight, setWeight] = useState('');
@@ -168,7 +168,8 @@ export default function ProgressScreen() {
     setLogging(true);
     try {
       const { url: photoUrl, publicId: photoPublicId } = await uploadPhotoToCloudinary();
-      await api.post('/weight', { weight: parseFloat(weight), notes, photoUrl, photoPublicId });
+      const res = await api.post('/weight', { weight: parseFloat(weight), notes, photoUrl, photoPublicId });
+      if (res.data?.profile) updateUser(res.data.profile);
       setWeight('');
       setNotes('');
       setPhotoUri(null);

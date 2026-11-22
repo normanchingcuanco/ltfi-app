@@ -1,5 +1,7 @@
 const Weight = require('../models/Weight');
+const User = require('../models/User');
 const { deleteCloudinaryImage } = require('../utils/cloudinary');
+const { calculateTDEE, calculateMacros } = require('../utils/calorieCalculator');
 
 const logWeight = async (req, res) => {
   try {
@@ -14,7 +16,42 @@ const logWeight = async (req, res) => {
       loggedAt: loggedAt || Date.now()
     });
 
-    res.status(201).json(entry);
+    // Newest entry by date drives the profile, so backdated logs don't override it
+    const latest = await Weight.findOne({ user: req.user._id }).sort({ loggedAt: -1 });
+
+    const user = await User.findById(req.user._id);
+    let profile = null;
+
+    if (user && latest) {
+      user.currentWeight = latest.weight;
+
+      const maintenance = calculateTDEE({
+        age: user.age,
+        height: user.height,
+        currentWeight: user.currentWeight,
+        activityLevel: user.activityLevel,
+        gender: user.gender
+      });
+
+      const deficit = user.dailyDeficit || 500;
+      const floor = user.minCalories || 1200;
+      const losing = user.goalWeight && user.currentWeight > user.goalWeight;
+      const target = losing ? Math.max(maintenance - deficit, floor) : maintenance;
+
+      user.dailyCalorieGoal = maintenance;
+      user.macroGoals = calculateMacros(target);
+      await user.save();
+
+      profile = {
+        currentWeight: user.currentWeight,
+        dailyCalorieGoal: user.dailyCalorieGoal,
+        dailyDeficit: deficit,
+        minCalories: floor,
+        macroGoals: user.macroGoals
+      };
+    }
+
+    res.status(201).json({ ...entry.toObject(), profile });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

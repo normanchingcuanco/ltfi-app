@@ -14,6 +14,11 @@ const COMMON_TIMEZONES = [
   'Australia/Sydney', 'Pacific/Auckland'
 ];
 
+const KCAL_PER_KG = 7700;
+
+const weeksFor = (kg, deficit) => (deficit > 0 ? Math.ceil((kg * KCAL_PER_KG) / (deficit * 7)) : 0);
+const deficitFor = (kg, weeks) => (weeks > 0 ? Math.round((kg * KCAL_PER_KG) / (weeks * 7)) : 0);
+
 const getDeviceTimezone = () => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -27,6 +32,10 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [planEditing, setPlanEditing] = useState(false);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planEdited, setPlanEdited] = useState('deficit');
+  const [planForm, setPlanForm] = useState({ deficit: '', weeks: '', minCalories: '' });
   const [form, setForm] = useState({
     name: '',
     currentWeight: '',
@@ -54,6 +63,98 @@ export default function ProfileScreen() {
       });
     }
   }, [user]);
+
+  // Weight loss plan numbers
+  const maintenance = user?.dailyCalorieGoal || 0;
+  const floor = user?.minCalories || 1200;
+  const showPlan = !!(user?.currentWeight && user?.goalWeight && user.currentWeight > user.goalWeight);
+  const kgToLose = showPlan ? user.currentWeight - user.goalWeight : 0;
+  const maxDeficit = Math.max(maintenance - floor, 0);
+  const savedDeficit = user?.dailyDeficit || 500;
+  const deficit = maxDeficit > 0 ? Math.min(savedDeficit, maxDeficit) : savedDeficit;
+  const planTarget = Math.max(maintenance - deficit, floor);
+  const planWeeks = weeksFor(kgToLose, deficit);
+  const planRate = ((deficit * 7) / KCAL_PER_KG).toFixed(2);
+  const isCapped = maintenance > 0 && planTarget === floor;
+
+  // Live values while editing the plan
+  const formDeficit = parseFloat(planForm.deficit) || 0;
+  const formFloor = parseFloat(planForm.minCalories) || 0;
+  const formMax = Math.max(maintenance - formFloor, 0);
+  const overCap = planEditing && formDeficit > formMax;
+  const shortestWeeks = formMax > 0 ? weeksFor(kgToLose, formMax) : 0;
+  const previewTarget = Math.max(maintenance - Math.min(formDeficit, formMax), formFloor);
+
+  const openPlanEdit = () => {
+    setPlanForm({
+      deficit: String(deficit),
+      weeks: String(planWeeks),
+      minCalories: String(floor)
+    });
+    setPlanEdited('deficit');
+    setPlanEditing(true);
+  };
+
+  const onChangeDeficit = (val) => {
+    const d = parseFloat(val) || 0;
+    setPlanEdited('deficit');
+    setPlanForm({
+      ...planForm,
+      deficit: val,
+      weeks: d > 0 ? String(weeksFor(kgToLose, d)) : ''
+    });
+  };
+
+  const onChangeWeeks = (val) => {
+    const w = parseInt(val) || 0;
+    setPlanEdited('weeks');
+    setPlanForm({
+      ...planForm,
+      weeks: val,
+      deficit: w > 0 ? String(deficitFor(kgToLose, w)) : ''
+    });
+  };
+
+  const onChangeMin = (val) => {
+    setPlanForm({ ...planForm, minCalories: val });
+  };
+
+  const handlePlanSave = async () => {
+    const body = {};
+    const minVal = parseFloat(planForm.minCalories);
+    if (!(minVal > 0)) {
+      Alert.alert('Check your numbers', 'Minimum kcal must be more than 0.');
+      return;
+    }
+    body.minCalories = minVal;
+
+    if (planEdited === 'weeks') {
+      const w = parseInt(planForm.weeks);
+      if (!(w > 0)) {
+        Alert.alert('Check your numbers', 'Weeks must be more than 0.');
+        return;
+      }
+      body.weeks = w;
+    } else {
+      const d = parseFloat(planForm.deficit);
+      if (!(d > 0)) {
+        Alert.alert('Check your numbers', 'Deficit must be more than 0.');
+        return;
+      }
+      body.dailyDeficit = d;
+    }
+
+    setPlanLoading(true);
+    try {
+      const res = await api.put('/auth/profile', body);
+      updateUser(res.data);
+      setPlanEditing(false);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to update plan.');
+    } finally {
+      setPlanLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -99,24 +200,86 @@ export default function ProfileScreen() {
         <Text style={styles.cardValue}>{user?.dailyCalorieGoal} kcal</Text>
       </View>
 
-      {user?.currentWeight && user?.goalWeight && user?.currentWeight > user?.goalWeight && (
+      {showPlan && (
         <View style={styles.deficitCard}>
-          <Text style={styles.cardLabel}>Weight Loss Plan</Text>
-          <View style={styles.deficitRow}>
-            <View style={styles.deficitItem}>
-              <Text style={styles.deficitValue}>{Math.max(user.dailyCalorieGoal - 500, 1200)} kcal</Text>
-              <Text style={styles.deficitLabel}>Daily Target</Text>
-            </View>
-            <View style={styles.deficitItem}>
-              <Text style={styles.deficitValue}>500 kcal</Text>
-              <Text style={styles.deficitLabel}>Daily Deficit</Text>
-            </View>
-            <View style={styles.deficitItem}>
-              <Text style={styles.deficitValue}>{Math.ceil((user.currentWeight - user.goalWeight) / 0.5)} wks</Text>
-              <Text style={styles.deficitLabel}>Est. to Goal</Text>
-            </View>
+          <View style={styles.planHeader}>
+            <Text style={styles.cardLabel}>Weight Loss Plan</Text>
+            {!planEditing && (
+              <TouchableOpacity style={styles.planEditBtn} onPress={openPlanEdit}>
+                <Text style={styles.planEditBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={styles.deficitNote}>Based on 500 kcal/day deficit · 0.5 kg/week loss</Text>
+
+          {!planEditing && (
+            <>
+              <View style={styles.deficitRow}>
+                <View style={styles.deficitItem}>
+                  <Text style={styles.deficitValue}>{planTarget} kcal</Text>
+                  <Text style={styles.deficitLabel}>Daily Target</Text>
+                </View>
+                <View style={styles.deficitItem}>
+                  <Text style={styles.deficitValue}>{deficit} kcal</Text>
+                  <Text style={styles.deficitLabel}>Daily Deficit</Text>
+                </View>
+                <View style={styles.deficitItem}>
+                  <Text style={styles.deficitValue}>{planWeeks} wks</Text>
+                  <Text style={styles.deficitLabel}>Est. to Goal</Text>
+                </View>
+              </View>
+              <Text style={styles.deficitNote}>Based on {deficit} kcal/day deficit · {planRate} kg/week loss</Text>
+              {isCapped && (
+                <Text style={styles.capNote}>Capped at {floor} kcal minimum</Text>
+              )}
+            </>
+          )}
+
+          {planEditing && (
+            <View style={styles.planForm}>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Daily Deficit (kcal)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={planForm.deficit}
+                  onChangeText={onChangeDeficit}
+                  keyboardType="decimal-pad"
+                  placeholderTextColor="#999"
+                />
+              </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Weeks to Goal</Text>
+                <TextInput
+                  style={styles.input}
+                  value={planForm.weeks}
+                  onChangeText={onChangeWeeks}
+                  keyboardType="number-pad"
+                  placeholderTextColor="#999"
+                />
+              </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>Minimum Daily kcal</Text>
+                <TextInput
+                  style={styles.input}
+                  value={planForm.minCalories}
+                  onChangeText={onChangeMin}
+                  keyboardType="number-pad"
+                  placeholderTextColor="#999"
+                />
+              </View>
+              <Text style={styles.deficitNote}>Daily target: {previewTarget} kcal</Text>
+              {overCap && (
+                <Text style={styles.capNote}>
+                  That goes under your {formFloor} kcal minimum. Deficit will be capped at {formMax} kcal, shortest timeline is {shortestWeeks} wks.
+                </Text>
+              )}
+              <TouchableOpacity style={styles.saveBtn} onPress={handlePlanSave} disabled={planLoading}>
+                <Text style={styles.saveBtnText}>{planLoading ? 'Saving...' : 'Save Plan'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setPlanEditing(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 
@@ -266,11 +429,16 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 12, color: '#888', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
   cardValue: { fontSize: 36, fontWeight: '900', color: '#F77E2D' },
   deficitCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginBottom: 16 },
+  planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  planEditBtn: { backgroundColor: '#EDE8DF', borderRadius: 99, paddingVertical: 6, paddingHorizontal: 14, marginBottom: 6 },
+  planEditBtnText: { fontSize: 12, fontWeight: '700', color: '#F77E2D' },
+  planForm: { gap: 12, marginTop: 8 },
   deficitRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 },
   deficitItem: { alignItems: 'center', flex: 1 },
   deficitValue: { fontSize: 18, fontWeight: '800', color: '#F77E2D' },
   deficitLabel: { fontSize: 10, color: '#888', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' },
   deficitNote: { fontSize: 11, color: '#aaa', textAlign: 'center' },
+  capNote: { fontSize: 11, color: '#F77E2D', textAlign: 'center', marginTop: 6, fontWeight: '600' },
   macrosRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   macroCard: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, alignItems: 'center' },
   macroValue: { fontSize: 22, fontWeight: '800', color: '#1A1A1A' },

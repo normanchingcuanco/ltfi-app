@@ -69,7 +69,7 @@ const getMe = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, currentWeight, goalWeight, height, age, activityLevel, dietPreference, gender, timezone, weightUnit, exerciseOrder } = req.body;
+    const { name, currentWeight, goalWeight, height, age, activityLevel, dietPreference, gender, timezone, weightUnit, exerciseOrder, dailyDeficit, weeks, minCalories } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -84,16 +84,36 @@ const updateProfile = async (req, res) => {
     if (timezone) user.timezone = timezone;
     if (weightUnit) user.weightUnit = weightUnit;
     if (exerciseOrder) user.exerciseOrder = exerciseOrder;
+    if (Number(minCalories) > 0) user.minCalories = Math.round(Number(minCalories));
 
-    const dailyCalorieGoal = calculateTDEE({
+    const maintenance = calculateTDEE({
       age: user.age,
       height: user.height,
       currentWeight: user.currentWeight,
       activityLevel: user.activityLevel,
       gender: user.gender
     });
-    user.dailyCalorieGoal = dailyCalorieGoal;
-    user.macroGoals = calculateMacros(dailyCalorieGoal);
+
+    const floor = user.minCalories || 1200;
+
+    // Deficit can be set directly, or derived from a number of weeks (7700 kcal per kg)
+    const losing = user.goalWeight && user.currentWeight > user.goalWeight;
+    if (Number(dailyDeficit) > 0) {
+      user.dailyDeficit = Math.round(Number(dailyDeficit));
+    } else if (Number(weeks) > 0 && losing) {
+      const kgToLose = user.currentWeight - user.goalWeight;
+      user.dailyDeficit = Math.round((kgToLose * 7700) / (Number(weeks) * 7));
+    }
+
+    // Never let the saved deficit push the target under the minimum kcal floor
+    const maxDeficit = Math.max(maintenance - floor, 0);
+    if (user.dailyDeficit > maxDeficit) user.dailyDeficit = maxDeficit;
+
+    const deficit = user.dailyDeficit || 500;
+    const target = losing ? Math.max(maintenance - deficit, floor) : maintenance;
+
+    user.dailyCalorieGoal = maintenance;
+    user.macroGoals = calculateMacros(target);
 
     await user.save();
 
@@ -104,6 +124,8 @@ const updateProfile = async (req, res) => {
       gender: user.gender,
       avatarInitials: user.avatarInitials,
       dailyCalorieGoal: user.dailyCalorieGoal,
+      dailyDeficit: user.dailyDeficit,
+      minCalories: user.minCalories,
       macroGoals: user.macroGoals,
       currentWeight: user.currentWeight,
       goalWeight: user.goalWeight,
