@@ -2,7 +2,7 @@
   "expo": {
     "name": "LTFI",
     "slug": "ltfi",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "scheme": "ltfi",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,10 +12,6 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#EDE8DF"
     },
     "ios": {
       "supportsTablet": true,
@@ -44,7 +40,8 @@
       "expo-updates",
       "expo-font",
       "expo-status-bar",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
