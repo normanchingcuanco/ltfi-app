@@ -35,7 +35,7 @@ const register = async (req, res) => {
   }
 };
 
-const login = async (req, res) => {
+cconst login = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
@@ -49,7 +49,17 @@ const login = async (req, res) => {
       gender: user.gender,
       avatarInitials: user.avatarInitials,
       dailyCalorieGoal: user.dailyCalorieGoal,
+      dailyDeficit: user.dailyDeficit,
+      minCalories: user.minCalories,
       macroGoals: user.macroGoals,
+      currentWeight: user.currentWeight,
+      goalWeight: user.goalWeight,
+      height: user.height,
+      age: user.age,
+      activityLevel: user.activityLevel,
+      dietPreference: user.dietPreference,
+      timezone: user.timezone,
+      exerciseOrder: user.exerciseOrder,
       weightUnit: user.weightUnit,
       token: generateToken(user._id)
     });
