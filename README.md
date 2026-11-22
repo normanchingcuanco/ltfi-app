@@ -110,8 +110,8 @@ An Expo-based mobile and web app that:
 |-------------|-----|
 | Frontend (Web) | https://ltfi-app.vercel.app |
 | Backend | https://ltfi-backend.onrender.com |
-| Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/00d76ff8-779a-4837-92d0-6bacdad57ffe |
-| Latest EAS Update (preview) | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/updates/7aa96e49-5c73-4cb5-8844-19cbca0abd14 |
+| Android APK | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/builds/00d76ff8-779a-4837-92d0-6bacdad57ffe (built on SDK 57, runtime 1.0.0) |
+| Latest EAS Update (preview) | https://expo.dev/accounts/norman.chingcuanco/projects/ltfi/updates/5f026ff5-934f-4dad-878a-444d3f28f021 |
 | iOS Native Build | On hold — requires Apple Developer account ($99/yr) |
 
 ---
@@ -120,7 +120,7 @@ An Expo-based mobile and web app that:
 
 | Layer | Technology | Cost |
 |-------|------------|------|
-| Mobile + Web | Expo SDK 57 + React Native 0.86.3 + React 19.2.3 + React Native Web | Free |
+| Mobile + Web | Expo SDK 58 + React Native 0.88.1 + React 19.3.0 + React Native Web | Free |
 | Backend | Node.js + Express | Free |
 | Database | MongoDB Atlas (free tier) | Free |
 | Auth | JWT + Email/Password | Free |
@@ -260,8 +260,10 @@ ltfi/
 | timezone | String | IANA timezone string e.g. Asia/Manila |
 | weightUnit | String | kg / lbs — display preference for workout weights, stored value always stays in kg |
 | exerciseOrder | [String] | User's custom drag/arrow-set order of exercise names on the Tracker tab; falls back to server-default order for anything not in the list |
-| dailyCalorieGoal | Number | Auto-calculated on registration |
-| macroGoals | Object | { protein, carbs, fat } in grams |
+| dailyCalorieGoal | Number | Maintenance calories (TDEE). Calculated on registration and recalculated on every profile save and weigh-in |
+| dailyDeficit | Number | Daily calorie deficit for the weight loss plan, default 500. Weeks to goal are always derived from it at 7700 kcal per kg |
+| minCalories | Number | Minimum daily calorie floor for the weight loss target, default 1200, user-adjustable with no hard stop |
+| macroGoals | Object | { protein, carbs, fat } in grams. Calculated from the daily target (maintenance minus deficit, never below minCalories) while above goal weight, otherwise from maintenance |
 | avatarInitials | String | Auto-generated from name |
 | resetToken | String | Password reset flow |
 | resetTokenExpiry | Date | 1 hour expiry |
@@ -362,7 +364,7 @@ ltfi/
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Expo App Setup | Expo SDK 57 + React Native Web with navigation | ✅ Done |
+| Expo App Setup | Expo SDK 58 + React Native Web with navigation | ✅ Done |
 | Backend Server Setup | Express app with helmet, morgan, rate limiting | ✅ Done |
 | MongoDB Connection | Mongoose connected to MongoDB Atlas free tier | ✅ Done |
 | Environment Config | .env for DB URI, JWT secret, Groq API key, Cloudinary keys, email, frontend URL | ✅ Done |
@@ -388,6 +390,7 @@ ltfi/
 | updateProfile Destructuring Fix | `exerciseOrder` was referenced in `updateProfile` before being destructured from `req.body`, which would have thrown on every profile update — fixed before it shipped | ✅ Done |
 | Gender Field Schema Fix | `gender` was accepted by `updateProfile` and used in the TDEE calculation, but was never declared on the `User` Mongoose schema — Mongoose silently stripped it on every save. Added `gender: { type: String, enum: ['male', 'female'] }` to the schema | ✅ Done |
 | Gender Field Assignment Fix | Separately from the schema bug, `updateProfile` destructured `gender` from the request and used it in TDEE calc and the response, but never actually contained the line assigning it to `user.gender` — so it silently never saved even after the schema fix. Added `if (gender !== undefined) user.gender = gender;` | ✅ Done |
+| Login Returns Full Profile | `login` previously returned only name, email, gender, calorie goal, macros and weight unit, so a fresh login (new browser, or after logout) had no current weight, goal weight, height, age or deficit and the Weight Loss Plan card stayed hidden. It now returns the full profile | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -457,13 +460,18 @@ ltfi/
 | Workout Calories Deducted | Calories burned from workouts added to remaining on dashboard | ✅ Done |
 | Dashboard Focus Refresh | Dashboard re-fetches data every time user navigates to it, and on day/week offset change | ✅ Done |
 | Diary Focus Refresh | Diary re-fetches data every time user navigates to it | ✅ Done |
+| Weigh-in Updates Profile | Logging a weight sets the profile's current weight to the newest entry by date (a backdated entry does not override it), recalculates the daily calorie goal and macros, and the app refreshes the Profile tab from the `POST /weight` response | ✅ Done |
+| Delete Rolls Profile Back | Deleting a weigh-in sets the profile weight back to the latest remaining entry and recalculates; deleting the only entry leaves the profile weight unchanged | ✅ Done |
 
 #### 5. Profile
 
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Profile Stats View | Shows current weight, goal weight, height, age, gender, activity level, timezone | ✅ Done |
-| Weight Loss Plan | Shows daily deficit target, 500 kcal deficit, and estimated weeks to goal | ✅ Done |
+| Weight Loss Plan | Card shows daily target, daily deficit and estimated weeks to goal, calculated from the saved deficit at 7700 kcal per kg (a 500 kcal deficit is about 0.45 kg/week) | ✅ Done |
+| Editable Weight Loss Plan | Edit button on the card: type a daily deficit and the weeks update live, or type weeks and the deficit updates live. The deficit is the stored value and weeks are always derived from it; whichever field was edited last is saved via `PUT /auth/profile` with `dailyDeficit` or `weeks` | ✅ Done |
+| Minimum Daily kcal | Adjustable floor (default 1200, no hard stop) on the plan card. A deficit that would push the target under the floor is capped, shown on the card as Capped at X kcal minimum, with a live warning and the shortest possible timeline while editing | ✅ Done |
+| Macros Follow Target | Macro goals are calculated from the daily target (maintenance minus deficit) while above goal weight, instead of from maintenance | ✅ Done |
 | Macro Formula | Updated to 25% protein / 45% carbs / 30% fat industry standard split | ✅ Done |
 | TDEE Formula | Mifflin-St Jeor with activity multiplier and gender | ✅ Done |
 | Gender Field | Male/female selector on registration and profile for accurate TDEE — see Gender Field Schema Fix and Gender Field Assignment Fix above; the selector always worked, the persistence layer did not | ✅ Done |
@@ -599,6 +607,13 @@ ltfi/
 | expo-camera Config Plugin | Added the `expo-camera` plugin block (with a proper `cameraPermission` description) to `app.json`'s `plugins` array — required for native/EAS builds; has no effect in Expo Go, where it was previously omitted without symptom | ✅ Done |
 | Android APK Rebuild on SDK 57 | Successfully rebuilt and installed a fresh Android internal-distribution APK on SDK 57 via `eas build -p android --profile preview`, confirming the full native build pipeline (not just Expo Go) is stable post-upgrade | ✅ Done |
 | iOS Native Build | EAS build for iOS — requires Apple Developer account ($99/yr) | ⬜ On hold |
+| SDK 57 → 58 Upgrade | Upgraded Expo SDK to 58 (React Native 0.88.1, React 19.3.0, and every `expo-*` package to its SDK 58 version) with `npm install expo@^58.0.0` then `npx expo install --fix`, on a branch off main, with a Vercel preview build verified before merging to main | ✅ Done |
+| Peer Dependency Install Fix | `expo-router` 58 declares optional peers (`@expo/ui`, `expo-symbols`) that triggered npm `ERESOLVE` against the previously installed versions. Resolved with `npx expo install --fix -- --legacy-peer-deps`; `npx expo-doctor` then flagged a required peer that flag skips (`expo-asset`), installed with `npx expo install expo-asset` | ✅ Done |
+| Metro Package Exports Re-enabled | `metro.config.js` had `config.resolver.unstable_enablePackageExports = false`, which stops Metro resolving `@expo/log-box/LogBox` (reachable only through the package's `exports` map) under SDK 58. Removed that line so Metro uses its default | ✅ Done |
+| splash Config Removed | SDK 58's app config schema no longer allows a top-level `splash` block (flagged by `expo-doctor`); removed it, it only held a background color. `expo-doctor` now passes 20/20 | ✅ Done |
+| Runtime Version Bump | `app.json` version 1.0.0 → 1.1.0 (`runtimeVersion` policy `appVersion`) so SDK 58 OTA updates never reach the SDK 57 Android APK | ✅ Done |
+| iOS Expo Go Compatibility | Expo Go on iOS auto-updates to the latest SDK only and refused the SDK 57 project (Project is incompatible with this version of Expo Go). Fixed by the SDK 58 upgrade and verified on an iPhone through a published EAS Update with the PC off | ✅ Done |
+| gesture-handler 3.x | `react-native-gesture-handler` moved to 3.x in the upgrade; the Workout tab's draggable list was verified working on iPhone afterwards | ✅ Done |
 
 ---
 
@@ -618,6 +633,10 @@ ltfi/
 | Browser/app caching can mask a successfully deployed fix | Development process only | If a confirmed-published OTA update doesn't appear to change behavior, hard-refresh (or disable cache in DevTools) or force-close and reopen the app before assuming the fix itself is broken |
 | Expo Go's "Recently Opened"/"Projects" list can serve a stale, pre-upgrade SDK snapshot | Development process only | This is *not* local device cache — deleting and reinstalling Expo Go does not clear it, because it is synced from the signed-in expo.dev account's cloud history. Two separate, unrelated fixes apply depending on what you're trying to do: (1) for **live local dev testing**, ignore "Recently Opened"/"Projects" entirely and use the auto-detected live server that appears under "Development servers" on the Expo Go Home tab whenever `npx expo start -c` is running on the same WiFi network — this always reflects current code; (2) for **testing without a PC running at all**, publish an EAS Update (`eas update --channel preview`) and open it via Expo Go's "PROJECTS" entry, which loads the last *published* bundle regardless of whether Metro is running — but this will only ever show whatever was last explicitly published, so it goes stale again the moment new local changes are made without re-publishing |
 | A build failing with only "Unknown error. See logs of the Install dependencies build phase" | EAS Build only | The EAS dashboard's build page does not reliably display expandable phase-by-phase logs in the browser. The actual raw log is always retrievable via `eas build:view <build-id> --json`, which returns a `logFiles` array containing a signed, time-limited (~15 min) Google Cloud Storage URL — open that URL directly in a browser to see the real npm/gradle error text. Guessing at the cause without pulling this log wasted significant time across this session; every fix that worked came directly from reading it |
+| Android APK is on SDK 57 | Android | Built with runtime 1.0.0, so it does not receive the SDK 58 updates (runtime 1.1.0). It keeps running its existing bundle until rebuilt with `eas build -p android --profile preview` |
+| Expo Go on iOS only runs the latest SDK | iOS | The project must be on the SDK that Expo Go currently supports (58). An older project shows Project is incompatible with this version of Expo Go, and the only fix is upgrading the project |
+| npm install can hit ERESOLVE after SDK upgrades | Development process only | `expo-router`'s optional peers can conflict with older installed versions. `npx expo install --fix -- --legacy-peer-deps` resolves it, then run `npx expo-doctor` to catch required peers that flag skipped |
+| Profile weight is only synced from logged weigh-ins | Both | A weight typed manually in Profile is not a logged weigh-in, so adding then deleting weigh-ins returns the profile to the latest logged entry, not to the manually typed value. Deleting your only entry leaves the profile weight unchanged |
 
 ---
 
@@ -653,6 +672,8 @@ cd ../frontend && npm install
 ```
 
 If `npm ci` is ever used instead of `npm install` (e.g. simulating what EAS Build actually runs), make sure `package-lock.json` is freshly regenerated from a clean `node_modules` first — an incrementally-updated lock file can pass `npm install` locally while still failing `npm ci` in CI. See the `package-lock.json Resync` entry under Phase 4 above.
+
+After an Expo SDK upgrade, `npm install` can fail with `ERESOLVE` peer dependency conflicts caused by `expo-router`'s optional peers. If that happens, run `npx expo install --fix -- --legacy-peer-deps`, then `npx expo-doctor`, and install any required peer it reports missing with `npx expo install <package>`.
 
 ### 3. Configure environment variables
 
@@ -717,6 +738,8 @@ This project's iOS testing has always run entirely through **Expo Go**, which ne
 
 Everything else — including the timer, its sounds and voice, the barcode scanner, and AI food scanning — runs correctly through Expo Go on a real iPhone with no paid account.
 
+**Expo Go version note:** Expo Go on iOS always updates to the latest SDK and cannot be downgraded, so the project's SDK must match it (currently SDK 58). A mismatch shows Project is incompatible with this version of Expo Go.
+
 **Day-to-day, PC-required testing:** run `npx expo start -c` in `frontend/`, then open Expo Go and tap the auto-detected server under "Development servers." This always reflects whatever code is currently on disk, saved or not yet committed.
 
 **PC-free testing:** publish the current code with `eas update --channel preview`, then open Expo Go → **PROJECTS → ltfi**. This loads the most recently published bundle with no PC or Metro server needed at all — but it will only ever reflect what was last explicitly published, so re-run the update command after making changes you want to test this way.
@@ -758,6 +781,8 @@ eas update --channel preview --message "your update description"
 
 Users get the update silently on next app launch. No new APK download needed. This is also how you make code changes available in Expo Go's **PROJECTS** tab for PC-free testing — see "Testing on iOS Without a Paid Account" above. If a confirmed-published update doesn't seem to have taken effect on a device already running the app, hard-refresh on web or force-close and reopen the app on mobile before assuming the deploy itself failed.
 
+If the `eas` command is not found, run it through npx instead: `npx eas-cli update --channel preview --message "your update description"`. The `runtimeVersion` policy is `appVersion`, so bump `version` in `app.json` whenever the SDK or native code changes (SDK 58 is runtime 1.1.0) so updates only reach builds that can run them.
+
 ### Branches
 
 | Branch | Used for |
@@ -779,4 +804,4 @@ Requires Apple Developer account ($99/yr) for any distribution outside of Expo G
 
 ---
 
-*Last updated: September 2026*
+*Last updated: November 2026*
