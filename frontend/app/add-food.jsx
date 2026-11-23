@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Activi
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
 
-const UNITS = ['g', 'kg', 'ml', 'L', 'cup', 'tbsp', 'tsp', 'oz', 'pc', 'serving'];
+const UNITS = ['g', 'kg', 'ml', 'L', 'cup', 'tbsp', 'tsp', 'oz', 'pc', 'pack', 'serving'];
 
 const UNIT_TO_GRAMS = {
   g: 1, kg: 1000, ml: 1, L: 1000,
@@ -12,6 +12,9 @@ const UNIT_TO_GRAMS = {
 };
 
 const gramsOf = (u, n) => (UNIT_TO_GRAMS[u] !== undefined ? n * UNIT_TO_GRAMS[u] : null);
+
+// A whole serving or a whole pack always counts as one of the food's servings.
+const isWhole = (u) => u === 'serving' || u === 'pack';
 
 const showAlert = (title, message, buttons) => {
   if (Platform.OS === 'web') {
@@ -135,7 +138,7 @@ export default function AddFoodScreen() {
   };
 
   // How many of the food's servings the logged amount equals.
-  // Returns null when the grams equivalent is still needed.
+  // Returns null while a needed equivalent (grams or pieces) is still empty.
   const getRatio = () => {
     if (!selectedFood) return 0;
     const qty = parseFloat(quantity) || 0;
@@ -148,12 +151,16 @@ export default function AddFoodScreen() {
     const foodGrams = gramsOf(foodUnit, foodSize);
 
     if (logGrams !== null && foodGrams !== null) return logGrams / foodGrams;
-    if (logGrams === null && foodGrams !== null) return qty;
-    if (logGrams !== null && foodGrams === null) {
-      const g = parseFloat(unitGrams);
-      return g > 0 ? logGrams / g : null;
+    if (isWhole(unit)) return qty;
+
+    if (unit === 'pc') {
+      if (foodGrams !== null) return qty;
+      const e = parseFloat(unitGrams);
+      return e > 0 ? qty / e : null;
     }
-    return qty / foodSize;
+
+    const g = parseFloat(unitGrams);
+    return g > 0 ? logGrams / g : null;
   };
 
   const confirmAdd = async () => {
@@ -162,7 +169,6 @@ export default function AddFoodScreen() {
     if (ratio === null) return;
 
     setAdding(true);
-    setShowQuantityPicker(false);
 
     const qty = parseFloat(quantity) || 1;
 
@@ -176,17 +182,19 @@ export default function AddFoodScreen() {
           quantity: qty,
           unit,
           calories: Math.round(selectedFood.calories * ratio),
-          protein: Math.round(selectedFood.protein * ratio),
-          carbs: Math.round(selectedFood.carbs * ratio),
-          fat: Math.round(selectedFood.fat * ratio),
+          protein: Math.round((selectedFood.protein || 0) * ratio),
+          carbs: Math.round((selectedFood.carbs || 0) * ratio),
+          fat: Math.round((selectedFood.fat || 0) * ratio),
           fiber: Math.round((selectedFood.fiber || 0) * ratio),
           sodium: Math.round((selectedFood.sodium || 0) * ratio),
           sugar: Math.round((selectedFood.sugar || 0) * ratio)
         }
       });
+      setShowQuantityPicker(false);
       router.replace('/(tabs)/diary');
     } catch (err) {
       console.error(err);
+      showAlert('Error', err?.response?.data?.message || err?.message || 'Could not add food. Please try again.');
     } finally {
       setAdding(false);
     }
@@ -213,10 +221,13 @@ export default function AddFoodScreen() {
   const calculatedCalories = selectedFood && ratio !== null ? Math.round(selectedFood.calories * ratio) : null;
   const foodSizeLabel = selectedFood ? (parseFloat(selectedFood.servingSize) || 1) : 1;
   const foodUnitLabel = selectedFood ? (selectedFood.servingUnit || 'serving') : 'serving';
-  const needsGramEquivalent = !!selectedFood
-    && UNIT_TO_GRAMS[unit] !== undefined
-    && UNIT_TO_GRAMS[foodUnitLabel] === undefined
-    && unit !== foodUnitLabel;
+  const foodGramsOK = UNIT_TO_GRAMS[foodUnitLabel] !== undefined;
+
+  // When the app can't convert, ask for the equivalent: grams, or pieces per serving/pack.
+  let equivUnit = null;
+  if (selectedFood && unit !== foodUnitLabel && !isWhole(unit) && !foodGramsOK) {
+    equivUnit = unit === 'pc' ? 'pc' : 'g';
+  }
 
   const renderFoodItem = (food, idx, showActions = false) => (
     <View key={idx} style={[styles.resultItem, (food.source === 'custom' || food.source === 'open_food_facts' || food.createdBy) && styles.resultItemCustom]}>
@@ -381,14 +392,14 @@ export default function AddFoodScreen() {
                 <TouchableOpacity
                   key={u}
                   style={[styles.unitBtn, unit === u && styles.unitBtnActive]}
-                  onPress={() => setUnit(u)}
+                  onPress={() => { setUnit(u); setUnitGrams(''); }}
                 >
                   <Text style={[styles.unitBtnText, unit === u && styles.unitBtnTextActive]}>{u}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
-            {needsGramEquivalent && (
+            {equivUnit && (
               <View style={styles.gramEquivRow}>
                 <Text style={styles.gramEquivLabel}>{foodSizeLabel} {foodUnitLabel} =</Text>
                 <TextInput
@@ -396,15 +407,15 @@ export default function AddFoodScreen() {
                   keyboardType="numeric"
                   value={unitGrams}
                   onChangeText={setUnitGrams}
-                  placeholder="grams"
+                  placeholder={equivUnit === 'pc' ? 'pieces' : 'grams'}
                   placeholderTextColor="#999"
                 />
-                <Text style={styles.gramEquivLabel}>g</Text>
+                <Text style={styles.gramEquivLabel}>{equivUnit}</Text>
               </View>
             )}
 
             <Text style={styles.caloriePreview}>
-              {calculatedCalories === null ? 'Enter the grams above' : `${calculatedCalories} kcal`}
+              {calculatedCalories === null ? 'Enter the amount above' : `${calculatedCalories} kcal`}
             </Text>
 
             <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd} disabled={adding || ratio === null}>
