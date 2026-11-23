@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Activi
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
 
-const UNITS = ['g', 'oz', 'ml', 'cup', 'tbsp', 'tsp', 'pc', 'serving'];
+const UNITS = ['g', 'oz', 'ml', 'cup', 'tbsp', 'tsp', 'pc', 'pack', 'serving'];
 
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {
@@ -23,7 +23,7 @@ export default function EditFoodScreen() {
   const [form, setForm] = useState({
     name: '', calories: '', protein: '', carbs: '',
     fat: '', fiber: '', sodium: '', sugar: '',
-    servingSize: '100', servingUnit: 'g'
+    servingSize: '1', servingUnit: 'serving'
   });
 
   useEffect(() => {
@@ -49,8 +49,8 @@ export default function EditFoodScreen() {
         fiber: food.fiber?.toString() || '',
         sodium: food.sodium?.toString() || '',
         sugar: food.sugar?.toString() || '',
-        servingSize: food.servingSize?.toString() || '100',
-        servingUnit: food.servingUnit || 'g',
+        servingSize: food.servingSize?.toString() || '1',
+        servingUnit: food.servingUnit || 'serving',
       });
     } catch (err) {
       showAlert('Error', 'Failed to load food.');
@@ -75,8 +75,8 @@ export default function EditFoodScreen() {
         fiber: Number(form.fiber) || 0,
         sodium: Number(form.sodium) || 0,
         sugar: Number(form.sugar) || 0,
-        servingSize: Number(form.servingSize) || 100,
-        servingUnit: form.servingUnit || 'g'
+        servingSize: Number(form.servingSize) || 1,
+        servingUnit: form.servingUnit || 'serving'
       });
       router.back();
     } catch (err) {
@@ -133,7 +133,7 @@ export default function EditFoodScreen() {
         <Text style={styles.label}>Serving Size</Text>
         <TextInput
           style={styles.input}
-          placeholder="100"
+          placeholder="1"
           placeholderTextColor="#999"
           value={form.servingSize}
           onChangeText={v => update('servingSize', v)}

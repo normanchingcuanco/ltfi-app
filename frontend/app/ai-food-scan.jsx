@@ -104,7 +104,7 @@ export default function AIFoodScanScreen() {
         mealType,
         food: {
           name: result.name,
-          quantity: 100,
+          quantity: result.servingSize || 100,
           unit: result.servingUnit || 'g',
           calories: result.calories,
           protein: result.protein,
@@ -172,7 +172,7 @@ export default function AIFoodScanScreen() {
               <Text style={styles.macroLabel}>Fat</Text>
             </View>
           </View>
-          <Text style={styles.disclaimer}>Estimates per 100g. Tap add to log this food.</Text>
+          <Text style={styles.disclaimer}>Estimates per {result.servingSize || 100} {result.servingUnit || 'g'}. Tap add to log this food.</Text>
           <TouchableOpacity style={styles.addBtn} onPress={addFood} disabled={adding}>
             <Text style={styles.addBtnText}>{adding ? 'Adding...' : 'Add to Diary'}</Text>
           </TouchableOpacity>

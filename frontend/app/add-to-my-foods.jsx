@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Activi
 import { useRouter } from 'expo-router';
 import api from '../src/utils/api';
 
-const UNITS = ['g', 'oz', 'ml', 'cup', 'tbsp', 'tsp', 'pc', 'serving'];
+const UNITS = ['g', 'oz', 'ml', 'cup', 'tbsp', 'tsp', 'pc', 'pack', 'serving'];
 
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {
@@ -21,7 +21,7 @@ export default function AddToMyFoodsScreen() {
   const [form, setForm] = useState({
     name: '', calories: '', protein: '', carbs: '',
     fat: '', fiber: '', sodium: '', sugar: '',
-    servingSize: '100', servingUnit: 'g'
+    servingSize: '1', servingUnit: 'serving'
   });
 
   const update = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
@@ -39,8 +39,8 @@ export default function AddToMyFoodsScreen() {
         fiber: Number(form.fiber) || 0,
         sodium: Number(form.sodium) || 0,
         sugar: Number(form.sugar) || 0,
-        servingSize: Number(form.servingSize) || 100,
-        servingUnit: form.servingUnit || 'g'
+        servingSize: Number(form.servingSize) || 1,
+        servingUnit: form.servingUnit || 'serving'
       });
       router.back();
     } catch (err) {
@@ -92,7 +92,7 @@ export default function AddToMyFoodsScreen() {
         <Text style={styles.label}>Serving Size</Text>
         <TextInput
           style={styles.input}
-          placeholder="100"
+          placeholder="1"
           placeholderTextColor="#999"
           value={form.servingSize}
           onChangeText={v => update('servingSize', v)}
