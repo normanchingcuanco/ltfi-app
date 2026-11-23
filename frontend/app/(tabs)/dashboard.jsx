@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -104,9 +104,19 @@ export default function DashboardScreen() {
 
   const isWeekly = viewMode === 'weekly';
 
+  // Same plan math as the Profile screen
+  const maintenance = user?.dailyCalorieGoal || 0;
+  const floor = user?.minCalories || 1200;
+  const hasPlan = !!(user?.currentWeight && user?.goalWeight && user.currentWeight > user.goalWeight);
+  const maxDeficit = Math.max(maintenance - floor, 0);
+  const savedDeficit = user?.dailyDeficit || 500;
+  const deficit = hasPlan ? (maxDeficit > 0 ? Math.min(savedDeficit, maxDeficit) : savedDeficit) : 0;
+  const goal = hasPlan && maintenance > 0 ? Math.max(maintenance - deficit, floor) : maintenance;
+
   const consumed = isWeekly ? (weeklyAvg?.calories || 0) : (summary?.totalCalories || 0);
-  const goal = user?.dailyCalorieGoal || 0;
-  const remaining = isWeekly ? Math.max(goal - consumed, 0) : Math.max(goal - consumed + caloriesBurned, 0);
+  const leftRaw = isWeekly ? goal - consumed : goal - consumed + caloriesBurned;
+  const isOver = goal > 0 && leftRaw < 0;
+  const remaining = Math.abs(leftRaw);
   const progress = goal > 0 ? Math.min(consumed / (isWeekly ? goal : (goal + caloriesBurned)), 1) : 0;
 
   const proteinConsumed = isWeekly ? (weeklyAvg?.protein || 0) : (summary?.totalProtein || 0);
@@ -174,17 +184,20 @@ export default function DashboardScreen() {
             <Text style={styles.calorieLabel}>Eaten</Text>
           </View>
           <View style={styles.calorieCenter}>
-            <Text style={styles.calorieGoalValue}>{remaining}</Text>
-            <Text style={styles.calorieGoalLabel}>Remaining</Text>
+            <Text style={[styles.calorieGoalValue, isOver && { color: '#E05A2B' }]}>{remaining}</Text>
+            <Text style={styles.calorieGoalLabel}>{isOver ? 'Over' : 'Remaining'}</Text>
           </View>
           <View style={styles.calorieItem}>
             <Text style={styles.calorieValue}>{goal}</Text>
-            <Text style={styles.calorieLabel}>Goal</Text>
+            <Text style={styles.calorieLabel}>{hasPlan ? 'Target' : 'Goal'}</Text>
           </View>
         </View>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: progress >= 1 ? '#E05A2B' : '#F77E2D' }]} />
         </View>
+        {hasPlan && maintenance > 0 && (
+          <Text style={styles.planText}>Maintenance {maintenance} − Deficit {deficit} = Target {goal}</Text>
+        )}
         {!isWeekly && caloriesBurned > 0 && (
           <Text style={styles.burnedText}>🔥 {caloriesBurned} kcal burned from workouts {isToday ? 'today' : 'that day'}</Text>
         )}
@@ -246,6 +259,7 @@ const styles = StyleSheet.create({
   calorieGoalLabel: { fontSize: 11, color: '#888', marginTop: 2, textTransform: 'uppercase', letterSpacing: 1 },
   progressBar: { height: 8, backgroundColor: '#C5BFB4', borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: 8, borderRadius: 4 },
+  planText: { fontSize: 11, color: '#888', marginTop: 10, textAlign: 'center' },
   burnedText: { fontSize: 12, color: '#F77E2D', marginTop: 10, textAlign: 'center' },
   macrosRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   macroCard: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 16, padding: 16, alignItems: 'center' },

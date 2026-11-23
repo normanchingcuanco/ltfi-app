@@ -63,6 +63,15 @@ export default function HealthScreen() {
     }
   };
 
+  
+  if (Platform.OS === 'android') return (
+    <View style={styles.center}>
+      <Text style={styles.cardIcon}>🌙</Text>
+      <Text style={styles.unavailableTitle}>Health sync is coming to Android</Text>
+      <Text style={styles.unavailableText}>Steps and sleep sync is not available yet. Stay tuned.</Text>
+    </View>
+  );
+
   if (loading) return (
     <View style={styles.center}>
       <ActivityIndicator size="large" color="#F77E2D" />
