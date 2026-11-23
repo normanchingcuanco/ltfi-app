@@ -11,7 +11,7 @@ const UNIT_TO_GRAMS = {
   oz: 28.35
 };
 
-const CUSTOM_UNITS = ['pc', 'serving', 'cup', 'tbsp', 'tsp'];
+const gramsOf = (u, n) => (UNIT_TO_GRAMS[u] !== undefined ? n * UNIT_TO_GRAMS[u] : null);
 
 const showAlert = (title, message, buttons) => {
   if (Platform.OS === 'web') {
@@ -41,8 +41,8 @@ export default function AddFoodScreen() {
 
   const [selectedFood, setSelectedFood] = useState(null);
   const [quantity, setQuantity] = useState('1');
-  const [unit, setUnit] = useState('pc');
-  const [unitGrams, setUnitGrams] = useState('100');
+  const [unit, setUnit] = useState('serving');
+  const [unitGrams, setUnitGrams] = useState('');
   const [showQuantityPicker, setShowQuantityPicker] = useState(false);
 
   useEffect(() => {
@@ -125,32 +125,45 @@ export default function AddFoodScreen() {
     }
   };
 
+  // Calories and macros on every food are per its own serving size + serving unit.
   const handleAddPress = (food) => {
     setSelectedFood(food);
-    setQuantity('1');
-    setUnit(food.servingUnit || 'pc');
-    setUnitGrams(food.servingSize?.toString() || '100');
+    setUnit(food.servingUnit || 'serving');
+    setQuantity(food.servingSize ? String(food.servingSize) : '1');
+    setUnitGrams('');
     setShowQuantityPicker(true);
   };
 
-  const getTotalGrams = () => {
+  // How many of the food's servings the logged amount equals.
+  // Returns null when the grams equivalent is still needed.
+  const getRatio = () => {
+    if (!selectedFood) return 0;
     const qty = parseFloat(quantity) || 0;
-    if (unit === 'serving' || unit === 'pc') {
-      return qty * 100;
+    const foodSize = parseFloat(selectedFood.servingSize) || 1;
+    const foodUnit = selectedFood.servingUnit || 'serving';
+
+    if (unit === foodUnit) return qty / foodSize;
+
+    const logGrams = gramsOf(unit, qty);
+    const foodGrams = gramsOf(foodUnit, foodSize);
+
+    if (logGrams !== null && foodGrams !== null) return logGrams / foodGrams;
+    if (logGrams === null && foodGrams !== null) return qty;
+    if (logGrams !== null && foodGrams === null) {
+      const g = parseFloat(unitGrams);
+      return g > 0 ? logGrams / g : null;
     }
-    if (UNIT_TO_GRAMS[unit] !== undefined) {
-      return qty * UNIT_TO_GRAMS[unit];
-    }
-    return qty * (parseFloat(unitGrams) || 100);
+    return qty / foodSize;
   };
 
   const confirmAdd = async () => {
     if (!selectedFood) return;
+    const ratio = getRatio();
+    if (ratio === null) return;
+
     setAdding(true);
     setShowQuantityPicker(false);
 
-    const totalGrams = getTotalGrams();
-    const ratio = totalGrams / 100;
     const qty = parseFloat(quantity) || 1;
 
     try {
@@ -196,9 +209,14 @@ export default function AddFoodScreen() {
     ]);
   };
 
-  const totalGrams = getTotalGrams();
-  const calculatedCalories = selectedFood ? Math.round(selectedFood.calories * totalGrams / 100) : 0;
-  const needsGramEquivalent = CUSTOM_UNITS.includes(unit) && !UNIT_TO_GRAMS[unit] && unit !== 'serving' && unit !== 'pc';
+  const ratio = selectedFood ? getRatio() : 0;
+  const calculatedCalories = selectedFood && ratio !== null ? Math.round(selectedFood.calories * ratio) : null;
+  const foodSizeLabel = selectedFood ? (parseFloat(selectedFood.servingSize) || 1) : 1;
+  const foodUnitLabel = selectedFood ? (selectedFood.servingUnit || 'serving') : 'serving';
+  const needsGramEquivalent = !!selectedFood
+    && UNIT_TO_GRAMS[unit] !== undefined
+    && UNIT_TO_GRAMS[foodUnitLabel] === undefined
+    && unit !== foodUnitLabel;
 
   const renderFoodItem = (food, idx, showActions = false) => (
     <View key={idx} style={[styles.resultItem, (food.source === 'custom' || food.source === 'open_food_facts' || food.createdBy) && styles.resultItemCustom]}>
@@ -213,9 +231,7 @@ export default function AddFoodScreen() {
         </View>
         <Text style={styles.resultMacros}>
           {food.calories} kcal · {food.protein}g P · {food.carbs}g C · {food.fat}g F
-          {food.servingSize && food.source !== 'usda' && food.source !== 'open_food_facts' && food.servingSize !== 100
-            ? ` per ${food.servingSize}${food.servingUnit || 'g'}`
-            : ''}
+          {food.servingSize ? ` per ${food.servingSize} ${food.servingUnit || 'g'}` : ''}
         </Text>
       </View>
       <View style={styles.itemActions}>
@@ -354,14 +370,7 @@ export default function AddFoodScreen() {
                 style={styles.quantityInput}
                 keyboardType="numeric"
                 value={quantity}
-                onChangeText={(val) => {
-                  setQuantity(val);
-                  if (unit === 'g' || unit === 'ml') {
-                    const grams = parseFloat(val) || 0;
-                    const ratio = grams / 100;
-                    setUnitGrams(val);
-                  }
-                }}
+                onChangeText={setQuantity}
                 autoFocus
               />
               <Text style={styles.quantityUnit}>{unit}</Text>
@@ -381,13 +390,13 @@ export default function AddFoodScreen() {
 
             {needsGramEquivalent && (
               <View style={styles.gramEquivRow}>
-                <Text style={styles.gramEquivLabel}>1 {unit} =</Text>
+                <Text style={styles.gramEquivLabel}>{foodSizeLabel} {foodUnitLabel} =</Text>
                 <TextInput
                   style={styles.gramEquivInput}
                   keyboardType="numeric"
                   value={unitGrams}
                   onChangeText={setUnitGrams}
-                  placeholder="100"
+                  placeholder="grams"
                   placeholderTextColor="#999"
                 />
                 <Text style={styles.gramEquivLabel}>g</Text>
@@ -395,11 +404,10 @@ export default function AddFoodScreen() {
             )}
 
             <Text style={styles.caloriePreview}>
-              {calculatedCalories} kcal
-              {totalGrams > 0 && <Text style={styles.gramsHint}> ({Math.round(totalGrams)}g)</Text>}
+              {calculatedCalories === null ? 'Enter the grams above' : `${calculatedCalories} kcal`}
             </Text>
 
-            <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd} disabled={adding}>
+            <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd} disabled={adding || ratio === null}>
               {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Add to {mealType}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowQuantityPicker(false)}>
