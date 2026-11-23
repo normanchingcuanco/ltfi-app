@@ -128,13 +128,14 @@ An Expo-based mobile and web app that:
 | AI Food Scanning | Groq API — Qwen 3.8 27B vision model (free tier) | Free |
 | Image Hosting | Cloudinary (free tier, unsigned upload preset + Admin API delete) | Free |
 | Email | Gmail SMTP via Nodemailer | Free |
-| Health Data | Apple HealthKit (deferred) | Free |
-| Wearable | Colmi Ring via QRing → HealthKit pipeline (deferred) | Free |
+| Health Data | iPhone Shortcut reads Apple Health and posts steps and sleep to the backend (live). Apple HealthKit native build deferred | Free |
+| Wearable | Colmi Ring via QRing → Apple Health → iPhone Shortcut → backend (live). Direct HealthKit read deferred | Free |
 | Hosting (Frontend) | Vercel free tier | Free |
 | Hosting (Backend) | Render free tier | Free |
 | Mobile Builds | EAS Build free tier | Free |
 | OTA Updates | EAS Update free tier | Free |
 | Audio | expo-audio (migrated from deprecated expo-av in SDK 57) | Free |
+| Date Picker | @react-native-community/datetimepicker (ships inside Expo Go) | Free |
 
 ---
 
@@ -148,6 +149,7 @@ ltfi/
 │   │   ├── authController.js
 │   │   ├── exerciseController.js
 │   │   ├── foodController.js
+│   │   ├── healthController.js
 │   │   ├── mealController.js
 │   │   ├── recipeController.js
 │   │   ├── weightController.js
@@ -158,6 +160,7 @@ ltfi/
 │   │   ├── User.js
 │   │   ├── ExerciseLog.js
 │   │   ├── Food.js
+│   │   ├── HealthDaily.js
 │   │   ├── Meal.js
 │   │   ├── Recipe.js
 │   │   ├── Weight.js
@@ -167,6 +170,7 @@ ltfi/
 │   │   ├── auth.js
 │   │   ├── exercises.js
 │   │   ├── food.js
+│   │   ├── health.js
 │   │   ├── meals.js
 │   │   ├── recipes.js
 │   │   ├── weight.js
@@ -263,6 +267,7 @@ ltfi/
 | dailyDeficit | Number | Daily calorie deficit for the weight loss plan, default 500. Weeks to goal are always derived from it at 7700 kcal per kg |
 | minCalories | Number | Minimum daily calorie floor for the weight loss target, default 1200, user-adjustable with no hard stop |
 | macroGoals | Object | { protein, carbs, fat } in grams. Calculated from the daily target (maintenance minus deficit, never below minCalories) while above goal weight, otherwise from maintenance |
+| healthSyncTokenHash | String | SHA-256 hash of the health sync token, `select: false`. The raw token is shown once when generated and never stored |
 | avatarInitials | String | Auto-generated from name |
 | resetToken | String | Password reset flow |
 | resetTokenExpiry | Date | 1 hour expiry |
@@ -352,6 +357,18 @@ ltfi/
 | week | Number | Manually settable — auto-increments by 1 each new calendar week (Mon-based) relative to the last logged week for that exercise, unless explicitly overridden |
 | sets | Array | [{ setNumber, weight, reps }] — weight always stored in kg regardless of the user's display unit; editable after the fact from the Exercise History screen |
 | notes | String | Session notes; supports plain URLs and named links in the form `[Label](https://...)`; carries forward from the most recent day with real content when today has no entry yet; editable from both the Tracker and the Exercise History screen |
+
+### Health Daily
+
+| Field | Type | Notes |
+|-------|------|-------|
+| _id | ObjectId | PK |
+| user | ObjectId | Ref: User |
+| date | String | YYYY-MM-DD in the user's timezone. Unique together with user |
+| steps | Number | Null until synced. Display only, never used in calorie math |
+| sleepMinutes | Number | Null until synced. Total time asleep in minutes |
+| source | String | Default `shortcut` |
+| syncedAt | Date | Last time a sync wrote this day |
 
 ---
 
@@ -469,6 +486,10 @@ ltfi/
 | Diary Focus Refresh | Diary re-fetches data every time user navigates to it | ✅ Done |
 | Weigh-in Updates Profile | Logging a weight sets the profile's current weight to the newest entry by date (a backdated entry does not override it), recalculates the daily calorie goal and macros, and the app refreshes the Profile tab from the `POST /weight` response | ✅ Done |
 | Delete Rolls Profile Back | Deleting a weigh-in sets the profile weight back to the latest remaining entry and recalculates; deleting the only entry leaves the profile weight unchanged | ✅ Done |
+| Home Shows Deficit Target | The calorie card's Goal becomes Target (maintenance minus the saved deficit, never below minCalories) while the user is above goal weight, using the same math as the Profile plan card. With no weight loss plan it falls back to maintenance and the label stays Goal | ✅ Done |
+| Plan Breakdown Line | Under the progress bar: Maintenance X − Deficit Y = Target Z | ✅ Done |
+| Distance to Maintenance | A second line shows how many kcal under or over maintenance the day is, including workout calories in Daily view | ✅ Done |
+| Over Target State | Past the target the large number turns red and reads Over, instead of stopping at 0 | ✅ Done |
 
 #### 5. Profile
 
@@ -572,7 +593,7 @@ ltfi/
 | Distance | Read daily distance from HealthKit | ⏸ On hold |
 | Multi-sport Workout Sync | Sync completed workouts from HealthKit | ⏸ On hold |
 | Colmi Ring Integration | Colmi ring data flows via QRing app into HealthKit — no direct integration needed | ⏸ On hold |
-| Health Screen UI | Dashboard showing steps, heart rate, calories, sleep, distance | ✅ Built — pending native build |
+| Health Screen UI | Dashboard showing steps, heart rate, calories, sleep, distance | ✅ Built — pending native build. The live Health tab currently uses the Shortcut sync below (steps and sleep only) |
 | HealthKit Utility Layer | Platform-aware data fetching from HealthKit | ✅ Built — pending native build |
 
 #### Android — Google Health Connect
@@ -585,6 +606,21 @@ ltfi/
 | Heart Rate | Read heart rate data from Health Connect | ⬜ Not Built |
 | Sleep Tracking | Read sleep duration from Health Connect | ⬜ Not Built |
 | Distance | Read daily distance from Health Connect | ⬜ Not Built |
+| Android Coming Soon Note | The Health tab shows a coming soon message on Android until Health Connect is built | ✅ Done |
+
+#### iPhone Shortcut Sync (live, no native build)
+
+> Steps and sleep from the QRing ring reach LTFI without a native build. An iPhone Shortcut reads Apple Health and posts to the backend, and the Health tab reads it back. Steps and sleep are display only and never change the calorie goal, deficit or remaining.
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Health Sync Token | `POST /api/health/token` (logged in) generates a random token, returns it once and stores only its SHA-256 hash on the user | ✅ Done |
+| Sync Endpoint | `POST /api/health/sync` with header `x-health-token` and a JSON body of `steps` and/or `sleepMinutes` (optional `date`, defaults to today in the user's timezone). Upserts one HealthDaily document per user per day, and sending only steps does not wipe sleep | ✅ Done |
+| Read Endpoint | `GET /api/health?date=YYYY-MM-DD` (logged in) returns steps, sleepMinutes and syncedAt, with nulls when the day has no data | ✅ Done |
+| Health Tab | Steps and sleep cards with last synced time, a Refresh button and a Try Again state. No HealthKit | ✅ Done |
+| Date Picker | Tap the date to open a calendar popup and view any past day. Includes a Today button and blocks future dates | ✅ Done |
+| Sync Shortcut | Sync QRing Steps reads today's steps (source QRing) from Apple Health, sums last night's sleep durations (seconds divided by 60 for minutes) and posts each to the sync endpoint | ✅ Done |
+| Automations | Three Time of Day automations run the shortcut daily at 6:00 AM, 2:00 PM and 10:00 PM | ✅ Done |
 
 ---
 
@@ -656,6 +692,15 @@ ltfi/
 | Groq models get deprecated and shut down | AI Food Scan | Check https://console.groq.com/docs/deprecations before assuming an AI scan failure is an app bug. If Render logs show `404 model_not_found`, swap the `model` value in `backend/controllers/aiScanController.js` for the replacement Groq lists, then redeploy the backend (the frontend does not need to change) |
 | Render free tier: 750 instance hours per month, shared across all services in the workspace | Backend hosting | Services sleep after 15 minutes idle. The keepalive job keeps the backend awake 24/7, which uses roughly 720 hours a month on its own — check Render Billing / Included Usage if other services share the workspace, since running out of hours takes every service in it offline |
 | Expo Go over LAN timed out ("The request timed out") even with Local Network permission granted | Development process only | Use a tunnel instead: set `$env:EXPO_TOKEN` to an Expo access token (expo.dev/settings/access-tokens) in PowerShell, then run `npx expo start --tunnel -c`. Use PowerShell rather than Git Bash, because Git Bash does not render the QR code. Delete the token when finished — never paste it into chat or commit it |
+
+| Health data only reaches LTFI after QRing syncs to Apple Health | iOS | The shortcut reads Apple Health, which only updates when the QRing app has synced the ring. LTFI shows the last synced time on the Health tab |
+| Sleep total can read slightly higher than Apple Health | iOS | On the one night checked, the shortcut summed 319 min against 307 min asleep in Apple Health. Filtering out Awake samples in Shortcuts made it worse, so that filter was removed. Display only |
+| Steps and sleep are display only | Both | They do not change the calorie goal, deficit or remaining calories |
+| Past days only exist from the first sync | Both | The date picker shows No data for this day for dates before syncing started |
+| Health sync is iPhone only | Android | The Health tab shows a coming soon note. Android would need Health Connect, which needs a native build |
+| Health sync token is a credential | iOS | Anyone with it can write steps and sleep for the account. If it is exposed, call `POST /api/health/token` again and update the `x-health-token` header in the shortcut |
+| Shortcut runs with the phone locked are not verified | iOS | Whether Apple Health can be read while the phone is locked at the 6:00 AM run has not been confirmed yet |
+| Describe-a-shortcut box does not reliably create automations | iOS | Build each Time of Day automation manually: Automation tab, plus, Edit, Automation, Time of Day, then Run Shortcut |
 
 ---
 
@@ -762,6 +807,23 @@ Everything else — including the timer, its sounds and voice, the barcode scann
 **Day-to-day, PC-required testing:** run `npx expo start -c` in `frontend/`, then open Expo Go and tap the auto-detected server under "Development servers." This always reflects whatever code is currently on disk, saved or not yet committed. If Expo Go times out over WiFi, use `npx expo start --tunnel -c` instead (see Known Limitations).
 
 **PC-free testing:** publish the current code with `eas update --channel preview`, then open Expo Go → **PROJECTS → ltfi**. This loads the most recently published bundle with no PC or Metro server needed at all — but it will only ever reflect what was last explicitly published, so re-run the update command after making changes you want to test this way.
+
+---
+
+## iPhone Health Sync Setup
+
+Steps and sleep from the QRing ring show on the Health tab through an iPhone Shortcut. No Apple Developer account or native build is needed.
+
+1. Log in to get a JWT, then call `POST /api/health/token` with header `Authorization: Bearer <JWT>`. Copy the returned token, it is shown once.
+2. In the Shortcuts app create a shortcut named Sync QRing Steps:
+   - Find Health Samples: Type Steps, Start Date is today, Source is QRing. Then Calculate the Sum.
+   - Get Contents of URL: `POST https://ltfi-backend.onrender.com/api/health/sync`, headers `Content-Type: application/json` and `x-health-token: <token>`, JSON body field `steps` set to the Sum.
+   - Find Health Samples: Type Sleep, Start Date is in the last 2 days, End Date is today. Get Duration, then Calculate the Sum.
+   - Calculate: Sum ÷ 60.
+   - Get Contents of URL: same URL and headers, JSON body field `sleepMinutes` set to the Calculation Result.
+3. Allow Health read access for Steps and Sleep when Shortcuts asks.
+4. Create three automations (Automation tab, plus, Edit, Automation, Time of Day, Run Shortcut, Sync QRing Steps) at 6:00 AM, 2:00 PM and 10:00 PM, daily.
+5. Open the Health tab in the app. Use the date at the top to view past days.
 
 ---
 
