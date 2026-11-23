@@ -196,7 +196,12 @@ export default function DashboardScreen() {
           <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: progress >= 1 ? '#E05A2B' : '#F77E2D' }]} />
         </View>
         {hasPlan && maintenance > 0 && (
-          <Text style={styles.planText}>Maintenance {maintenance} − Deficit {deficit} = Target {goal}</Text>
+          <>
+            <Text style={styles.planText}>Maintenance {maintenance} − Deficit {deficit} = Target {goal}</Text>
+            <Text style={styles.planText}>
+              {Math.abs(maintenance - consumed + (isWeekly ? 0 : caloriesBurned))} kcal {maintenance - consumed + (isWeekly ? 0 : caloriesBurned) >= 0 ? 'under' : 'over'} maintenance
+            </Text>
+          </>
         )}
         {!isWeekly && caloriesBurned > 0 && (
           <Text style={styles.burnedText}>🔥 {caloriesBurned} kcal burned from workouts {isToday ? 'today' : 'that day'}</Text>
