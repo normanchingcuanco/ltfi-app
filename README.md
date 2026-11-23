@@ -136,6 +136,7 @@ An Expo-based mobile and web app that:
 | OTA Updates | EAS Update free tier | Free |
 | Audio | expo-audio (migrated from deprecated expo-av in SDK 57) | Free |
 | Date Picker | @react-native-community/datetimepicker (ships inside Expo Go) | Free |
+| Timer Notifications | expo-notifications (local scheduled notifications, works in Expo Go) | Free |
 
 ---
 
@@ -571,7 +572,7 @@ ltfi/
 | Edit Exercise History Entry | Pencil icon on any past log opens inline editing for its sets (weight/reps, add/remove rows) and notes, saved via `PUT /exercises/:id` | ✅ Done |
 | Delete Exercise | ✕ button on each exercise card deletes the exercise and all its logged history via `DELETE /exercises/by-name/:exercise` | ✅ Done |
 | Back Navigation Fix | Root layout switched from Slot to Stack so pushed screens (e.g. exercise history) correctly pop back to the previous tab instead of resetting to Home | ✅ Done |
-| Background Timer | Timer continues running when app is backgrounded | ⬜ On hold — requires native build |
+| Background Timer | Timer keeps correct time and buzzes at every phase change while the app is backgrounded or the phone is locked. `timer.jsx` flattens the workout into timed segments driven by end timestamps (not a per-second counter), so the countdown catches up to the right spot when you return. At start or resume it schedules up to 60 upcoming phase changes as local notifications via `expo-notifications` (iOS keeps only the 64 soonest pending per app). Notification permission is requested on Start Workout. In the foreground the in-app sounds and voice play and system notifications are hidden. Pause, reset, skip, quit and leaving the screen cancel pending notifications | ✅ Done — works in Expo Go, no native build needed |
 | iOS Sound Effects | Timer sound effects on iPhone | ✅ Done — resolved by the expo-av → expo-audio migration; does **not** require a native build, works in Expo Go |
 
 ---
@@ -670,8 +671,9 @@ ltfi/
 
 | Limitation | Platform | Resolution |
 |------------|----------|------------|
-| Timer pauses when app is backgrounded | iOS + Android | On hold — requires native build |
-| Background timer | Both | On hold — requires native build |
+| Background timer uses the default notification sound only | iOS | Custom sounds and voice cues only play while the app is open. Background buzz uses the system notification sound at ringer volume, shows a banner, and is muted by the silent switch or Focus. A custom sound or true background audio needs a native build |
+| Countdown does not update on screen while backgrounded | iOS + Android | Expected. The display catches up to the correct time when the app returns to the foreground, and notifications fire on schedule meanwhile |
+| Background buzz needs notification permission | iOS + Android | If denied, the timer still runs but shows a hint that background buzz is off |
 | `@zxing/library@0.23.0` requests Node ≥24 | Backend build only | EAS's build image currently runs Node 22.23.1; this only surfaces as an `EBADENGINE` warning during `npm ci`, not a failure — noted here as a watch item if the web barcode scanner (which uses this library) ever misbehaves |
 | Progress photos logged before the Cloudinary cleanup fix have no stored public_id | Both | Those images will remain in Cloudinary storage even after the weight entry is deleted; negligible at current free-tier usage (25GB) |
 | Exercise notes/sets lost before the unified Save button and stale-data fixes shipped | Both | Data wiped by the earlier auto-save race condition cannot be recovered automatically — re-enter it manually; the underlying bug is fixed going forward |
@@ -798,9 +800,9 @@ This project's iOS testing has always run entirely through **Expo Go**, which ne
 
 - A standalone `.ipa` build (an installable app outside Expo Go)
 - App Store or TestFlight distribution
-- Native features that genuinely cannot run inside Expo Go's sandbox — currently just Apple HealthKit and the background timer
+- Native features that genuinely cannot run inside Expo Go's sandbox — currently just Apple HealthKit and background audio (custom sounds while backgrounded)
 
-Everything else — including the timer, its sounds and voice, the barcode scanner, and AI food scanning — runs correctly through Expo Go on a real iPhone with no paid account.
+Everything else — including the timer, its sounds and voice, background buzz via notifications, the barcode scanner, and AI food scanning — runs correctly through Expo Go on a real iPhone with no paid account.
 
 **Expo Go version note:** Expo Go on iOS always updates to the latest SDK and cannot be downgraded, so the project's SDK must match it (currently SDK 58). A mismatch shows Project is incompatible with this version of Expo Go.
 
