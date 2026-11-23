@@ -29,7 +29,8 @@ const userSchema = new mongoose.Schema({
   resetToken: { type: String },
   resetTokenExpiry: { type: Date },
   timezone: { type: String, default: '' },
-  weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' }
+  weightUnit: { type: String, enum: ['kg', 'lbs'], default: 'kg' },
+  healthSyncTokenHash: { type: String, select: false }
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {
