@@ -285,15 +285,15 @@ ltfi/
 | _id | ObjectId | PK |
 | name | String | |
 | barcode | String | Optional |
-| calories | Number | Per 100g or per serving |
+| calories | Number | Per serving, where one serving is servingSize x servingUnit. Protein, carbs, fat, fiber, sodium and sugar use the same basis |
 | protein | Number | |
 | carbs | Number | |
 | fat | Number | |
 | fiber | Number | |
 | sodium | Number | |
 | sugar | Number | |
-| servingSize | Number | Default 100 |
-| servingUnit | String | g / oz / ml / cup / tbsp / tsp / pc / serving |
+| servingSize | Number | Size of one serving, in servingUnit. The schema default is 100, which matches USDA and Open Food Facts results (per 100 g). The food forms start at 1 |
+| servingUnit | String | g / oz / ml / cup / tbsp / tsp / pc / pack / serving |
 | source | String | open_food_facts / ai_scan / custom |
 | createdBy | ObjectId | Ref: User — null if from public DB |
 
@@ -419,7 +419,7 @@ ltfi/
 | AI Scan Image Compression | Compress image to stay under Groq's base64 payload limit | ✅ Done |
 | AI Scan Saves to My Foods | AI-scanned results now create a Food doc automatically, matching barcode behavior | ✅ Done |
 | My Foods Backfill Script | One-time script (`backend/scripts/backfillMyFoods.js`) that scans historical meal logs and creates missing Food docs for any food that was logged before the AI Scan → My Foods fix existed | ✅ Done |
-| Custom Food Entry | Manual entry form with unit picker (g, oz, ml, cup, tbsp, tsp, pc, serving) | ✅ Done |
+| Custom Food Entry | Manual entry form with unit picker (g, oz, ml, cup, tbsp, tsp, pc, pack, serving). A new food starts at 1 serving, and the calories and macros you type are for that serving | ✅ Done |
 | Edit Custom Food | Edit name, macros, serving size and unit of saved custom foods | ✅ Done |
 | Add to My Foods | Add food to library without logging to a meal | ✅ Done |
 | My Foods | View, edit, search, paginate, and delete custom foods | ✅ Done |
@@ -427,7 +427,13 @@ ltfi/
 | My Foods Shortcut | Quick access to My Foods from the diary page | ✅ Done |
 | Seeded PH Foods | Jollibee, McDonald's PH, Chowking, Starbucks PH, eggs seeded to DB | ✅ Done |
 | Quantity Picker | Select serving size and auto-scale macros before adding food to diary | ✅ Done |
-| Serving/PC Unit Fix | 1 serving or 1 pc correctly maps to 100% of calories without 100g lock | ✅ Done |
+| Serving/PC Unit Fix | 1 serving or 1 pc correctly maps to 100% of calories without 100g lock (superseded by Serving-Based Logging below, which removed the hardcoded 100 g for pc and serving) | ✅ Done |
+| Serving-Based Logging | The log screen in `add-food.jsx` no longer assumes calories are per 100 g. Calories and macros on every food are per its own servingSize and servingUnit, and the amount you log is converted against that. Mayo saved as 100 kcal per 15 g logs 100 kcal for 15 g, Spam saved as 180 kcal per 56 g logs 180 kcal for 56 g, and 3 pc of a 6 pc serving logs half the calories. The log box opens pre-filled with the food's serving size. USDA and Open Food Facts results are saved with a 100 g serving, so they follow the same rule | ✅ Done |
+| Pack Unit | New pack unit in the log screen and in the Custom Food, Add to My Foods and Edit Food forms. Logging a whole serving or a whole pack counts as one serving of the food | ✅ Done |
+| Equivalent Prompt | When the app cannot convert between units, the log box asks for the missing number instead of guessing: grams for a food saved in pieces, packs or servings, or pieces per serving or pack when logging pc against a food saved as a pack or serving. The Add button stays disabled until it is filled | ✅ Done |
+| Add Food Error Message | A failed save from the log screen now shows an error with the server's message and keeps the log box open. Before, the box closed and nothing was shown | ✅ Done |
+| Food Form Defaults | Custom Food, Add to My Foods and Edit Food no longer default the serving to 100 g. A new food starts at 1 serving | ✅ Done |
+| AI Scan Logs Real Serving | `ai-food-scan.jsx` logs the quantity as the scan result's serving size instead of a hardcoded 100, and the note on the result card shows the real serving | ✅ Done |
 | Recipe Builder | Build a recipe from multiple ingredients with unit picker and macro scaling | ✅ Done |
 | Edit Recipe | Full edit screen (`edit-recipe.jsx`) — loads existing recipe, converts logged macros back to per-100g base values for correct unit/quantity rescaling, saves via `PUT /recipes/:id` | ✅ Done |
 | Recipes Screen | View, edit, delete, and add recipes to diary | ✅ Done |
@@ -644,6 +650,9 @@ ltfi/
 | Expo Go on iOS only runs the latest SDK | iOS | The project must be on the SDK that Expo Go currently supports (58). An older project shows Project is incompatible with this version of Expo Go, and the only fix is upgrading the project |
 | npm install can hit ERESOLVE after SDK upgrades | Development process only | `expo-router`'s optional peers can conflict with older installed versions. `npx expo install --fix -- --legacy-peer-deps` resolves it, then run `npx expo-doctor` to catch required peers that flag skipped |
 | Profile weight is only synced from logged weigh-ins | Both | A weight typed manually in Profile is not a logged weigh-in, so adding then deleting weigh-ins returns the profile to the latest logged entry, not to the manually typed value. Deleting your only entry leaves the profile weight unchanged |
+| Foods saved before the serving-based fix can have mixed bases | Both | Found on a scanned bread whose calories were edited to per piece while the macros stayed per 100 g. Open the food in My Foods and make sure calories and every macro are for the same serving size and unit |
+| Diary entries keep the numbers they were logged with | Both | A diary entry stores its calories and macros when it is added, so entries logged before the serving-based fix stay wrong. Delete them and log them again |
+| Pack and pieces are not converted automatically | Both | A pack counts as one serving of the food. The app cannot know how many pieces are in a pack, so logging pc against a food saved as a pack or serving asks for the pieces per pack |
 | Groq models get deprecated and shut down | AI Food Scan | Check https://console.groq.com/docs/deprecations before assuming an AI scan failure is an app bug. If Render logs show `404 model_not_found`, swap the `model` value in `backend/controllers/aiScanController.js` for the replacement Groq lists, then redeploy the backend (the frontend does not need to change) |
 | Render free tier: 750 instance hours per month, shared across all services in the workspace | Backend hosting | Services sleep after 15 minutes idle. The keepalive job keeps the backend awake 24/7, which uses roughly 720 hours a month on its own — check Render Billing / Included Usage if other services share the workspace, since running out of hours takes every service in it offline |
 | Expo Go over LAN timed out ("The request timed out") even with Local Network permission granted | Development process only | Use a tunnel instead: set `$env:EXPO_TOKEN` to an Expo access token (expo.dev/settings/access-tokens) in PowerShell, then run `npx expo start --tunnel -c`. Use PowerShell rather than Git Bash, because Git Bash does not render the QR code. Delete the token when finished — never paste it into chat or commit it |
