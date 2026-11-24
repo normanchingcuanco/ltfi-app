@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -11,8 +11,10 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const passwordRef = useRef(null);
 
   const handleLogin = async () => {
+    if (loading) return;
     if (!email || !password) return setError('All fields required');
     setLoading(true);
     setError('');
@@ -40,15 +42,21 @@ export default function LoginScreen() {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => passwordRef.current?.focus()}
         />
         <View style={styles.passwordRow}>
           <TextInput
+            ref={passwordRef}
             style={styles.passwordInput}
             placeholder="Password"
             placeholderTextColor="#999"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
             <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -16,9 +16,18 @@ export default function RegisterScreen() {
   const { register } = useAuth();
   const router = useRouter();
 
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+  const ageRef = useRef(null);
+  const heightRef = useRef(null);
+  const weightRef = useRef(null);
+  const goalRef = useRef(null);
+  const dietRef = useRef(null);
+
   const update = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
   const handleRegister = async () => {
+    if (loading) return;
     if (!form.name || !form.email || !form.password || !form.age || !form.height || !form.currentWeight || !form.goalWeight) {
       return setError('Please fill in all required fields');
     }
@@ -44,34 +53,112 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.inner} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.inner} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.logo}>LTFI</Text>
         <Text style={styles.tagline}>Create your account</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#999" value={form.name} onChangeText={v => update('name', v)} />
-        <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#999" value={form.email} onChangeText={v => update('email', v)} autoCapitalize="none" keyboardType="email-address" />
+        <TextInput
+          style={styles.input}
+          placeholder="Full Name"
+          placeholderTextColor="#999"
+          value={form.name}
+          onChangeText={v => update('name', v)}
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => emailRef.current?.focus()}
+        />
+        <TextInput
+          ref={emailRef}
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor="#999"
+          value={form.email}
+          onChangeText={v => update('email', v)}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => passwordRef.current?.focus()}
+        />
 
         <View style={styles.passwordRow}>
           <TextInput
+            ref={passwordRef}
             style={styles.passwordInput}
             placeholder="Password"
             placeholderTextColor="#999"
             value={form.password}
             onChangeText={v => update('password', v)}
             secureTextEntry={!showPassword}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => ageRef.current?.focus()}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
             <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>
           </TouchableOpacity>
         </View>
 
-        <TextInput style={styles.input} placeholder="Age" placeholderTextColor="#999" value={form.age} onChangeText={v => update('age', v)} keyboardType="numeric" />
-        <TextInput style={styles.input} placeholder="Height (cm)" placeholderTextColor="#999" value={form.height} onChangeText={v => update('height', v)} keyboardType="numeric" />
-        <TextInput style={styles.input} placeholder="Current Weight (kg)" placeholderTextColor="#999" value={form.currentWeight} onChangeText={v => update('currentWeight', v)} keyboardType="numeric" />
-        <TextInput style={styles.input} placeholder="Goal Weight (kg)" placeholderTextColor="#999" value={form.goalWeight} onChangeText={v => update('goalWeight', v)} keyboardType="numeric" />
-        <TextInput style={styles.input} placeholder="Diet Preference (optional)" placeholderTextColor="#999" value={form.dietPreference} onChangeText={v => update('dietPreference', v)} />
+        <TextInput
+          ref={ageRef}
+          style={styles.input}
+          placeholder="Age"
+          placeholderTextColor="#999"
+          value={form.age}
+          onChangeText={v => update('age', v)}
+          keyboardType="numeric"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => heightRef.current?.focus()}
+        />
+        <TextInput
+          ref={heightRef}
+          style={styles.input}
+          placeholder="Height (cm)"
+          placeholderTextColor="#999"
+          value={form.height}
+          onChangeText={v => update('height', v)}
+          keyboardType="numeric"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => weightRef.current?.focus()}
+        />
+        <TextInput
+          ref={weightRef}
+          style={styles.input}
+          placeholder="Current Weight (kg)"
+          placeholderTextColor="#999"
+          value={form.currentWeight}
+          onChangeText={v => update('currentWeight', v)}
+          keyboardType="numeric"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => goalRef.current?.focus()}
+        />
+        <TextInput
+          ref={goalRef}
+          style={styles.input}
+          placeholder="Goal Weight (kg)"
+          placeholderTextColor="#999"
+          value={form.goalWeight}
+          onChangeText={v => update('goalWeight', v)}
+          keyboardType="numeric"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => dietRef.current?.focus()}
+        />
+        <TextInput
+          ref={dietRef}
+          style={styles.input}
+          placeholder="Diet Preference (optional)"
+          placeholderTextColor="#999"
+          value={form.dietPreference}
+          onChangeText={v => update('dietPreference', v)}
+          returnKeyType="go"
+          onSubmitEditing={handleRegister}
+        />
 
         <Text style={styles.label}>Gender</Text>
         <View style={styles.pills}>
