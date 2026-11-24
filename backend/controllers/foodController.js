@@ -237,11 +237,22 @@ const searchFood = async (req, res) => {
     const pattern = fuzzyPattern(q);
     let localFoods = [];
     if (pattern) {
+      // Shared pool: every saved food is searchable by every user.
       const found = await Food.find({
-        name: { $regex: pattern, $options: 'i' },
-        $or: [{ createdBy: null }, { createdBy: req.user._id }]
-      }).limit(50);
-      localFoods = sortByMatch(found, q).slice(0, 10);
+        name: { $regex: pattern, $options: 'i' }
+      }).limit(200);
+
+      const isMine = (f) =>
+        f.createdBy && f.createdBy.toString() === req.user._id.toString() ? 1 : 0;
+
+      const ranked = [...found].sort((a, b) =>
+        matchScore(b.name, q) - matchScore(a.name, q) ||
+        isMine(b) - isMine(a) ||
+        String(a.name).localeCompare(String(b.name))
+      );
+
+      // One result per name, your own version wins because it sorts first.
+      localFoods = deduplicateResults(ranked).slice(0, 10);
     }
 
     const [usdaFoods, offFoods, calorieApiFoods, apinFoods] = await Promise.all([
@@ -264,10 +275,9 @@ const searchFood = async (req, res) => {
 const getFoodByBarcode = async (req, res) => {
   try {
     const { barcode } = req.params;
-    let food = await Food.findOne({
-      barcode,
-      $or: [{ createdBy: null }, { createdBy: req.user._id }]
-    });
+    // Shared pool: your own saved version first, otherwise anyone's.
+    let food = await Food.findOne({ barcode, createdBy: req.user._id });
+    if (!food) food = await Food.findOne({ barcode });
     if (food) return res.json(food);
 
     const response = await fetchWithTimeout(
