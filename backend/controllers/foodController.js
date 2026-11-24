@@ -318,25 +318,6 @@ const getFoodByBarcode = async (req, res) => {
   }
 };
 
-    const [usdaFoods, offFoods, calorieApiFoods, apinFoods] = await Promise.all([
-      searchUSDA(barcode),
-      searchOFF(barcode),
-      searchCalorieAPI(barcode),
-      searchAPINinjas(barcode)
-    ]);
-
-    const allResults = deduplicateResults([...usdaFoods, ...offFoods, ...calorieApiFoods, ...apinFoods]);
-
-    if (allResults.length > 0) {
-      return res.json(allResults[0]);
-    }
-
-    res.status(404).json({ message: 'Product not found' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
 const getUserFoods = async (req, res) => {
   try {
     const { q, page = 1, limit = 20 } = req.query;
