@@ -2,6 +2,32 @@ const fetch = require('node-fetch');
 const { AbortController } = require('abort-controller');
 const Food = require('../models/Food');
 
+// Fuzzy matching for typing-as-you-search.
+// Ignores spaces and punctuation, allows up to 2 stray characters between
+// letters, and only ever puts letters and digits into the regex (safe).
+const normalizeText = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const fuzzyPattern = (q) => {
+  const chars = normalizeText(q).split('');
+  if (!chars.length) return null;
+  const gap = chars.length >= 4 ? '.{0,2}' : '[^a-z0-9]?';
+  return chars.join(gap);
+};
+
+const matchScore = (name, q) => {
+  const n = normalizeText(name);
+  const nq = normalizeText(q);
+  if (n === nq) return 4;
+  if (n.startsWith(nq)) return 3;
+  if (n.includes(nq)) return 2;
+  return 1;
+};
+
+const sortByMatch = (foods, q) =>
+  [...foods].sort((a, b) =>
+    matchScore(b.name, q) - matchScore(a.name, q) || String(a.name).localeCompare(String(b.name))
+  );
+
 const createFood = async (req, res) => {
   try {
     const { name, calories, protein, carbs, fat, fiber, sodium, sugar, servingSize, servingUnit, barcode } = req.body;
@@ -208,10 +234,15 @@ const searchFood = async (req, res) => {
     const { q } = req.query;
     if (!q) return res.status(400).json({ message: 'Search query required' });
 
-    const localFoods = await Food.find({
-      name: { $regex: q, $options: 'i' },
-      $or: [{ createdBy: null }, { createdBy: req.user._id }]
-    }).limit(10);
+    const pattern = fuzzyPattern(q);
+    let localFoods = [];
+    if (pattern) {
+      const found = await Food.find({
+        name: { $regex: pattern, $options: 'i' },
+        $or: [{ createdBy: null }, { createdBy: req.user._id }]
+      }).limit(50);
+      localFoods = sortByMatch(found, q).slice(0, 10);
+    }
 
     const [usdaFoods, offFoods, calorieApiFoods, apinFoods] = await Promise.all([
       searchUSDA(q),
@@ -297,7 +328,12 @@ const getUserFoods = async (req, res) => {
     };
 
     if (q) {
-      baseQuery.name = { $regex: q, $options: 'i' };
+      const pattern = fuzzyPattern(q);
+      if (pattern) {
+        baseQuery.name = { $regex: pattern, $options: 'i' };
+      } else {
+        return res.json({ foods: [], total: 0, page: parseInt(page), limit: parseInt(limit) });
+      }
     }
 
     const allFoods = await Food.find(baseQuery).sort({ name: 1 });
@@ -314,7 +350,8 @@ const getUserFoods = async (req, res) => {
       }
     });
 
-    const deduped = Array.from(seen.values());
+    let deduped = Array.from(seen.values());
+    if (q) deduped = sortByMatch(deduped, q);
     const total = deduped.length;
     const foods = deduped.slice(skip, skip + parseInt(limit));
 
