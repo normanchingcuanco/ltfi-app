@@ -1,10 +1,32 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const Food = require('../models/Food');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { calculateTDEE, calculateMacros } = require('../utils/calorieCalculator');
 const { sendPasswordResetEmail } = require('../utils/mailer');
 
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
+const isAdminEmail = (email) => {
+  const adminEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+  return !!adminEmail && String(email || '').trim().toLowerCase() === adminEmail;
+};
+
+// Removes a user and everything tied to them. Any model with a "user" field
+// (meals, weights, workouts, recipes, exercise logs, health) is wiped.
+// Foods they created stay in the shared pool with the owner cleared.
+const wipeUserData = async (userId) => {
+  for (const name of mongoose.modelNames()) {
+    if (name === 'User') continue;
+    const model = mongoose.model(name);
+    if (model.schema.path('user')) {
+      await model.deleteMany({ user: userId });
+    }
+  }
+  await Food.updateMany({ createdBy: userId }, { $set: { createdBy: null } });
+  await User.findByIdAndDelete(userId);
+};
 
 const register = async (req, res) => {
   try {
@@ -27,6 +49,7 @@ const register = async (req, res) => {
       dailyCalorieGoal: user.dailyCalorieGoal,
       macroGoals: user.macroGoals,
       weightUnit: user.weightUnit,
+      isAdmin: isAdminEmail(user.email),
       token: generateToken(user._id)
     });
   } catch (err) {
@@ -61,6 +84,7 @@ const login = async (req, res) => {
       timezone: user.timezone,
       exerciseOrder: user.exerciseOrder,
       weightUnit: user.weightUnit,
+      isAdmin: isAdminEmail(user.email),
       token: generateToken(user._id)
     });
   } catch (err) {
@@ -71,7 +95,8 @@ const login = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
-    res.json(user);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ ...user.toObject(), isAdmin: isAdminEmail(user.email) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -191,4 +216,69 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, forgotPassword, resetPassword };
+// User deletes their own account. Password is required as confirmation.
+const deleteMe = async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ message: 'Password required to delete your account' });
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const match = await user.comparePassword(password);
+    if (!match) return res.status(401).json({ message: 'Wrong password' });
+
+    await wipeUserData(user._id);
+    res.json({ message: 'Account deleted' });
+  } catch (err) {
+    console.error('DELETE ACCOUNT ERROR:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Admin only: gate used by the two routes below.
+const requireAdmin = async (req, res) => {
+  const me = await User.findById(req.user.id).select('email');
+  if (!me || !isAdminEmail(me.email)) {
+    res.status(403).json({ message: 'Admin only' });
+    return null;
+  }
+  return me;
+};
+
+const adminListUsers = async (req, res) => {
+  try {
+    const me = await requireAdmin(req, res);
+    if (!me) return;
+    const users = await User.find().select('name email createdAt').sort({ createdAt: -1 });
+    res.json(users.map(u => ({
+      _id: u._id,
+      name: u.name,
+      email: u.email,
+      createdAt: u.createdAt,
+      isAdmin: isAdminEmail(u.email)
+    })));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const adminDeleteUser = async (req, res) => {
+  try {
+    const me = await requireAdmin(req, res);
+    if (!me) return;
+    const target = await User.findById(req.params.id).select('email');
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    if (isAdminEmail(target.email)) {
+      return res.status(400).json({ message: 'The admin account cannot be deleted here' });
+    }
+    await wipeUserData(target._id);
+    res.json({ message: 'User deleted' });
+  } catch (err) {
+    console.error('ADMIN DELETE ERROR:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+module.exports = {
+  register, login, getMe, updateProfile, forgotPassword, resetPassword,
+  deleteMe, adminListUsers, adminDeleteUser
+};

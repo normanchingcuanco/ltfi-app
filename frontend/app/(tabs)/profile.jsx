@@ -36,6 +36,10 @@ export default function ProfileScreen() {
   const [planLoading, setPlanLoading] = useState(false);
   const [planEdited, setPlanEdited] = useState('deficit');
   const [planForm, setPlanForm] = useState({ deficit: '', weeks: '', minCalories: '' });
+  const [deleting, setDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [form, setForm] = useState({
     name: '',
     currentWeight: '',
@@ -159,6 +163,24 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     await logout();
     router.replace('/(auth)/login');
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      setDeleteError('Enter your password to confirm');
+      return;
+    }
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      await api.post('/auth/delete-account', { password: deletePassword });
+      await logout();
+      router.replace('/(auth)/login');
+    } catch (err) {
+      setDeleteError(err.response?.data?.message || 'Could not delete account');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -410,16 +432,57 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {user?.isAdmin && (
+        <TouchableOpacity style={styles.adminBtn} onPress={() => router.push('/admin-users')}>
+          <Text style={styles.adminBtnText}>Manage Users</Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
+
+      {!deleting && (
+        <TouchableOpacity style={styles.deleteLink} onPress={() => setDeleting(true)}>
+          <Text style={styles.deleteLinkText}>Delete Account</Text>
+        </TouchableOpacity>
+      )}
+
+      {deleting && (
+        <View style={styles.deleteCard}>
+          <Text style={styles.deleteWarn}>
+            This permanently deletes your account and all your meals, weights, workouts, recipes and health data. It cannot be undone.
+          </Text>
+          {deleteError ? <Text style={styles.deleteError}>{deleteError}</Text> : null}
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password to confirm"
+            placeholderTextColor="#999"
+            value={deletePassword}
+            onChangeText={setDeletePassword}
+            secureTextEntry
+            autoCapitalize="none"
+            returnKeyType="go"
+            onSubmitEditing={handleDeleteAccount}
+          />
+          <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteAccount} disabled={deleteLoading}>
+            <Text style={styles.deleteBtnText}>{deleteLoading ? 'Deleting...' : 'Delete My Account Forever'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={() => { setDeleting(false); setDeletePassword(''); setDeleteError(''); }}
+          >
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#EDE8DF' },
-  content: { padding: 24, paddingTop: 60 },
+  content: { padding: 24, paddingTop: 60, paddingBottom: 60 },
   header: { alignItems: 'center', marginBottom: 32 },
   avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F77E2D', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   avatarText: { color: '#fff', fontWeight: '900', fontSize: 26 },
@@ -464,6 +527,15 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: '#888', fontWeight: '600' },
   editBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 16 },
   editBtnText: { color: '#fff', fontWeight: '700' },
+  adminBtn: { backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 8 },
+  adminBtnText: { color: '#fff', fontWeight: '700' },
   logoutBtn: { padding: 16, borderRadius: 12, borderWidth: 1.5, borderColor: '#C4BDB2', alignItems: 'center', marginTop: 8 },
-  logoutText: { color: '#888', fontWeight: '600' }
+  logoutText: { color: '#888', fontWeight: '600' },
+  deleteLink: { padding: 16, alignItems: 'center', marginTop: 8 },
+  deleteLinkText: { color: '#FF2D2D', fontWeight: '600', fontSize: 13 },
+  deleteCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20, marginTop: 8, gap: 12 },
+  deleteWarn: { fontSize: 13, color: '#1A1A1A', lineHeight: 19 },
+  deleteError: { fontSize: 13, color: '#FF2D2D', fontWeight: '600' },
+  deleteBtn: { backgroundColor: '#FF2D2D', borderRadius: 12, padding: 14, alignItems: 'center' },
+  deleteBtnText: { color: '#fff', fontWeight: '700' }
 });
