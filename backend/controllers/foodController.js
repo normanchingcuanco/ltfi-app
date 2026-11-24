@@ -46,8 +46,8 @@ const updateFood = async (req, res) => {
   try {
     const food = await Food.findById(req.params.id);
     if (!food) return res.status(404).json({ message: 'Food not found' });
-    if (food.createdBy && food.createdBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized' });
+    if (!food.createdBy || food.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'This is a shared food and cannot be changed' });
     }
     const { name, calories, protein, carbs, fat, fiber, sodium, sugar, servingSize, servingUnit } = req.body;
     if (name !== undefined) food.name = name;
@@ -264,7 +264,10 @@ const searchFood = async (req, res) => {
 const getFoodByBarcode = async (req, res) => {
   try {
     const { barcode } = req.params;
-    let food = await Food.findOne({ barcode });
+    let food = await Food.findOne({
+      barcode,
+      $or: [{ createdBy: null }, { createdBy: req.user._id }]
+    });
     if (food) return res.json(food);
 
     const response = await fetchWithTimeout(
@@ -295,6 +298,25 @@ const getFoodByBarcode = async (req, res) => {
         return res.json(food);
       }
     }
+
+    const [usdaFoods, offFoods, calorieApiFoods, apinFoods] = await Promise.all([
+      searchUSDA(barcode),
+      searchOFF(barcode),
+      searchCalorieAPI(barcode),
+      searchAPINinjas(barcode)
+    ]);
+
+    const allResults = deduplicateResults([...usdaFoods, ...offFoods, ...calorieApiFoods, ...apinFoods]);
+
+    if (allResults.length > 0) {
+      return res.json(allResults[0]);
+    }
+
+    res.status(404).json({ message: 'Product not found' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 
     const [usdaFoods, offFoods, calorieApiFoods, apinFoods] = await Promise.all([
       searchUSDA(barcode),
@@ -365,8 +387,8 @@ const deleteFood = async (req, res) => {
   try {
     const food = await Food.findById(req.params.id);
     if (!food) return res.status(404).json({ message: 'Food not found' });
-    if (food.createdBy && food.createdBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized' });
+    if (!food.createdBy || food.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'This is a shared food and cannot be changed' });
     }
     await food.deleteOne();
     res.json({ message: 'Food deleted' });
