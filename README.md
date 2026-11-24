@@ -409,6 +409,7 @@ ltfi/
 | Gender Field Assignment Fix | Separately from the schema bug, `updateProfile` destructured `gender` from the request and used it in TDEE calc and the response, but never actually contained the line assigning it to `user.gender` — so it silently never saved even after the schema fix. Added `if (gender !== undefined) user.gender = gender;` | ✅ Done |
 | Login Returns Full Profile | `login` previously returned only name, email, gender, calorie goal, macros and weight unit, so a fresh login (new browser, or after logout) had no current weight, goal weight, height, age or deficit and the Weight Loss Plan card stayed hidden. It now returns the full profile | ✅ Done |
 | Profile Data Not Loading Fix | `/auth/login` and `/auth/register` return only a short object (id, name, email, token), and `AuthContext` only called `/auth/me` when nothing was cached in AsyncStorage — so Profile showed blank weight, goal, height, age and activity level even though the data was saved in MongoDB. `AuthContext` now calls `/auth/me` after login/register and after loading the cached user, merges the full profile into context, and re-caches it | ✅ Done |
+| Enter Key Submit | Login: Enter on the email field moves to the password, Enter on the password logs in. Register: Enter moves down the text fields and submits from Diet Preference. The iPhone number pad has no Return key, so Age, Height and the two weight fields need a tap to move on. Double submits are blocked while loading | ✅ Done |
 
 #### 3. Food Tracking
 
@@ -671,15 +672,18 @@ ltfi/
 
 ### Phase 5 — Multi-User Access (friend on web and Expo Go)
 
-> Goal: let a friend use LTFI with his own account, on the web and in Expo Go, with his data kept separate from the owner's and everything staying on free tiers. Audited on Nov 24 2026 by reading the code. Nothing in this phase is built yet.
+> Goal: let a friend use LTFI with his own account, on the web and in Expo Go, with his data kept separate from the owner's and everything staying on free tiers. Audited on Nov 24 2026 by reading the code. Built and pushed on Nov 24 2026, with testing still in progress.
 
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Audit | Confirmed every Meal, Weight, Workout, Recipe, Exercise Log and Health Daily query filters by the logged-in user. Health sync uses a per-user hashed token, so a second user's steps and sleep stay in his own account. Registration already exists (`POST /api/auth/register`, `app/(auth)/register.jsx`) and works on web and in the app | ✅ Done |
-| Shared Foods Read-Only | In `backend/controllers/foodController.js`, `updateFood` and `deleteFood` only block edits when a food has an owner, so the seeded Philippine foods (no owner) can be edited or deleted by any logged-in user. Make shared foods read-only, and scope barcode lookup to shared foods or the user's own | ⬜ Planned |
-| Expo Organization | Since May 12 2026 Expo Go only loads projects owned by you or by an organization you belong to. Create a free Expo organization, transfer the `ltfi` project to it, change `owner` in `frontend/app.json`, publish one EAS Update, and invite the friend as a member. Confirm organization creation is free and test with a second Expo account first | ⬜ Planned |
-| Web and App Together | The friend can use the web app at the Vercel URL and Expo Go with the same login and the same backend | ⬜ Planned |
-| Two-Account Test | Register a second account, use it on web and in Expo Go, and confirm his data and the owner's never mix | ⬜ Planned |
+| Shared Foods Read-Only | `updateFood` and `deleteFood` in `backend/controllers/foodController.js` return 403 for any food that has no owner or belongs to another user, so only the creator can edit or delete a food. The seeded Philippine foods can no longer be changed by a logged-in user | ✅ Done |
+| Shared Food Pool | MyFitnessPal style. Food search and barcode lookup find foods from every user, one result per name, and the logged-in user's own version wins a name clash. The My Foods list still shows the user's own foods plus the ownerless shared ones. Deleting an account keeps the foods it created in the pool with the owner cleared | ✅ Done |
+| Expo Organization | Created a free Expo organization, Norman Apps (slug `norman-apps-dev`), transferred the `ltfi` project to it, changed `owner` in `frontend/app.json` to `norman-apps-dev`, and published an EAS Update. LTFI now opens in Expo Go from the Norman Apps profile. Still to do: invite the friend as a member and confirm he can load it with his own Expo account. Fuel Tank stays on the personal account, because organization members can see every project in the organization | 🔄 Testing |
+| Web and App Together | The web app at the Vercel URL works with login and registration on the same backend. Loading the app in Expo Go from the friend's own account is not confirmed yet | 🔄 Testing |
+| Two-Account Test | A second account was registered on web using a plus address of the owner's Gmail, and a food was logged in it. Confirming that the owner's own diary shows none of it is still to be checked, then the same test in Expo Go | 🔄 Testing |
+| Delete Account | `POST /api/auth/delete-account` requires the account password. It wipes every model that has a `user` field (meals, weights, workouts, recipes, exercise logs, health) and clears the owner on foods the user created. Profile has a Delete Account section at the bottom with an inline password confirm, so it works on web and in the app | 🔄 Testing |
+| Admin Users | The `ADMIN_EMAIL` environment variable on Render decides who is admin. `GET /api/auth/admin/users` and `DELETE /api/auth/admin/users/:id` are admin only, and the admin account itself cannot be deleted there. Login and `/auth/me` return `isAdmin`. Profile shows a Manage Users button for the admin, which opens `app/admin-users.jsx` with a two step delete on each row | 🔄 Testing |
 | Invite Code on Register | A code required to register, so strangers cannot sign up and use the AI scan quota. Not decided yet | ⬜ Not decided |
 | Health Sync Token Screen | There is no screen to generate the health sync token, only the API (`POST /api/health/token`), so a friend cannot set up the iPhone Shortcut himself yet | ⬜ Later |
 
@@ -708,8 +712,8 @@ ltfi/
 | Profile weight is only synced from logged weigh-ins | Both | A weight typed manually in Profile is not a logged weigh-in, so adding then deleting weigh-ins returns the profile to the latest logged entry, not to the manually typed value. Deleting your only entry leaves the profile weight unchanged |
 | Foods saved before the serving-based fix can have mixed bases | Both | Found on a scanned bread whose calories were edited to per piece while the macros stayed per 100 g. Open the food in My Foods and make sure calories and every macro are for the same serving size and unit |
 | Calorie API source is failing | Backend | Render logs on Nov 24 2026 showed `getaddrinfo ENOTFOUND api.calorieapi.com`, so that domain did not resolve. Search still works through USDA, Open Food Facts and API Ninjas. Check the Calorie API address and key, or remove that source. Open Food Facts also returned an invalid response on some searches, which the app already handles by skipping it |
-| Shared foods can be edited or deleted by any user | Backend | Foods with no owner (the seeded Philippine foods) pass the ownership check in `updateFood` and `deleteFood`, and show in every user's My Foods. Fine with one user, must be fixed before a second user joins. See Phase 5 |
-| Expo Go only opens projects you own or an organization you belong to | Expo Go | Since May 12 2026 a friend cannot load an EAS Update owned by a personal account. The project needs to move to an Expo organization he joins. See Phase 5 |
+| Any user's saved foods are searchable by every user | Backend | Shared food pool by design. A wrong entry from one user shows up in everyone's search. Only the creator can edit or delete a food, and there is no admin screen to remove a single bad food yet, only to delete a whole account |
+| Expo Go only opens projects you own or an organization you belong to | Expo Go | Since May 12 2026 a friend cannot load an EAS Update owned by a personal account. LTFI now lives in the Norman Apps organization (`norman-apps-dev`), so a friend needs a free Expo account and must accept the invite. Organization members can see every project in it, so keep other apps in a different account |
 | Registration is open to anyone with the URL | Backend | No invite code or email verification. Anyone who finds the app can create an account, which also uses the shared AI scan key |
 | Diary entries keep the numbers they were logged with | Both | A diary entry stores its calories and macros when it is added, so entries logged before the serving-based fix stay wrong. Delete them and log them again |
 | Pack and pieces are not converted automatically | Both | A pack counts as one serving of the food. The app cannot know how many pieces are in a pack, so logging pc against a food saved as a pack or serving asks for the pieces per pack |
@@ -781,11 +785,14 @@ API_NINJAS_KEY=your_api_ninjas_key
 CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+ADMIN_EMAIL=your_login_email_for_admin
 ```
 
 Important: the `MONGODB_URI` here is separate from whatever is set on Render — they are two independent copies. If the Atlas database password is ever reset, **update it in both places**, or one environment will start failing with `bad auth: authentication failed` while the other keeps working. If the local network blocks SRV DNS lookups (common on restrictive/corporate networks), use the non-SRV connection string format from Atlas's "Connect" screen (toggle off "SRV Connection String") instead of `mongodb+srv://`.
 
 These same `CLOUDINARY_*` values also need to be set as environment variables on Render for the deployed backend — `.env` is gitignored and never reaches production on its own.
+
+`ADMIN_EMAIL` also needs to be set on Render. The account that logs in with that email sees Manage Users in Profile and can delete other users. Leave it unset and nobody is admin.
 
 The frontend's Cloudinary cloud name and unsigned upload preset are set directly in `frontend/app/(tabs)/progress.jsx` as `CLOUDINARY_CLOUD_NAME` and `CLOUDINARY_UPLOAD_PRESET` constants, since unsigned uploads are safe to expose client-side.
 
@@ -906,6 +913,12 @@ If the `eas` command is not found, run it through npx instead: `npx eas-cli upda
 
 **iOS:**
 Requires Apple Developer account ($99/yr) for any distribution outside of Expo Go. Personal use via Expo Go (see above) does not require this.
+
+**Friend in Expo Go (free):**
+1. The friend creates a free account at expo.dev
+2. The owner invites him at expo.dev, Norman Apps, Members, Invite
+3. He accepts the invite, opens Expo Go signed in, switches to the Norman Apps profile and opens LTFI
+4. On the web he uses the same login at the Vercel URL
 
 ---
 
