@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/api';
@@ -48,6 +48,9 @@ export default function AddFoodScreen() {
   const [unitGrams, setUnitGrams] = useState('');
   const [showQuantityPicker, setShowQuantityPicker] = useState(false);
 
+  const typeaheadReq = useRef(0);
+  const myFoodsReq = useRef(0);
+
   useEffect(() => {
     if (prefillFood) {
       setResults([JSON.parse(prefillFood)]);
@@ -60,20 +63,18 @@ export default function AddFoodScreen() {
     }
   }, [productNotFound]);
 
-  useEffect(() => {
-    if (tab === 'myfoods') fetchMyFoods();
-  }, [tab]);
-
   const [myFoodsSearch, setMyFoodsSearch] = useState('');
     const [myFoodsPage, setMyFoodsPage] = useState(1);
     const [myFoodsTotal, setMyFoodsTotal] = useState(0);
     const [myFoodsLoadingMore, setMyFoodsLoadingMore] = useState(false);
 
     const fetchMyFoods = async (page = 1, search = '', append = false) => {
+      const reqId = ++myFoodsReq.current;
       if (page === 1) setMyFoodsLoading(true);
       else setMyFoodsLoadingMore(true);
       try {
         const res = await api.get(`/food/my?page=${page}&limit=20${search ? `&q=${encodeURIComponent(search)}` : ''}`);
+        if (reqId !== myFoodsReq.current) return;
         const { foods, total } = res.data;
         if (append) {
           setMyFoods(prev => [...prev, ...foods]);
@@ -85,34 +86,59 @@ export default function AddFoodScreen() {
       } catch (err) {
         console.error(err);
       } finally {
-        setMyFoodsLoading(false);
-        setMyFoodsLoadingMore(false);
+        if (reqId === myFoodsReq.current) {
+          setMyFoodsLoading(false);
+          setMyFoodsLoadingMore(false);
+        }
       }
     };
 
     const handleMyFoodsSearch = () => {
-      fetchMyFoods(1, myFoodsSearch);
+      fetchMyFoods(1, myFoodsSearch.trim());
     };
 
     const loadMoreMyFoods = () => {
-      fetchMyFoods(myFoodsPage + 1, myFoodsSearch, true);
+      fetchMyFoods(myFoodsPage + 1, myFoodsSearch.trim(), true);
     };
+
+  // My Foods tab: filter the list as you type
+  useEffect(() => {
+    if (tab !== 'myfoods') return;
+    const t = setTimeout(() => fetchMyFoods(1, myFoodsSearch.trim()), myFoodsSearch ? 250 : 0);
+    return () => clearTimeout(t);
+  }, [tab, myFoodsSearch]);
+
+  // Search tab: show your saved foods as you type (after 2 letters)
+  useEffect(() => {
+    if (tab !== 'search') return;
+    const q = search.trim();
+    if (q.length < 2) {
+      setMyFoodMatches([]);
+      return;
+    }
+    const id = ++typeaheadReq.current;
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.get(`/food/my?q=${encodeURIComponent(q)}&limit=8`);
+        if (id !== typeaheadReq.current) return;
+        setMyFoodMatches(res.data.foods || []);
+      } catch (err) {
+        console.error(err);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [search, tab]);
 
   const searchFood = async () => {
     if (!search.trim()) return;
     setLoading(true);
-    setMyFoodMatches([]);
     try {
       const [searchRes, myRes] = await Promise.all([
-            api.get(`/food/search?q=${encodeURIComponent(search)}`),
-            api.get(`/food/my?q=${encodeURIComponent(search)}&limit=5`)
+            api.get(`/food/search?q=${encodeURIComponent(search.trim())}`),
+            api.get(`/food/my?q=${encodeURIComponent(search.trim())}&limit=8`)
           ]);
 
-          const q = search.toLowerCase();
-          const myFoodsData = myRes.data.foods || myRes.data || [];
-          const matched = myFoodsData.filter(f =>
-            f.name.toLowerCase().includes(q)
-          );
+          const matched = myRes.data.foods || myRes.data || [];
 
     const matchedIds = new Set(matched.map(f => f._id?.toString()));
     const external = (searchRes.data || []).filter(f =>
@@ -267,7 +293,7 @@ export default function AddFoodScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.back}>← Back</Text>

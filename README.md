@@ -459,6 +459,8 @@ ltfi/
 | Food Search | USDA + Open Food Facts + Calorie API + API Ninjas + custom entries | ✅ Done |
 | Search Ranking | Exact and partial name matches ranked above unrelated results | ✅ Done |
 | Search Deduplication | Duplicate food names across sources filtered out | ✅ Done |
+| Fuzzy My Foods Search | `foodController.js` matches saved foods ignoring spaces and punctuation and allowing up to 2 stray letters between typed letters, so typing migoreng finds Mi Goreng and indie finds Indomie. Closest matches rank first. The search text is reduced to letters and digits before it becomes a regex, which also fixes a crash on characters like brackets | ✅ Done |
+| Type-ahead Search | `add-food.jsx` shows your saved foods as you type after 2 letters on the Search tab, and filters the My Foods tab as you type. Online sources only run when you press Search. Stale responses are ignored so fast typing cannot show old results | ✅ Done |
 
 #### 4. Nutrition Dashboard
 
@@ -689,6 +691,7 @@ ltfi/
 | npm install can hit ERESOLVE after SDK upgrades | Development process only | `expo-router`'s optional peers can conflict with older installed versions. `npx expo install --fix -- --legacy-peer-deps` resolves it, then run `npx expo-doctor` to catch required peers that flag skipped |
 | Profile weight is only synced from logged weigh-ins | Both | A weight typed manually in Profile is not a logged weigh-in, so adding then deleting weigh-ins returns the profile to the latest logged entry, not to the manually typed value. Deleting your only entry leaves the profile weight unchanged |
 | Foods saved before the serving-based fix can have mixed bases | Both | Found on a scanned bread whose calories were edited to per piece while the macros stayed per 100 g. Open the food in My Foods and make sure calories and every macro are for the same serving size and unit |
+| Calorie API source is failing | Backend | Render logs on Nov 24 2026 showed `getaddrinfo ENOTFOUND api.calorieapi.com`, so that domain did not resolve. Search still works through USDA, Open Food Facts and API Ninjas. Check the Calorie API address and key, or remove that source. Open Food Facts also returned an invalid response on some searches, which the app already handles by skipping it |
 | Diary entries keep the numbers they were logged with | Both | A diary entry stores its calories and macros when it is added, so entries logged before the serving-based fix stay wrong. Delete them and log them again |
 | Pack and pieces are not converted automatically | Both | A pack counts as one serving of the food. The app cannot know how many pieces are in a pack, so logging pc against a food saved as a pack or serving asks for the pieces per pack |
 | Groq models get deprecated and shut down | AI Food Scan | Check https://console.groq.com/docs/deprecations before assuming an AI scan failure is an app bug. If Render logs show `404 model_not_found`, swap the `model` value in `backend/controllers/aiScanController.js` for the replacement Groq lists, then redeploy the backend (the frontend does not need to change) |
