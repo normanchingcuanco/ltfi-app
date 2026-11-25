@@ -164,6 +164,7 @@ export default function AddFoodScreen() {
     setUnit(food.servingUnit || 'serving');
     setQuantity(food.servingSize ? String(food.servingSize) : '1');
     setUnitGrams('');
+    setShowMealMenu(false);
     setShowQuantityPicker(true);
   };
 
@@ -303,24 +304,6 @@ export default function AddFoodScreen() {
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Add Food</Text>
-
-        <TouchableOpacity style={styles.mealPicker} onPress={() => setShowMealMenu(!showMealMenu)}>
-          <Text style={styles.mealPickerLabel}>Meal</Text>
-          <Text style={styles.mealPickerValue}>{meal} {showMealMenu ? '▴' : '▾'}</Text>
-        </TouchableOpacity>
-        {showMealMenu && (
-          <View style={styles.mealMenu}>
-            {MEALS.map(m => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.mealOption, meal === m && styles.mealOptionActive]}
-                onPress={() => { setMeal(m); setShowMealMenu(false); }}
-              >
-                <Text style={[styles.mealOptionText, meal === m && styles.mealOptionTextActive]}>{m}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
       </View>
 
       <View style={styles.tabs}>
@@ -423,6 +406,24 @@ export default function AddFoodScreen() {
             <Text style={styles.modalTitle}>{selectedFood.name}</Text>
             <Text style={styles.modalSub}>How much are you logging?</Text>
 
+            <TouchableOpacity style={styles.mealPicker} onPress={() => setShowMealMenu(!showMealMenu)}>
+              <Text style={styles.mealPickerLabel}>Meal</Text>
+              <Text style={styles.mealPickerValue}>{meal} {showMealMenu ? '▴' : '▾'}</Text>
+            </TouchableOpacity>
+            {showMealMenu && (
+              <View style={styles.mealMenu}>
+                {MEALS.map(m => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.mealOption, meal === m && styles.mealOptionActive]}
+                    onPress={() => { setMeal(m); setShowMealMenu(false); }}
+                  >
+                    <Text style={[styles.mealOptionText, meal === m && styles.mealOptionTextActive]}>{m}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             <View style={styles.quantityRow}>
               <TextInput
                 style={styles.quantityInput}
@@ -484,10 +485,10 @@ const styles = StyleSheet.create({
   header: { marginBottom: 24 },
   back: { color: '#F77E2D', fontSize: 14, marginBottom: 8 },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A' },
-  mealPicker: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginTop: 12 },
+  mealPicker: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginBottom: 12 },
   mealPickerLabel: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 1 },
   mealPickerValue: { fontSize: 15, fontWeight: '700', color: '#1A1A1A', textTransform: 'capitalize' },
-  mealMenu: { backgroundColor: '#D9D3C8', borderRadius: 12, marginTop: 6, padding: 6, gap: 4 },
+  mealMenu: { backgroundColor: '#D9D3C8', borderRadius: 12, marginBottom: 12, padding: 6, gap: 4 },
   mealOption: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8 },
   mealOptionActive: { backgroundColor: '#F77E2D' },
   mealOptionText: { fontSize: 14, fontWeight: '600', color: '#1A1A1A', textTransform: 'capitalize' },
