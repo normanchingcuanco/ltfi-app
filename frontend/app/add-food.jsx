@@ -5,6 +5,8 @@ import api from '../src/utils/api';
 
 const UNITS = ['g', 'kg', 'ml', 'L', 'cup', 'tbsp', 'tsp', 'oz', 'pc', 'pack', 'serving'];
 
+const MEALS = ['breakfast', 'lunch', 'dinner', 'snacks'];
+
 const UNIT_TO_GRAMS = {
   g: 1, kg: 1000, ml: 1, L: 1000,
   cup: 240, tbsp: 15, tsp: 5,
@@ -33,6 +35,8 @@ const showAlert = (title, message, buttons) => {
 export default function AddFoodScreen() {
   const { mealType, date, prefillFood, defaultTab, productNotFound } = useLocalSearchParams();
   const router = useRouter();
+  const [meal, setMeal] = useState(MEALS.includes(mealType) ? mealType : 'breakfast');
+  const [showMealMenu, setShowMealMenu] = useState(false);
   const [tab, setTab] = useState(defaultTab || 'search');
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
@@ -201,7 +205,7 @@ export default function AddFoodScreen() {
     try {
       await api.post('/meals', {
         date,
-        mealType,
+        mealType: meal,
         food: {
           foodId: selectedFood._id || null,
           name: selectedFood.name,
@@ -279,7 +283,7 @@ export default function AddFoodScreen() {
           <>
             <TouchableOpacity
               style={styles.editBtn}
-              onPress={() => router.push({ pathname: '/edit-food', params: { foodId: food._id, mealType, date } })}
+              onPress={() => router.push({ pathname: '/edit-food', params: { foodId: food._id, mealType: meal, date } })}
             >
               <Text style={styles.editBtnText}>✎</Text>
             </TouchableOpacity>
@@ -299,7 +303,24 @@ export default function AddFoodScreen() {
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Add Food</Text>
-        <Text style={styles.mealLabel}>{mealType}</Text>
+
+        <TouchableOpacity style={styles.mealPicker} onPress={() => setShowMealMenu(!showMealMenu)}>
+          <Text style={styles.mealPickerLabel}>Meal</Text>
+          <Text style={styles.mealPickerValue}>{meal} {showMealMenu ? '▴' : '▾'}</Text>
+        </TouchableOpacity>
+        {showMealMenu && (
+          <View style={styles.mealMenu}>
+            {MEALS.map(m => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.mealOption, meal === m && styles.mealOptionActive]}
+                onPress={() => { setMeal(m); setShowMealMenu(false); }}
+              >
+                <Text style={[styles.mealOptionText, meal === m && styles.mealOptionTextActive]}>{m}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       <View style={styles.tabs}>
@@ -329,13 +350,13 @@ export default function AddFoodScreen() {
           </View>
 
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/barcode-scanner', params: { mealType, date } })}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/barcode-scanner', params: { mealType: meal, date } })}>
               <Text style={styles.actionBtnText}>📷 Scan Barcode</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/ai-food-scan', params: { mealType, date } })}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/ai-food-scan', params: { mealType: meal, date } })}>
               <Text style={styles.actionBtnText}>🤖 AI Scan</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/custom-food', params: { mealType, date } })}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/custom-food', params: { mealType: meal, date } })}>
               <Text style={styles.actionBtnText}>+ Custom</Text>
             </TouchableOpacity>
           </View>
@@ -445,7 +466,7 @@ export default function AddFoodScreen() {
             </Text>
 
             <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd} disabled={adding || ratio === null}>
-              {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Add to {mealType}</Text>}
+              {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Add to {meal}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowQuantityPicker(false)}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -463,7 +484,14 @@ const styles = StyleSheet.create({
   header: { marginBottom: 24 },
   back: { color: '#F77E2D', fontSize: 14, marginBottom: 8 },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A' },
-  mealLabel: { fontSize: 13, color: '#999', textTransform: 'capitalize', marginTop: 2 },
+  mealPicker: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, marginTop: 12 },
+  mealPickerLabel: { fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 1 },
+  mealPickerValue: { fontSize: 15, fontWeight: '700', color: '#1A1A1A', textTransform: 'capitalize' },
+  mealMenu: { backgroundColor: '#D9D3C8', borderRadius: 12, marginTop: 6, padding: 6, gap: 4 },
+  mealOption: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8 },
+  mealOptionActive: { backgroundColor: '#F77E2D' },
+  mealOptionText: { fontSize: 14, fontWeight: '600', color: '#1A1A1A', textTransform: 'capitalize' },
+  mealOptionTextActive: { color: '#fff', fontWeight: '700' },
   tabs: { flexDirection: 'row', backgroundColor: '#D9D3C8', borderRadius: 12, padding: 4, marginBottom: 20 },
   tabBtn: { flex: 1, padding: 10, borderRadius: 10, alignItems: 'center' },
   tabBtnActive: { backgroundColor: '#F77E2D' },
