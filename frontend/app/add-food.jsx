@@ -56,6 +56,8 @@ export default function AddFoodScreen() {
   const myFoodsReq = useRef(0);
   // Instant lock so a double tap on Add cannot log or save twice.
   const addingRef = useRef(false);
+  // Used to focus the amount box after the popup has finished drawing.
+  const qtyRef = useRef(null);
 
   // A scanned result opens the amount and meal popup straight away.
   useEffect(() => {
@@ -65,6 +67,13 @@ export default function AddFoodScreen() {
       handleAddPress(food);
     }
   }, [prefillFood]);
+
+  // Focus the amount box a moment after the popup opens so the number is selected.
+  useEffect(() => {
+    if (!showQuantityPicker) return;
+    const t = setTimeout(() => qtyRef.current?.focus(), 300);
+    return () => clearTimeout(t);
+  }, [showQuantityPicker]);
 
   useEffect(() => {
     if (productNotFound === 'true') {
@@ -468,11 +477,11 @@ export default function AddFoodScreen() {
 
             <View style={styles.quantityRow}>
               <TextInput
+                ref={qtyRef}
                 style={styles.quantityInput}
                 keyboardType="numeric"
                 value={quantity}
                 onChangeText={setQuantity}
-                autoFocus
                 selectTextOnFocus
               />
               <Text style={styles.quantityUnit}>{unit}</Text>
