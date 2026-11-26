@@ -28,6 +28,15 @@ const sortByMatch = (foods, q) =>
     matchScore(b.name, q) - matchScore(a.name, q) || String(a.name).localeCompare(String(b.name))
   );
 
+// Open Food Facts stores sodium in grams per 100 g. The app stores milligrams.
+// If sodium is missing, salt divided by 2.5 gives sodium.
+const offSodiumMg = (n) => {
+  const g = n['sodium_100g'] != null
+    ? n['sodium_100g']
+    : (n['salt_100g'] != null ? n['salt_100g'] / 2.5 : 0);
+  return Math.round((Number(g) || 0) * 1000);
+};
+
 const createFood = async (req, res) => {
   try {
     const { name, calories, protein, carbs, fat, fiber, sodium, sugar, servingSize, servingUnit, barcode } = req.body;
@@ -161,7 +170,7 @@ const searchOFF = async (q) => {
         carbs: Math.round(p.nutriments['carbohydrates_100g'] || 0),
         fat: Math.round(p.nutriments['fat_100g'] || 0),
         fiber: Math.round(p.nutriments['fiber_100g'] || 0),
-        sodium: Math.round(p.nutriments['sodium_100g'] || 0),
+        sodium: offSodiumMg(p.nutriments),
         sugar: Math.round(p.nutriments['sugars_100g'] || 0),
         servingSize: 100,
         servingUnit: 'g',
@@ -300,7 +309,7 @@ const getFoodByBarcode = async (req, res) => {
           carbs: Math.round(p.carbohydrates_100g || 0),
           fat: Math.round(p.fat_100g || 0),
           fiber: Math.round(p.fiber_100g || 0),
-          sodium: Math.round(p.sodium_100g || 0),
+          sodium: offSodiumMg(p),
           sugar: Math.round(p.sugars_100g || 0),
           source: 'open_food_facts',
           createdBy: req.user._id
