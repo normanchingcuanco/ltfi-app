@@ -473,6 +473,7 @@ export default function AddFoodScreen() {
                 value={quantity}
                 onChangeText={setQuantity}
                 autoFocus
+                selectTextOnFocus
               />
               <Text style={styles.quantityUnit}>{unit}</Text>
             </View>
