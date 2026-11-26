@@ -314,12 +314,18 @@ const getFoodByBarcode = async (req, res) => {
         const p = prod.nutriments;
         const productName = prod.product_name || prod.product_name_en || 'Unknown Product';
 
-        // Open Food Facts values are per 100 g. If the label has a serving size,
-        // scale to that serving. Otherwise keep per 100 g.
+        // Open Food Facts values are per 100 g. Scale to the label serving if
+        // there is one. If not, scale to the pack quantity (for example 50 g).
+        // If neither is known, keep per 100 g.
         const servingQty = parseFloat(prod.serving_quantity);
-        const hasServing = servingQty > 0 && servingQty <= 1000;
-        const factor = hasServing ? servingQty / 100 : 1;
-        const servingUnit = /ml/i.test(String(prod.serving_size || '')) ? 'ml' : 'g';
+        const packQty = parseFloat(prod.product_quantity);
+        const useServing = servingQty > 0 && servingQty <= 1000;
+        const usePack = !useServing && packQty > 0 && packQty <= 1000;
+        const baseQty = useServing ? servingQty : (usePack ? packQty : 0);
+        const hasServing = baseQty > 0;
+        const factor = hasServing ? baseQty / 100 : 1;
+        const unitText = useServing ? prod.serving_size : prod.quantity;
+        const servingUnit = /\d\s*(ml|cl|l)\b/i.test(String(unitText || '')) ? 'ml' : 'g';
         const scale = (v) => {
           const n = (Number(v) || 0) * factor;
           return hasServing ? Math.round(n * 10) / 10 : Math.round(n);
@@ -335,7 +341,7 @@ const getFoodByBarcode = async (req, res) => {
           fiber: scale(p.fiber_100g),
           sodium: Math.round(offSodiumMg(p) * factor),
           sugar: scale(p.sugars_100g),
-          servingSize: hasServing ? servingQty : 100,
+          servingSize: hasServing ? baseQty : 100,
           servingUnit: hasServing ? servingUnit : 'g',
           source: 'open_food_facts',
           createdBy: req.user._id
