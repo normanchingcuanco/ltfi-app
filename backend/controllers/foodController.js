@@ -299,18 +299,33 @@ const getFoodByBarcode = async (req, res) => {
     if (contentType && contentType.includes('application/json')) {
       const data = await response.json();
       if (data.status === 1 && data.product) {
-        const p = data.product.nutriments;
-        const productName = data.product.product_name || data.product.product_name_en || 'Unknown Product';
+        const prod = data.product;
+        const p = prod.nutriments;
+        const productName = prod.product_name || prod.product_name_en || 'Unknown Product';
+
+        // Open Food Facts values are per 100 g. If the label has a serving size,
+        // scale to that serving. Otherwise keep per 100 g.
+        const servingQty = parseFloat(prod.serving_quantity);
+        const hasServing = servingQty > 0 && servingQty <= 1000;
+        const factor = hasServing ? servingQty / 100 : 1;
+        const servingUnit = /ml/i.test(String(prod.serving_size || '')) ? 'ml' : 'g';
+        const scale = (v) => {
+          const n = (Number(v) || 0) * factor;
+          return hasServing ? Math.round(n * 10) / 10 : Math.round(n);
+        };
+
         food = await Food.create({
           name: productName,
           barcode,
-          calories: Math.round(p['energy-kcal_100g'] || 0),
-          protein: Math.round(p.proteins_100g || 0),
-          carbs: Math.round(p.carbohydrates_100g || 0),
-          fat: Math.round(p.fat_100g || 0),
-          fiber: Math.round(p.fiber_100g || 0),
-          sodium: offSodiumMg(p),
-          sugar: Math.round(p.sugars_100g || 0),
+          calories: Math.round((p['energy-kcal_100g'] || 0) * factor),
+          protein: scale(p.proteins_100g),
+          carbs: scale(p.carbohydrates_100g),
+          fat: scale(p.fat_100g),
+          fiber: scale(p.fiber_100g),
+          sodium: Math.round(offSodiumMg(p) * factor),
+          sugar: scale(p.sugars_100g),
+          servingSize: hasServing ? servingQty : 100,
+          servingUnit: hasServing ? servingUnit : 'g',
           source: 'open_food_facts',
           createdBy: req.user._id
         });
