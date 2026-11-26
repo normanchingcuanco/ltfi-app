@@ -86,20 +86,29 @@ export default function BarcodeScannerScreen() {
   const [manualBarcode, setManualBarcode] = useState('');
   const router = useRouter();
   const params = useLocalSearchParams();
+  // Instant lock. State is too slow: the camera fires many scans before a re-render.
+  const lockRef = useRef(false);
 
   const handleScanned = async (data) => {
-    if (scanned || loading) return;
+    if (lockRef.current) return;
+    lockRef.current = true;
     setScanned(true);
     setLoading(true);
     try {
       const res = await api.get(`/food/barcode/${data}`);
       router.replace({ pathname: '/add-food', params: { ...params, prefillFood: JSON.stringify(res.data) } });
     } catch (err) {
+      lockRef.current = false;
       setScanned(false);
       router.replace({ pathname: '/add-food', params: { ...params, productNotFound: 'true' } });
     } finally {
       setLoading(false);
     }
+  };
+
+  const scanAgain = () => {
+    lockRef.current = false;
+    setScanned(false);
   };
 
   if (Platform.OS === 'web') {
@@ -165,7 +174,7 @@ export default function BarcodeScannerScreen() {
       )}
       {scanned && !loading && (
         <View style={styles.bottomBar}>
-          <TouchableOpacity style={styles.button} onPress={() => setScanned(false)}>
+          <TouchableOpacity style={styles.button} onPress={scanAgain}>
             <Text style={styles.buttonText}>Scan Again</Text>
           </TouchableOpacity>
         </View>

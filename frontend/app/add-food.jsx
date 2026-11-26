@@ -54,6 +54,8 @@ export default function AddFoodScreen() {
 
   const typeaheadReq = useRef(0);
   const myFoodsReq = useRef(0);
+  // Instant lock so a double tap on Add cannot log or save twice.
+  const addingRef = useRef(false);
 
   useEffect(() => {
     if (prefillFood) {
@@ -194,21 +196,57 @@ export default function AddFoodScreen() {
     return g > 0 ? logGrams / g : null;
   };
 
+  // An AI Scan food is not saved yet. Save it to My Foods once, or reuse an
+  // existing entry with the same name, and return its id.
+  const saveAiFood = async (food) => {
+    try {
+      const name = String(food.name || '').trim();
+      const existing = await api.get(`/food/my?q=${encodeURIComponent(name)}&limit=20`);
+      const list = existing.data.foods || [];
+      const match = list.find(f => String(f.name || '').toLowerCase().trim() === name.toLowerCase());
+      if (match) return match._id;
+
+      const created = await api.post('/food', {
+        name,
+        calories: food.calories,
+        protein: food.protein || 0,
+        carbs: food.carbs || 0,
+        fat: food.fat || 0,
+        fiber: food.fiber || 0,
+        sodium: food.sodium || 0,
+        sugar: food.sugar || 0,
+        servingSize: food.servingSize || 100,
+        servingUnit: food.servingUnit || 'g'
+      });
+      return created.data._id;
+    } catch (err) {
+      console.error('Could not save AI food to My Foods:', err);
+      return null;
+    }
+  };
+
   const confirmAdd = async () => {
     if (!selectedFood) return;
+    if (addingRef.current) return;
     const ratio = getRatio();
     if (ratio === null) return;
 
+    addingRef.current = true;
     setAdding(true);
 
     const qty = parseFloat(quantity) || 1;
 
     try {
+      let foodId = selectedFood._id || null;
+      if (!foodId && selectedFood.source === 'ai_scan') {
+        foodId = await saveAiFood(selectedFood);
+      }
+
       await api.post('/meals', {
         date,
         mealType: meal,
         food: {
-          foodId: selectedFood._id || null,
+          foodId,
           name: selectedFood.name,
           quantity: qty,
           unit,
@@ -225,6 +263,7 @@ export default function AddFoodScreen() {
       router.replace('/(tabs)/diary');
     } catch (err) {
       console.error(err);
+      addingRef.current = false;
       showAlert('Error', err?.response?.data?.message || err?.message || 'Could not add food. Please try again.');
     } finally {
       setAdding(false);
