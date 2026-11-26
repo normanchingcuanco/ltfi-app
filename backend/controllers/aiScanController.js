@@ -23,6 +23,8 @@ const fetchWithTimeout = async (url, options = {}, ms = 8000) => {
   }
 };
 
+// The database search helpers below are no longer called by scanFoodImage.
+// AI Scan now returns the AI's own estimate. They are kept in case they are needed again.
 const searchAllSources = async (q) => {
   const results = await Promise.allSettled([
     searchUSDA(q),
@@ -160,6 +162,8 @@ const deduplicateResults = (results) => {
   });
 };
 
+const num = (v) => Math.round(Number(v) || 0);
+
 const scanFoodImage = async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
@@ -186,7 +190,7 @@ const scanFoodImage = async (req, res) => {
   "servingSize": 100,
   "servingUnit": "g"
 }
-Estimate values per 100g serving. If multiple foods are visible, return the primary dish.`
+Estimate values per 100g serving. Calories in kcal, protein, carbs, fat, fiber and sugar in grams, sodium in milligrams. If multiple foods are visible, return the primary dish.`
             },
             {
               type: 'image_url',
@@ -219,30 +223,20 @@ Estimate values per 100g serving. If multiple foods are visible, return the prim
       }
     }
 
-    // Search all sources using the AI-identified food name
-    const allResults = await searchAllSources(aiFood.name);
-    const deduplicated = deduplicateResults(allResults);
-
-    if (deduplicated.length > 0) {
-      const best = deduplicated[0];
-      // Merge: prefer DB data but keep AI name if DB name is too generic
-      return res.json({
-        name: aiFood.name,
-        calories: best.calories || aiFood.calories,
-        protein: best.protein || aiFood.protein,
-        carbs: best.carbs || aiFood.carbs,
-        fat: best.fat || aiFood.fat,
-        fiber: best.fiber || aiFood.fiber,
-        sodium: best.sodium || aiFood.sodium,
-        sugar: best.sugar || aiFood.sugar,
-        servingSize: best.servingSize || aiFood.servingSize,
-        servingUnit: best.servingUnit || aiFood.servingUnit,
-        source: best.source
-      });
-    }
-
-    // No DB match, so return the AI estimate as fallback
-    res.json({ ...aiFood, source: 'ai_scan' });
+    // Return the AI's own estimate. The prompt asks for per 100 g, so that is what this is.
+    res.json({
+      name: aiFood.name,
+      calories: num(aiFood.calories),
+      protein: num(aiFood.protein),
+      carbs: num(aiFood.carbs),
+      fat: num(aiFood.fat),
+      fiber: num(aiFood.fiber),
+      sodium: num(aiFood.sodium),
+      sugar: num(aiFood.sugar),
+      servingSize: 100,
+      servingUnit: 'g',
+      source: 'ai_scan'
+    });
   } catch (err) {
     console.error('AI Scan error:', err.message || err);
     res.status(500).json({ message: 'Failed to analyze image', detail: err.message });
