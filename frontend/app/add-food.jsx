@@ -57,9 +57,12 @@ export default function AddFoodScreen() {
   // Instant lock so a double tap on Add cannot log or save twice.
   const addingRef = useRef(false);
 
+  // A scanned result opens the amount and meal popup straight away.
   useEffect(() => {
     if (prefillFood) {
-      setResults([JSON.parse(prefillFood)]);
+      const food = JSON.parse(prefillFood);
+      setResults([food]);
+      handleAddPress(food);
     }
   }, [prefillFood]);
 
