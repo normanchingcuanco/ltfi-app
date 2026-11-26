@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Image, ActivityIndicator, ScrollView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../src/utils/api';
@@ -27,6 +27,7 @@ export default function AIFoodScanScreen() {
   const { mealType, date } = useLocalSearchParams();
   const [image, setImage] = useState(null);
   const [result, setResult] = useState(null);
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
   const pickImage = async (useCamera) => {
@@ -56,6 +57,7 @@ export default function AIFoodScanScreen() {
       const asset = source.assets[0];
       setImage({ uri: asset.uri });
       setResult(null);
+      setName('');
 
       let base64 = asset.base64;
       if (Platform.OS === 'web') {
@@ -74,6 +76,7 @@ export default function AIFoodScanScreen() {
         mimeType: 'image/jpeg'
       });
       setResult(res.data);
+      setName(res.data.name || '');
     } catch (err) {
       console.error('AI scan failed:', err?.response?.status, err?.response?.data || err?.message);
       alert('Could not analyze image. Try again.');
@@ -83,16 +86,17 @@ export default function AIFoodScanScreen() {
   };
 
   // Hand the result to Add Food so you log how much you actually ate.
-  // Add Food saves it to My Foods when you log it.
+  // Add Food saves it to My Foods when you log it, under the name you typed here.
   const chooseAmount = () => {
+    const finalName = name.trim() || result.name;
     router.replace({
       pathname: '/add-food',
-      params: { mealType, date, prefillFood: JSON.stringify(result) }
+      params: { mealType, date, prefillFood: JSON.stringify({ ...result, name: finalName }) }
     });
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Back</Text>
       </TouchableOpacity>
@@ -121,7 +125,14 @@ export default function AIFoodScanScreen() {
 
       {result && !loading && (
         <View style={styles.resultCard}>
-          <Text style={styles.foodName}>{result.name}</Text>
+          <Text style={styles.nameLabel}>Name</Text>
+          <TextInput
+            style={styles.nameInput}
+            value={name}
+            onChangeText={setName}
+            placeholder="Food name"
+            placeholderTextColor="#999"
+          />
           <View style={styles.macroRow}>
             <View style={styles.macroItem}>
               <Text style={styles.macroValue}>{result.calories}</Text>
@@ -140,7 +151,7 @@ export default function AIFoodScanScreen() {
               <Text style={styles.macroLabel}>Fat</Text>
             </View>
           </View>
-          <Text style={styles.disclaimer}>Estimates per {result.servingSize || 100} {result.servingUnit || 'g'}. Next you choose how much you ate.</Text>
+          <Text style={styles.disclaimer}>Estimates per {result.servingSize || 100} {result.servingUnit || 'g'}. Use the same name for the same dish to reuse your saved food. Next you choose how much you ate.</Text>
           <TouchableOpacity style={styles.addBtn} onPress={chooseAmount}>
             <Text style={styles.addBtnText}>Choose Amount</Text>
           </TouchableOpacity>
@@ -163,7 +174,8 @@ const styles = StyleSheet.create({
   loadingBox: { alignItems: 'center', marginTop: 20 },
   loadingText: { color: '#888', marginTop: 10, fontSize: 14 },
   resultCard: { backgroundColor: '#D9D3C8', borderRadius: 16, padding: 20 },
-  foodName: { fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 16 },
+  nameLabel: { fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
+  nameInput: { backgroundColor: '#EDE8DF', borderRadius: 10, padding: 12, fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 16 },
   macroRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   macroItem: { alignItems: 'center' },
   macroValue: { fontSize: 18, fontWeight: '800', color: '#F77E2D' },
