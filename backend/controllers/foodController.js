@@ -51,6 +51,17 @@ const createFood = async (req, res) => {
   }
 };
 
+const getFoodById = async (req, res) => {
+  try {
+    const food = await Food.findById(req.params.id);
+    if (!food) return res.status(404).json({ message: 'Food not found' });
+    res.json(food);
+  } catch (err) {
+    if (err.name === 'CastError') return res.status(404).json({ message: 'Food not found' });
+    res.status(500).json({ message: err.message });
+  }
+};
+
 const updateFood = async (req, res) => {
   try {
     const food = await Food.findById(req.params.id);
@@ -412,4 +423,4 @@ const deleteFood = async (req, res) => {
   }
 };
 
-module.exports = { createFood, updateFood, searchFood, getFoodByBarcode, getUserFoods, deleteFood };
+module.exports = { createFood, getFoodById, updateFood, searchFood, getFoodByBarcode, getUserFoods, deleteFood };
