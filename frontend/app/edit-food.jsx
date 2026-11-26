@@ -32,9 +32,8 @@ export default function EditFoodScreen() {
 
   const fetchFood = async () => {
     try {
-      const res = await api.get(`/food/my?limit=200`);
-      const foodList = res.data.foods || res.data || [];
-      const food = foodList.find(f => f._id?.toString() === foodId?.toString());
+      const res = await api.get(`/food/${foodId}`);
+      const food = res.data;
       if (!food) {
         showAlert('Error', 'Food not found.');
         router.back();
@@ -53,7 +52,8 @@ export default function EditFoodScreen() {
         servingUnit: food.servingUnit || 'serving',
       });
     } catch (err) {
-      showAlert('Error', 'Failed to load food.');
+      const status = err?.response?.status;
+      showAlert('Error', status === 404 ? 'Food not found.' : 'Failed to load food.');
       router.back();
     } finally {
       setLoading(false);
