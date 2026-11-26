@@ -4,6 +4,15 @@ const { AbortController } = require('abort-controller');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+// Open Food Facts stores sodium in grams per 100 g. The app stores milligrams.
+// If sodium is missing, salt divided by 2.5 gives sodium.
+const offSodiumMg = (n) => {
+  const g = n['sodium_100g'] != null
+    ? n['sodium_100g']
+    : (n['salt_100g'] != null ? n['salt_100g'] / 2.5 : 0);
+  return Math.round((Number(g) || 0) * 1000);
+};
+
 const fetchWithTimeout = async (url, options = {}, ms = 8000) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ms);
@@ -78,7 +87,7 @@ const searchOFF = async (q) => {
         carbs: Math.round(p.nutriments['carbohydrates_100g'] || 0),
         fat: Math.round(p.nutriments['fat_100g'] || 0),
         fiber: Math.round(p.nutriments['fiber_100g'] || 0),
-        sodium: Math.round(p.nutriments['sodium_100g'] || 0),
+        sodium: offSodiumMg(p.nutriments),
         sugar: Math.round(p.nutriments['sugars_100g'] || 0),
         servingSize: 100,
         servingUnit: 'g',
@@ -200,7 +209,7 @@ Estimate values per 100g serving. If multiple foods are visible, return the prim
     try {
       aiFood = JSON.parse(clean);
     } catch (parseErr) {
-      // Model didn't return clean JSON -- try to salvage the first {...} block
+      // Model didn't return clean JSON, so try to salvage the first {...} block
       const match = clean.match(/\{[\s\S]*\}/);
       if (match) {
         aiFood = JSON.parse(match[0]);
@@ -216,7 +225,7 @@ Estimate values per 100g serving. If multiple foods are visible, return the prim
 
     if (deduplicated.length > 0) {
       const best = deduplicated[0];
-      // Merge -- prefer DB data but keep AI name if DB name is too generic
+      // Merge: prefer DB data but keep AI name if DB name is too generic
       return res.json({
         name: aiFood.name,
         calories: best.calories || aiFood.calories,
@@ -232,7 +241,7 @@ Estimate values per 100g serving. If multiple foods are visible, return the prim
       });
     }
 
-    // No DB match -- return AI estimate as fallback
+    // No DB match, so return the AI estimate as fallback
     res.json({ ...aiFood, source: 'ai_scan' });
   } catch (err) {
     console.error('AI Scan error:', err.message || err);
