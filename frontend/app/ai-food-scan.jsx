@@ -28,7 +28,6 @@ export default function AIFoodScanScreen() {
   const [image, setImage] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [adding, setAdding] = useState(false);
 
   const pickImage = async (useCamera) => {
     const options = { base64: true, quality: 0.3, allowsEditing: true, aspect: [4, 3] };
@@ -83,44 +82,13 @@ export default function AIFoodScanScreen() {
     }
   };
 
-  const addFood = async () => {
-    setAdding(true);
-    try {
-      await api.post('/food', {
-        name: result.name,
-        calories: result.calories,
-        protein: result.protein,
-        carbs: result.carbs,
-        fat: result.fat,
-        fiber: result.fiber,
-        sodium: result.sodium,
-        sugar: result.sugar,
-        servingSize: result.servingSize || 100,
-        servingUnit: result.servingUnit || 'g'
-      }).catch(err => console.error('Failed to save to My Foods:', err));
-
-      await api.post('/meals', {
-        date,
-        mealType,
-        food: {
-          name: result.name,
-          quantity: result.servingSize || 100,
-          unit: result.servingUnit || 'g',
-          calories: result.calories,
-          protein: result.protein,
-          carbs: result.carbs,
-          fat: result.fat,
-          fiber: result.fiber,
-          sodium: result.sodium,
-          sugar: result.sugar
-        }
-      });
-      router.replace('/(tabs)/diary');
-    } catch (err) {
-      alert('Failed to add food.');
-    } finally {
-      setAdding(false);
-    }
+  // Hand the result to Add Food so you log how much you actually ate.
+  // Add Food saves it to My Foods when you log it.
+  const chooseAmount = () => {
+    router.replace({
+      pathname: '/add-food',
+      params: { mealType, date, prefillFood: JSON.stringify(result) }
+    });
   };
 
   return (
@@ -172,9 +140,9 @@ export default function AIFoodScanScreen() {
               <Text style={styles.macroLabel}>Fat</Text>
             </View>
           </View>
-          <Text style={styles.disclaimer}>Estimates per {result.servingSize || 100} {result.servingUnit || 'g'}. Tap add to log this food.</Text>
-          <TouchableOpacity style={styles.addBtn} onPress={addFood} disabled={adding}>
-            <Text style={styles.addBtnText}>{adding ? 'Adding...' : 'Add to Diary'}</Text>
+          <Text style={styles.disclaimer}>Estimates per {result.servingSize || 100} {result.servingUnit || 'g'}. Next you choose how much you ate.</Text>
+          <TouchableOpacity style={styles.addBtn} onPress={chooseAmount}>
+            <Text style={styles.addBtnText}>Choose Amount</Text>
           </TouchableOpacity>
         </View>
       )}
