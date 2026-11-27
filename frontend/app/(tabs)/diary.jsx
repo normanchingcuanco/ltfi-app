@@ -1,9 +1,22 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Platform, Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import api from '../../src/utils/api';
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
+
+const UNITS = ['g', 'kg', 'ml', 'L', 'cup', 'tbsp', 'tsp', 'oz', 'pc', 'pack', 'serving'];
+
+const UNIT_TO_GRAMS = {
+  g: 1, kg: 1000, ml: 1, L: 1000,
+  cup: 240, tbsp: 15, tsp: 5,
+  oz: 28.35
+};
+
+const gramsOf = (u, n) => (UNIT_TO_GRAMS[u] !== undefined ? n * UNIT_TO_GRAMS[u] : null);
+
+// A whole serving or a whole pack always counts as one of the food's servings.
+const isWhole = (u) => u === 'serving' || u === 'pack';
 
 const formatDate = (date) => {
   const y = date.getFullYear();
@@ -34,17 +47,30 @@ export default function DiaryScreen() {
   const [loading, setLoading] = useState(true);
   const [editingFood, setEditingFood] = useState(null);
   const [editQuantity, setEditQuantity] = useState('');
+  const [editUnit, setEditUnit] = useState('g');
+  const [editUnitGrams, setEditUnitGrams] = useState('');
+  const [sourceFood, setSourceFood] = useState(null);
+  const [sourceLoading, setSourceLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calMonth, setCalMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const router = useRouter();
+  const qtyRef = useRef(null);
+  const sourceReq = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
       fetchSummary(selectedDate);
     }, [selectedDate])
   );
+
+  // Focus the amount box a moment after the edit popup opens so the number is selected.
+  useEffect(() => {
+    if (!editingFood) return;
+    const t = setTimeout(() => qtyRef.current?.focus(), 300);
+    return () => clearTimeout(t);
+  }, [!!editingFood]);
 
   const fetchSummary = async (date) => {
     setLoading(true);
@@ -102,29 +128,93 @@ export default function DiaryScreen() {
     }
   };
 
-  const openEdit = (meal, food) => {
+  // Opens the edit popup. If the entry remembers its food, load that food so the
+  // calories can be recalculated from it instead of from the logged entry.
+  const openEdit = async (meal, food) => {
+    const reqId = ++sourceReq.current;
     setEditingFood({ mealId: meal._id, foodId: food._id, food });
     setEditQuantity(food.quantity?.toString() || '100');
+    setEditUnit(food.unit || 'g');
+    setEditUnitGrams('');
+    setSourceFood(null);
+    if (!food.foodId) {
+      setSourceLoading(false);
+      return;
+    }
+    setSourceLoading(true);
+    try {
+      const res = await api.get(`/food/${food.foodId}`);
+      if (reqId !== sourceReq.current) return;
+      setSourceFood(res.data);
+    } catch (err) {
+      if (reqId !== sourceReq.current) return;
+      setSourceFood(null);
+    } finally {
+      if (reqId === sourceReq.current) setSourceLoading(false);
+    }
+  };
+
+  const closeEdit = () => {
+    sourceReq.current++;
+    setEditingFood(null);
+    setSourceFood(null);
+    setSourceLoading(false);
+  };
+
+  // How many servings of the base the edited amount equals.
+  // With the source food, the base is its serving size and unit.
+  // Without it, the base is the logged entry and the unit stays the same.
+  // Returns null while a needed equivalent (grams or pieces) is still empty.
+  const getEditRatio = () => {
+    if (!editingFood) return 0;
+    const qty = parseFloat(editQuantity) || 0;
+
+    if (!sourceFood) {
+      const originalQty = parseFloat(editingFood.food.quantity) || 100;
+      return qty / originalQty;
+    }
+
+    const foodSize = parseFloat(sourceFood.servingSize) || 1;
+    const foodUnit = sourceFood.servingUnit || 'serving';
+
+    if (editUnit === foodUnit) return qty / foodSize;
+
+    const logGrams = gramsOf(editUnit, qty);
+    const foodGrams = gramsOf(foodUnit, foodSize);
+
+    if (logGrams !== null && foodGrams !== null) return logGrams / foodGrams;
+    if (isWhole(editUnit)) return qty;
+
+    if (editUnit === 'pc') {
+      if (foodGrams !== null) return qty;
+      const e = parseFloat(editUnitGrams);
+      return e > 0 ? qty / e : null;
+    }
+
+    const g = parseFloat(editUnitGrams);
+    return g > 0 ? logGrams / g : null;
   };
 
   const saveEdit = async () => {
-    if (!editingFood) return;
+    if (!editingFood || sourceLoading) return;
+    const ratio = getEditRatio();
+    if (ratio === null) return;
     setSaving(true);
     try {
       const qty = parseFloat(editQuantity) || 100;
-      const originalQty = editingFood.food.quantity || 100;
-      const ratio = qty / originalQty;
+      const base = sourceFood || editingFood.food;
       await api.put(`/meals/${editingFood.mealId}/food/${editingFood.foodId}`, {
         quantity: qty,
-        calories: Math.round(editingFood.food.calories * ratio),
-        protein: Math.round(editingFood.food.protein * ratio),
-        carbs: Math.round(editingFood.food.carbs * ratio),
-        fat: Math.round(editingFood.food.fat * ratio),
-        fiber: Math.round((editingFood.food.fiber || 0) * ratio),
-        sodium: Math.round((editingFood.food.sodium || 0) * ratio),
-        sugar: Math.round((editingFood.food.sugar || 0) * ratio)
+        unit: editUnit,
+        calories: Math.round((base.calories || 0) * ratio),
+        protein: Math.round((base.protein || 0) * ratio),
+        carbs: Math.round((base.carbs || 0) * ratio),
+        fat: Math.round((base.fat || 0) * ratio),
+        fiber: Math.round((base.fiber || 0) * ratio),
+        sodium: Math.round((base.sodium || 0) * ratio),
+        sugar: Math.round((base.sugar || 0) * ratio)
       });
-      setEditingFood(null);
+      closeEdit();
       fetchSummary(selectedDate);
     } catch (err) {
       console.error(err);
@@ -174,6 +264,21 @@ export default function DiaryScreen() {
 
   const isEmpty = !summary?.meals || summary.meals.every(m => m.foods.length === 0);
   const calCells = buildCalendarCells(calMonth.getFullYear(), calMonth.getMonth());
+
+  const editRatio = editingFood ? getEditRatio() : 0;
+  const editBase = sourceFood || (editingFood ? editingFood.food : null);
+  const editCalories = editingFood && editRatio !== null && !sourceLoading
+    ? Math.round((editBase.calories || 0) * editRatio)
+    : null;
+  const srcSizeLabel = sourceFood ? (parseFloat(sourceFood.servingSize) || 1) : 1;
+  const srcUnitLabel = sourceFood ? (sourceFood.servingUnit || 'serving') : 'serving';
+  const srcGramsOK = UNIT_TO_GRAMS[srcUnitLabel] !== undefined;
+
+  // When the app can't convert, ask for the equivalent: grams, or pieces per serving.
+  let editEquivUnit = null;
+  if (sourceFood && editUnit !== srcUnitLabel && !isWhole(editUnit) && !srcGramsOK) {
+    editEquivUnit = editUnit === 'pc' ? 'pc' : 'g';
+  }
 
   if (loading) return (
     <View style={styles.center}>
@@ -290,35 +395,71 @@ export default function DiaryScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{editingFood.food.name}</Text>
-            <Text style={styles.modalSub}>Edit quantity</Text>
+            <Text style={styles.modalSub}>Edit amount</Text>
             <View style={styles.quantityRow}>
               <TextInput
+                ref={qtyRef}
                 style={styles.quantityInput}
                 keyboardType="numeric"
                 value={editQuantity}
                 onChangeText={setEditQuantity}
-                autoFocus
+                selectTextOnFocus
               />
-              <Text style={styles.quantityUnit}>{editingFood.food.unit || 'g'}</Text>
             </View>
+
+            {sourceFood ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll} contentContainerStyle={styles.unitScrollContent}>
+                {UNITS.map(u => (
+                  <TouchableOpacity
+                    key={u}
+                    style={[styles.unitBtn, editUnit === u && styles.unitBtnActive]}
+                    onPress={() => { setEditUnit(u); setEditUnitGrams(''); }}
+                  >
+                    <Text style={[styles.unitBtnText, editUnit === u && styles.unitBtnTextActive]}>{u}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <Text style={styles.unitFixed}>{editUnit}</Text>
+            )}
+
+            {editEquivUnit && (
+              <View style={styles.gramEquivRow}>
+                <Text style={styles.gramEquivLabel}>{srcSizeLabel} {srcUnitLabel} =</Text>
+                <TextInput
+                  style={styles.gramEquivInput}
+                  keyboardType="numeric"
+                  value={editUnitGrams}
+                  onChangeText={setEditUnitGrams}
+                  placeholder={editEquivUnit === 'pc' ? 'pieces' : 'grams'}
+                  placeholderTextColor="#999"
+                />
+                <Text style={styles.gramEquivLabel}>{editEquivUnit}</Text>
+              </View>
+            )}
+
             <Text style={styles.caloriePreview}>
-              {Math.round(editingFood.food.calories * (parseFloat(editQuantity) || 100) / (editingFood.food.quantity || 100))} kcal
+              {sourceLoading ? '...' : (editCalories === null ? 'Enter the amount above' : `${editCalories} kcal`)}
             </Text>
-            <View style={styles.quickBtns}>
-              {['50', '100', '150', '200'].map(q => (
-                <TouchableOpacity
-                  key={q}
-                  style={[styles.quickBtn, editQuantity === q && styles.quickBtnActive]}
-                  onPress={() => setEditQuantity(q)}
-                >
-                  <Text style={[styles.quickBtnText, editQuantity === q && styles.quickBtnTextActive]}>{q}g</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity style={styles.saveBtn} onPress={saveEdit} disabled={saving}>
+
+            {editUnit === 'g' && (
+              <View style={styles.quickBtns}>
+                {['50', '100', '150', '200'].map(q => (
+                  <TouchableOpacity
+                    key={q}
+                    style={[styles.quickBtn, editQuantity === q && styles.quickBtnActive]}
+                    onPress={() => setEditQuantity(q)}
+                  >
+                    <Text style={[styles.quickBtnText, editQuantity === q && styles.quickBtnTextActive]}>{q}g</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.saveBtn} onPress={saveEdit} disabled={saving || sourceLoading || editRatio === null}>
               {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingFood(null)}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={closeEdit}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -392,8 +533,6 @@ const styles = StyleSheet.create({
   copyBtn: { borderWidth: 1.5, borderColor: '#F77E2D', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
   myFoodsBtn: { backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
   myFoodsBtnText: { color: '#1A1A1A', fontWeight: '700', fontSize: 14 },
-  myFoodsBtn: { backgroundColor: '#D9D3C8', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 24 },
-  myFoodsBtnText: { color: '#1A1A1A', fontWeight: '700', fontSize: 14 },
   copyBtnText: { color: '#F77E2D', fontWeight: '700', fontSize: 14 },
   mealSection: { marginBottom: 24 },
   mealHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
@@ -412,9 +551,18 @@ const styles = StyleSheet.create({
   modalCard: { backgroundColor: '#EDE8DF', borderRadius: 20, padding: 24, width: '100%' },
   modalTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 4, textAlign: 'center' },
   modalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 20 },
-  quantityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingHorizontal: 16, marginBottom: 8 },
+  quantityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingHorizontal: 16, marginBottom: 12 },
   quantityInput: { flex: 1, fontSize: 32, fontWeight: '900', color: '#1A1A1A', padding: 14, textAlign: 'center' },
-  quantityUnit: { fontSize: 16, color: '#888', fontWeight: '600' },
+  unitScroll: { marginBottom: 12 },
+  unitScrollContent: { gap: 8, paddingHorizontal: 4 },
+  unitBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 99, backgroundColor: '#D9D3C8' },
+  unitBtnActive: { backgroundColor: '#F77E2D' },
+  unitBtnText: { fontSize: 13, color: '#888', fontWeight: '600' },
+  unitBtnTextActive: { color: '#fff' },
+  unitFixed: { fontSize: 14, color: '#888', fontWeight: '600', textAlign: 'center', marginBottom: 12 },
+  gramEquivRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, backgroundColor: '#D9D3C8', borderRadius: 12, padding: 12 },
+  gramEquivLabel: { fontSize: 14, color: '#888', fontWeight: '600' },
+  gramEquivInput: { flex: 1, fontSize: 18, fontWeight: '700', color: '#1A1A1A', textAlign: 'center', backgroundColor: '#EDE8DF', borderRadius: 8, padding: 8 },
   caloriePreview: { fontSize: 14, color: '#F77E2D', fontWeight: '700', textAlign: 'center', marginBottom: 16 },
   quickBtns: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   quickBtn: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 10, padding: 10, alignItems: 'center' },
