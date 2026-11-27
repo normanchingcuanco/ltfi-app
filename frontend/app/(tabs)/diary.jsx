@@ -26,6 +26,7 @@ const formatDate = (date) => {
 };
 const displayDate = (date) => date.toDateString();
 const isToday = (date) => formatDate(date) === formatDate(new Date());
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -46,18 +47,24 @@ export default function DiaryScreen() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editingFood, setEditingFood] = useState(null);
+  const [mode, setMode] = useState('edit'); // 'edit' or 'copy'
   const [editQuantity, setEditQuantity] = useState('');
   const [editUnit, setEditUnit] = useState('g');
-  const [editUnitGrams, setEditUnitGrams] = useState('');
+  const [copyDate, setCopyDate] = useState(new Date());
+  const [copyMeal, setCopyMeal] = useState('breakfast');
   const [sourceFood, setSourceFood] = useState(null);
   const [sourceLoading, setSourceLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [toast, setToast] = useState('');
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calTarget, setCalTarget] = useState('view'); // 'view' or 'copy'
   const [calMonth, setCalMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const router = useRouter();
   const qtyRef = useRef(null);
+  const scrollRef = useRef(null);
   const sourceReq = useRef(0);
+  const savingRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,12 +72,17 @@ export default function DiaryScreen() {
     }, [selectedDate])
   );
 
-  // Focus the amount box a moment after the edit popup opens so the number is selected.
+  // Focus the amount box a moment after the popup opens so the number is selected.
   useEffect(() => {
     if (!editingFood) return;
     const t = setTimeout(() => qtyRef.current?.focus(), 300);
     return () => clearTimeout(t);
   }, [!!editingFood]);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  };
 
   const fetchSummary = async (date) => {
     setLoading(true);
@@ -99,13 +111,19 @@ export default function DiaryScreen() {
   };
 
   const goToToday = () => {
-    setSelectedDate(new Date());
-    setSummary(null);
+    if (calTarget === 'copy') {
+      setCopyDate(new Date());
+    } else {
+      setSelectedDate(new Date());
+      setSummary(null);
+    }
     setCalendarOpen(false);
   };
 
-  const openCalendar = () => {
-    setCalMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+  const openCalendar = (target = 'view') => {
+    const base = target === 'copy' ? copyDate : selectedDate;
+    setCalTarget(target);
+    setCalMonth(new Date(base.getFullYear(), base.getMonth(), 1));
     setCalendarOpen(true);
   };
 
@@ -114,9 +132,20 @@ export default function DiaryScreen() {
   };
 
   const pickDay = (day) => {
-    setSelectedDate(new Date(calMonth.getFullYear(), calMonth.getMonth(), day));
-    setSummary(null);
+    const picked = new Date(calMonth.getFullYear(), calMonth.getMonth(), day);
+    if (calTarget === 'copy') {
+      setCopyDate(picked);
+    } else {
+      setSelectedDate(picked);
+      setSummary(null);
+    }
     setCalendarOpen(false);
+  };
+
+  const shiftCopyDate = (delta) => {
+    const d = new Date(copyDate);
+    d.setDate(d.getDate() + delta);
+    setCopyDate(d);
   };
 
   const deleteFood = async (mealId, foodId) => {
@@ -128,14 +157,17 @@ export default function DiaryScreen() {
     }
   };
 
-  // Opens the edit popup. If the entry remembers its food, load that food so the
-  // calories can be recalculated from it instead of from the logged entry.
-  const openEdit = async (meal, food) => {
+  // Opens the popup in edit or copy mode. If the entry remembers its food, load that
+  // food so the calories can be recalculated from it instead of from the logged entry.
+  const openEdit = async (meal, food, openMode = 'edit') => {
     const reqId = ++sourceReq.current;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    setMode(openMode);
+    setCopyDate(new Date(selectedDate));
+    setCopyMeal(meal.mealType);
     setEditingFood({ mealId: meal._id, foodId: food._id, food });
     setEditQuantity(food.quantity?.toString() || '100');
     setEditUnit(food.unit || 'g');
-    setEditUnitGrams('');
     setSourceFood(null);
     if (!food.foodId) {
       setSourceLoading(false);
@@ -161,10 +193,10 @@ export default function DiaryScreen() {
     setSourceLoading(false);
   };
 
-  // How many servings of the base the edited amount equals.
+  // How many servings of the base the amount equals.
   // With the source food, the base is its serving size and unit.
   // Without it, the base is the logged entry and the unit stays the same.
-  // Returns null while a needed equivalent (grams or pieces) is still empty.
+  // Returns null when the app cannot convert the chosen unit.
   const getEditRatio = () => {
     if (!editingFood) return 0;
     const qty = parseFloat(editQuantity) || 0;
@@ -184,28 +216,20 @@ export default function DiaryScreen() {
 
     if (logGrams !== null && foodGrams !== null) return logGrams / foodGrams;
     if (isWhole(editUnit)) return qty;
-
-    if (editUnit === 'pc') {
-      if (foodGrams !== null) return qty;
-      const e = parseFloat(editUnitGrams);
-      return e > 0 ? qty / e : null;
-    }
-
-    const g = parseFloat(editUnitGrams);
-    return g > 0 ? logGrams / g : null;
+    if (editUnit === 'pc' && foodGrams !== null) return qty;
+    return null;
   };
 
   const saveEdit = async () => {
-    if (!editingFood || sourceLoading) return;
+    if (!editingFood || sourceLoading || savingRef.current) return;
     const ratio = getEditRatio();
     if (ratio === null) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const qty = parseFloat(editQuantity) || 100;
       const base = sourceFood || editingFood.food;
-      await api.put(`/meals/${editingFood.mealId}/food/${editingFood.foodId}`, {
-        quantity: qty,
-        unit: editUnit,
+      const macros = {
         calories: Math.round((base.calories || 0) * ratio),
         protein: Math.round((base.protein || 0) * ratio),
         carbs: Math.round((base.carbs || 0) * ratio),
@@ -213,12 +237,38 @@ export default function DiaryScreen() {
         fiber: Math.round((base.fiber || 0) * ratio),
         sodium: Math.round((base.sodium || 0) * ratio),
         sugar: Math.round((base.sugar || 0) * ratio)
-      });
-      closeEdit();
-      fetchSummary(selectedDate);
+      };
+
+      if (mode === 'copy') {
+        await api.post('/meals', {
+          date: formatDate(copyDate),
+          mealType: copyMeal,
+          food: {
+            foodId: editingFood.food.foodId,
+            name: editingFood.food.name,
+            quantity: qty,
+            unit: editUnit,
+            ...macros
+          }
+        });
+        const when = isToday(copyDate) ? 'Today' : displayDate(copyDate);
+        const sameDay = formatDate(copyDate) === formatDate(selectedDate);
+        closeEdit();
+        showToast(`Copied to ${when}, ${cap(copyMeal)}`);
+        if (sameDay) fetchSummary(selectedDate);
+      } else {
+        await api.put(`/meals/${editingFood.mealId}/food/${editingFood.foodId}`, {
+          quantity: qty,
+          unit: editUnit,
+          ...macros
+        });
+        closeEdit();
+        fetchSummary(selectedDate);
+      }
     } catch (err) {
       console.error(err);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -264,6 +314,7 @@ export default function DiaryScreen() {
 
   const isEmpty = !summary?.meals || summary.meals.every(m => m.foods.length === 0);
   const calCells = buildCalendarCells(calMonth.getFullYear(), calMonth.getMonth());
+  const calSelected = calTarget === 'copy' ? copyDate : selectedDate;
 
   const editRatio = editingFood ? getEditRatio() : 0;
   const editBase = sourceFood || (editingFood ? editingFood.food : null);
@@ -272,13 +323,11 @@ export default function DiaryScreen() {
     : null;
   const srcSizeLabel = sourceFood ? (parseFloat(sourceFood.servingSize) || 1) : 1;
   const srcUnitLabel = sourceFood ? (sourceFood.servingUnit || 'serving') : 'serving';
-  const srcGramsOK = UNIT_TO_GRAMS[srcUnitLabel] !== undefined;
-
-  // When the app can't convert, ask for the equivalent: grams, or pieces per serving.
-  let editEquivUnit = null;
-  if (sourceFood && editUnit !== srcUnitLabel && !isWhole(editUnit) && !srcGramsOK) {
-    editEquivUnit = editUnit === 'pc' ? 'pc' : 'g';
-  }
+  const weightFood = UNIT_TO_GRAMS[srcUnitLabel] !== undefined;
+  const availableUnits = weightFood
+    ? UNITS
+    : ['serving', 'pack', ...(srcUnitLabel === 'pc' ? ['pc'] : [])];
+  const saveDisabled = saving || sourceLoading || editRatio === null;
 
   if (loading) return (
     <View style={styles.center}>
@@ -287,14 +336,20 @@ export default function DiaryScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Food Diary</Text>
+
+      {toast !== '' && (
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      )}
 
       <View style={styles.dateNav}>
         <TouchableOpacity style={styles.navBtn} onPress={goToPrevDay}>
           <Text style={styles.navBtnText}>‹</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={openCalendar}>
+        <TouchableOpacity onPress={() => openCalendar('view')}>
           <Text style={styles.dateText}>
             {isToday(selectedDate) ? 'Today' : displayDate(selectedDate)}
           </Text>
@@ -353,15 +408,15 @@ export default function DiaryScreen() {
       )}
 
       <TouchableOpacity style={styles.myFoodsBtn} onPress={() => router.push({ pathname: '/add-food', params: { mealType: 'breakfast', date: formatDate(selectedDate), defaultTab: 'myfoods' } })}>
-          <Text style={styles.myFoodsBtnText}>📋 My Foods</Text>
-        </TouchableOpacity>
+        <Text style={styles.myFoodsBtnText}>📋 My Foods</Text>
+      </TouchableOpacity>
 
-        {MEAL_TYPES.map(mealType => {
+      {MEAL_TYPES.map(mealType => {
         const meal = summary?.meals?.find(m => m.mealType === mealType);
         return (
           <View key={mealType} style={styles.mealSection}>
             <View style={styles.mealHeader}>
-              <Text style={styles.mealTitle}>{mealType.charAt(0).toUpperCase() + mealType.slice(1)}</Text>
+              <Text style={styles.mealTitle}>{cap(mealType)}</Text>
               <TouchableOpacity
                 style={styles.addBtn}
                 onPress={() => router.push({ pathname: '/add-food', params: { mealType, date: formatDate(selectedDate) } })}
@@ -371,14 +426,17 @@ export default function DiaryScreen() {
             </View>
             {meal?.foods?.length > 0 ? (
               meal.foods.map((food, idx) => (
-                <TouchableOpacity key={idx} style={styles.foodItem} onPress={() => openEdit(meal, food)}>
+                <TouchableOpacity key={idx} style={styles.foodItem} onPress={() => openEdit(meal, food, 'edit')}>
                   <View style={styles.foodInfo}>
-                    <View>
+                    <View style={styles.foodNameWrap}>
                       <Text style={styles.foodName}>{food.name}</Text>
                       <Text style={styles.foodQty}>{food.quantity || 100}{food.unit || 'g'}</Text>
                     </View>
                     <Text style={styles.foodCals}>{food.calories} kcal</Text>
                   </View>
+                  <TouchableOpacity style={styles.copyItemBtn} onPress={() => openEdit(meal, food, 'copy')}>
+                    <Text style={styles.copyItemBtnText}>Copy</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteFood(meal._id, food._id)}>
                     <Text style={styles.deleteBtnText}>✕</Text>
                   </TouchableOpacity>
@@ -395,7 +453,36 @@ export default function DiaryScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{editingFood.food.name}</Text>
-            <Text style={styles.modalSub}>Edit amount</Text>
+            <Text style={styles.modalSub}>{mode === 'copy' ? 'Copy to' : 'Edit amount'}</Text>
+
+            {mode === 'copy' && (
+              <>
+                <View style={styles.copyDateRow}>
+                  <TouchableOpacity style={styles.navBtn} onPress={() => shiftCopyDate(-1)}>
+                    <Text style={styles.navBtnText}>‹</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => openCalendar('copy')}>
+                    <Text style={styles.dateText}>{isToday(copyDate) ? 'Today' : displayDate(copyDate)}</Text>
+                    <Text style={styles.goToToday}>Tap to pick a date</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.navBtn} onPress={() => shiftCopyDate(1)}>
+                    <Text style={styles.navBtnText}>›</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.mealChips}>
+                  {MEAL_TYPES.map(m => (
+                    <TouchableOpacity
+                      key={m}
+                      style={[styles.unitBtn, copyMeal === m && styles.unitBtnActive]}
+                      onPress={() => setCopyMeal(m)}
+                    >
+                      <Text style={[styles.unitBtnText, copyMeal === m && styles.unitBtnTextActive]}>{cap(m)}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+
             <View style={styles.quantityRow}>
               <TextInput
                 ref={qtyRef}
@@ -408,38 +495,28 @@ export default function DiaryScreen() {
             </View>
 
             {sourceFood ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll} contentContainerStyle={styles.unitScrollContent}>
-                {UNITS.map(u => (
-                  <TouchableOpacity
-                    key={u}
-                    style={[styles.unitBtn, editUnit === u && styles.unitBtnActive]}
-                    onPress={() => { setEditUnit(u); setEditUnitGrams(''); }}
-                  >
-                    <Text style={[styles.unitBtnText, editUnit === u && styles.unitBtnTextActive]}>{u}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              <>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll} contentContainerStyle={styles.unitScrollContent} keyboardShouldPersistTaps="handled">
+                  {availableUnits.map(u => (
+                    <TouchableOpacity
+                      key={u}
+                      style={[styles.unitBtn, editUnit === u && styles.unitBtnActive]}
+                      onPress={() => setEditUnit(u)}
+                    >
+                      <Text style={[styles.unitBtnText, editUnit === u && styles.unitBtnTextActive]}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                {!weightFood && (
+                  <Text style={styles.hint}>This food is saved per {srcSizeLabel} {srcUnitLabel}.</Text>
+                )}
+              </>
             ) : (
               <Text style={styles.unitFixed}>{editUnit}</Text>
             )}
 
-            {editEquivUnit && (
-              <View style={styles.gramEquivRow}>
-                <Text style={styles.gramEquivLabel}>{srcSizeLabel} {srcUnitLabel} =</Text>
-                <TextInput
-                  style={styles.gramEquivInput}
-                  keyboardType="numeric"
-                  value={editUnitGrams}
-                  onChangeText={setEditUnitGrams}
-                  placeholder={editEquivUnit === 'pc' ? 'pieces' : 'grams'}
-                  placeholderTextColor="#999"
-                />
-                <Text style={styles.gramEquivLabel}>{editEquivUnit}</Text>
-              </View>
-            )}
-
             <Text style={styles.caloriePreview}>
-              {sourceLoading ? '...' : (editCalories === null ? 'Enter the amount above' : `${editCalories} kcal`)}
+              {sourceLoading ? '...' : (editCalories === null ? 'Pick a different unit' : `${editCalories} kcal`)}
             </Text>
 
             {editUnit === 'g' && (
@@ -456,8 +533,10 @@ export default function DiaryScreen() {
               </View>
             )}
 
-            <TouchableOpacity style={styles.saveBtn} onPress={saveEdit} disabled={saving || sourceLoading || editRatio === null}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+            <TouchableOpacity style={[styles.saveBtn, saveDisabled && styles.saveBtnDisabled]} onPress={saveEdit} disabled={saveDisabled}>
+              {saving
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.saveBtnText}>{mode === 'copy' ? `Add to ${cap(copyMeal)}` : 'Save Changes'}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.cancelBtn} onPress={closeEdit}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -487,7 +566,7 @@ export default function DiaryScreen() {
               {calCells.map((day, i) => {
                 if (!day) return <View key={i} style={styles.calCell} />;
                 const cellDate = new Date(calMonth.getFullYear(), calMonth.getMonth(), day);
-                const isSelected = formatDate(cellDate) === formatDate(selectedDate);
+                const isSelected = formatDate(cellDate) === formatDate(calSelected);
                 const isTodayCell = isToday(cellDate);
                 return (
                   <TouchableOpacity key={i} style={styles.calCell} onPress={() => pickDay(day)}>
@@ -518,6 +597,8 @@ const styles = StyleSheet.create({
   content: { padding: 24, paddingTop: 60 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#EDE8DF' },
   title: { fontSize: 28, fontWeight: '900', color: '#1A1A1A', marginBottom: 16 },
+  toast: { backgroundColor: '#1A1A1A', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 12 },
+  toastText: { color: '#fff', fontSize: 13, fontWeight: '600', textAlign: 'center' },
   dateNav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   navBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 20 },
   navBtnText: { fontSize: 24, color: '#1A1A1A', fontWeight: '700' },
@@ -541,16 +622,21 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   foodItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 10, padding: 12, marginBottom: 6 },
   foodInfo: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  foodNameWrap: { flex: 1, paddingRight: 8 },
   foodName: { fontSize: 14, color: '#1A1A1A', fontWeight: '500' },
   foodQty: { fontSize: 11, color: '#888', marginTop: 2 },
   foodCals: { fontSize: 14, color: '#F77E2D', fontWeight: '700' },
-  deleteBtn: { marginLeft: 12, width: 28, height: 28, borderRadius: 14, backgroundColor: '#C5BFB4', justifyContent: 'center', alignItems: 'center' },
+  copyItemBtn: { marginLeft: 10, height: 28, paddingHorizontal: 10, borderRadius: 14, backgroundColor: '#C5BFB4', justifyContent: 'center', alignItems: 'center' },
+  copyItemBtnText: { color: '#555', fontSize: 11, fontWeight: '700' },
+  deleteBtn: { marginLeft: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: '#C5BFB4', justifyContent: 'center', alignItems: 'center' },
   deleteBtnText: { color: '#888', fontSize: 12, fontWeight: '700' },
   emptyText: { fontSize: 13, color: '#bbb', fontStyle: 'italic' },
-  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start', alignItems: 'center', padding: 24, paddingTop: 70 },
   modalCard: { backgroundColor: '#EDE8DF', borderRadius: 20, padding: 24, width: '100%' },
   modalTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 4, textAlign: 'center' },
   modalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 20 },
+  copyDateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  mealChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 16 },
   quantityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingHorizontal: 16, marginBottom: 12 },
   quantityInput: { flex: 1, fontSize: 32, fontWeight: '900', color: '#1A1A1A', padding: 14, textAlign: 'center' },
   unitScroll: { marginBottom: 12 },
@@ -560,9 +646,7 @@ const styles = StyleSheet.create({
   unitBtnText: { fontSize: 13, color: '#888', fontWeight: '600' },
   unitBtnTextActive: { color: '#fff' },
   unitFixed: { fontSize: 14, color: '#888', fontWeight: '600', textAlign: 'center', marginBottom: 12 },
-  gramEquivRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, backgroundColor: '#D9D3C8', borderRadius: 12, padding: 12 },
-  gramEquivLabel: { fontSize: 14, color: '#888', fontWeight: '600' },
-  gramEquivInput: { flex: 1, fontSize: 18, fontWeight: '700', color: '#1A1A1A', textAlign: 'center', backgroundColor: '#EDE8DF', borderRadius: 8, padding: 8 },
+  hint: { fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 12 },
   caloriePreview: { fontSize: 14, color: '#F77E2D', fontWeight: '700', textAlign: 'center', marginBottom: 16 },
   quickBtns: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   quickBtn: { flex: 1, backgroundColor: '#D9D3C8', borderRadius: 10, padding: 10, alignItems: 'center' },
@@ -570,6 +654,7 @@ const styles = StyleSheet.create({
   quickBtnText: { fontSize: 13, color: '#888', fontWeight: '600' },
   quickBtnTextActive: { color: '#fff' },
   saveBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 8 },
+  saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   cancelBtn: { padding: 12, alignItems: 'center' },
   cancelBtnText: { color: '#888', fontSize: 14 },
