@@ -49,7 +49,6 @@ export default function AddFoodScreen() {
   const [selectedFood, setSelectedFood] = useState(null);
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState('serving');
-  const [unitGrams, setUnitGrams] = useState('');
   const [showQuantityPicker, setShowQuantityPicker] = useState(false);
 
   const typeaheadReq = useRef(0);
@@ -177,13 +176,12 @@ export default function AddFoodScreen() {
     setSelectedFood(food);
     setUnit(food.servingUnit || 'serving');
     setQuantity(food.servingSize ? String(food.servingSize) : '1');
-    setUnitGrams('');
     setShowMealMenu(false);
     setShowQuantityPicker(true);
   };
 
   // How many of the food's servings the logged amount equals.
-  // Returns null while a needed equivalent (grams or pieces) is still empty.
+  // Returns null when the app cannot convert the chosen unit.
   const getRatio = () => {
     if (!selectedFood) return 0;
     const qty = parseFloat(quantity) || 0;
@@ -197,15 +195,9 @@ export default function AddFoodScreen() {
 
     if (logGrams !== null && foodGrams !== null) return logGrams / foodGrams;
     if (isWhole(unit)) return qty;
+    if (unit === 'pc' && foodGrams !== null) return qty;
 
-    if (unit === 'pc') {
-      if (foodGrams !== null) return qty;
-      const e = parseFloat(unitGrams);
-      return e > 0 ? qty / e : null;
-    }
-
-    const g = parseFloat(unitGrams);
-    return g > 0 ? logGrams / g : null;
+    return null;
   };
 
   // An AI Scan food is not saved yet. Save it to My Foods once, or reuse an
@@ -301,15 +293,13 @@ export default function AddFoodScreen() {
 
   const ratio = selectedFood ? getRatio() : 0;
   const calculatedCalories = selectedFood && ratio !== null ? Math.round(selectedFood.calories * ratio) : null;
-  const foodSizeLabel = selectedFood ? (parseFloat(selectedFood.servingSize) || 1) : 1;
   const foodUnitLabel = selectedFood ? (selectedFood.servingUnit || 'serving') : 'serving';
-  const foodGramsOK = UNIT_TO_GRAMS[foodUnitLabel] !== undefined;
+  const weightFood = UNIT_TO_GRAMS[foodUnitLabel] !== undefined;
 
-  // When the app can't convert, ask for the equivalent: grams, or pieces per serving/pack.
-  let equivUnit = null;
-  if (selectedFood && unit !== foodUnitLabel && !isWhole(unit) && !foodGramsOK) {
-    equivUnit = unit === 'pc' ? 'pc' : 'g';
-  }
+  // Foods saved per serving, pack or pc can only be logged in units the app can convert.
+  const availableUnits = weightFood
+    ? UNITS
+    : ['serving', 'pack', ...(foodUnitLabel === 'pc' ? ['pc'] : [])];
 
   const renderFoodItem = (food, idx, showActions = false) => (
     <View key={idx} style={[styles.resultItem, (food.source === 'custom' || food.source === 'open_food_facts' || food.createdBy) && styles.resultItemCustom]}>
@@ -484,38 +474,28 @@ export default function AddFoodScreen() {
                 onChangeText={setQuantity}
                 selectTextOnFocus
               />
-              <Text style={styles.quantityUnit}>{unit}</Text>
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll} contentContainerStyle={styles.unitScrollContent}>
-              {UNITS.map(u => (
+              {availableUnits.map(u => (
                 <TouchableOpacity
                   key={u}
                   style={[styles.unitBtn, unit === u && styles.unitBtnActive]}
-                  onPress={() => { setUnit(u); setUnitGrams(''); }}
+                  onPress={() => setUnit(u)}
                 >
                   <Text style={[styles.unitBtnText, unit === u && styles.unitBtnTextActive]}>{u}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
-            {equivUnit && (
-              <View style={styles.gramEquivRow}>
-                <Text style={styles.gramEquivLabel}>{foodSizeLabel} {foodUnitLabel} =</Text>
-                <TextInput
-                  style={styles.gramEquivInput}
-                  keyboardType="numeric"
-                  value={unitGrams}
-                  onChangeText={setUnitGrams}
-                  placeholder={equivUnit === 'pc' ? 'pieces' : 'grams'}
-                  placeholderTextColor="#999"
-                />
-                <Text style={styles.gramEquivLabel}>{equivUnit}</Text>
-              </View>
+            {!weightFood && (
+              <Text style={styles.hintText}>
+                This food is saved per {foodUnitLabel}. To log it in grams, edit the food and set its gram size.
+              </Text>
             )}
 
             <Text style={styles.caloriePreview}>
-              {calculatedCalories === null ? 'Enter the amount above' : `${calculatedCalories} kcal`}
+              {calculatedCalories === null ? 'Pick a different unit' : `${calculatedCalories} kcal`}
             </Text>
 
             <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd} disabled={adding || ratio === null}>
@@ -585,18 +565,14 @@ const styles = StyleSheet.create({
   modalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 20 },
   quantityRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D9D3C8', borderRadius: 12, paddingHorizontal: 16, marginBottom: 12 },
   quantityInput: { flex: 1, fontSize: 32, fontWeight: '900', color: '#1A1A1A', padding: 14, textAlign: 'center' },
-  quantityUnit: { fontSize: 16, color: '#888', fontWeight: '600' },
   unitScroll: { marginBottom: 12 },
   unitScrollContent: { gap: 8, paddingHorizontal: 4 },
   unitBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 99, backgroundColor: '#D9D3C8' },
   unitBtnActive: { backgroundColor: '#F77E2D' },
   unitBtnText: { fontSize: 13, color: '#888', fontWeight: '600' },
   unitBtnTextActive: { color: '#fff' },
-  gramEquivRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, backgroundColor: '#D9D3C8', borderRadius: 12, padding: 12 },
-  gramEquivLabel: { fontSize: 14, color: '#888', fontWeight: '600' },
-  gramEquivInput: { flex: 1, fontSize: 18, fontWeight: '700', color: '#1A1A1A', textAlign: 'center', backgroundColor: '#EDE8DF', borderRadius: 8, padding: 8 },
+  hintText: { fontSize: 12, color: '#888', textAlign: 'center', marginBottom: 12 },
   caloriePreview: { fontSize: 14, color: '#F77E2D', fontWeight: '700', textAlign: 'center', marginBottom: 16 },
-  gramsHint: { fontSize: 12, color: '#aaa' },
   confirmBtn: { backgroundColor: '#F77E2D', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 8 },
   confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   cancelBtn: { padding: 12, alignItems: 'center' },
