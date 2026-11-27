@@ -47,8 +47,9 @@ const updateFoodInMeal = async (req, res) => {
     if (!meal) return res.status(404).json({ message: 'Meal not found' });
     const food = meal.foods.id(foodId);
     if (!food) return res.status(404).json({ message: 'Food not found' });
-    const { quantity, calories, protein, carbs, fat, fiber, sodium, sugar } = req.body;
+    const { quantity, unit, calories, protein, carbs, fat, fiber, sodium, sugar } = req.body;
     if (quantity !== undefined) food.quantity = quantity;
+    if (unit !== undefined) food.unit = unit;
     if (calories !== undefined) food.calories = calories;
     if (protein !== undefined) food.protein = protein;
     if (carbs !== undefined) food.carbs = carbs;
