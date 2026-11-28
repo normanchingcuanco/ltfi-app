@@ -71,7 +71,9 @@ export default function EditWorkoutScreen() {
         const secs = w.intervals[0]?.workSeconds || 0;
         setSimpleDurationMins(Math.floor(secs / 60).toString());
         setSimpleDurationSecs((secs % 60).toString().padStart(2, '0'));
-        setSimpleExercise(w.intervals[0]?.name || '');
+        // An interval name equal to the workout name was auto-filled on save, so leave the box blank
+        const savedName = w.intervals[0]?.name || '';
+        setSimpleExercise(savedName && savedName !== w.name ? savedName : '');
         setSimpleMet(w.intervals[0]?.met || 5.0);
       } else {
         setIntervals(w.intervals.map(i => ({
